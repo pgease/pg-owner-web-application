@@ -55,19 +55,19 @@ const Dashboard = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Page header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-sm text-muted-foreground">
             Welcome back, Rajesh. Here's your PG overview.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" className="gap-2">
-            <FileSpreadsheet className="h-4 w-4" /> Import Excel
+            <FileSpreadsheet className="h-4 w-4" /> <span className="hidden sm:inline">Import</span> Excel
           </Button>
           <Button size="sm" variant="outline" className="gap-2">
-            <Send className="h-4 w-4" /> Send Invite
+            <Send className="h-4 w-4" /> <span className="hidden sm:inline">Send</span> Invite
           </Button>
           <Button size="sm" className="gap-2">
             <UserPlus className="h-4 w-4" /> Add Tenant
@@ -76,7 +76,7 @@ const Dashboard = () => {
       </div>
 
       {/* Stats grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {stats.map((stat) => (
           <Card key={stat.label} className="relative overflow-hidden">
             <CardContent className="p-4">
