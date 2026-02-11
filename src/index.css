@@ -52,6 +52,9 @@
     --sidebar-ring: 180 100% 40%;
     --sidebar-muted: 180 10% 40%;
 
+    --primary-soft: 180 50% 12%;
+    --primary-glow: 180 100% 35%;
+
     --chart-1: 180 100% 25%;
     --chart-2: 180 60% 45%;
     --chart-3: 180 40% 65%;
@@ -103,6 +106,9 @@
     --sidebar-border: 200 12% 15%;
     --sidebar-ring: 180 80% 45%;
     --sidebar-muted: 180 10% 45%;
+
+    --primary-soft: 180 40% 14%;
+    --primary-glow: 180 80% 40%;
 
     --chart-1: 180 80% 45%;
     --chart-2: 180 50% 55%;
