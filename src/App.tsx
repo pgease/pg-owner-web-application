@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
+import RequireAuth from "@/components/auth/RequireAuth";
 import Dashboard from "./pages/Dashboard";
 import Tenants from "./pages/Tenants";
 import MyPGs from "./pages/MyPGs";
@@ -29,6 +30,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           {/* Auth routes (no layout) */}
+          <Route path="/" element={<Login />} />
           <Route path="/login" element={<Login />} />
           <Route path="/onboarding" element={<Onboarding />} />
 
@@ -36,34 +38,35 @@ const App = () => (
           <Route
             path="/*"
             element={
-              <AppLayout>
-                <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/kpis" element={<Dashboard />} />
-                  <Route path="/tenants" element={<Tenants />} />
-                  <Route path="/tenants/onboarding" element={<Tenants />} />
-                  <Route path="/tenants/guests" element={<Tenants />} />
-                  <Route path="/my-pgs" element={<MyPGs />} />
-                  <Route path="/my-pgs/rooms" element={<MyPGs />} />
-                  <Route path="/my-pgs/bank" element={<MyPGs />} />
-                  <Route path="/rent-payments" element={<RentPayments />} />
-                  <Route path="/rent-payments/history" element={<RentPayments />} />
-                  <Route path="/rent-payments/dues" element={<RentPayments />} />
-                  <Route path="/staff" element={<Staff />} />
-                  <Route path="/staff/roles" element={<Staff />} />
-                  <Route path="/expenses" element={<Expenses />} />
-                  <Route path="/expenses/categories" element={<Expenses />} />
-                  <Route path="/expenses/monthly" element={<Expenses />} />
-                  <Route path="/reports" element={<Reports />} />
-                  <Route path="/reports/payments" element={<Reports />} />
-                  <Route path="/reports/export" element={<Reports />} />
-                  <Route path="/plans" element={<Plans />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="/settings/notifications" element={<SettingsPage />} />
-                  <Route path="/support" element={<Support />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </AppLayout>
+              <RequireAuth>
+                <AppLayout>
+                  <Routes>
+                    <Route path="/kpis" element={<Dashboard />} />
+                    <Route path="/tenants" element={<Tenants />} />
+                    <Route path="/tenants/onboarding" element={<Tenants />} />
+                    <Route path="/tenants/guests" element={<Tenants />} />
+                    <Route path="/my-pgs" element={<MyPGs />} />
+                    <Route path="/my-pgs/rooms" element={<MyPGs />} />
+                    <Route path="/my-pgs/bank" element={<MyPGs />} />
+                    <Route path="/rent-payments" element={<RentPayments />} />
+                    <Route path="/rent-payments/history" element={<RentPayments />} />
+                    <Route path="/rent-payments/dues" element={<RentPayments />} />
+                    <Route path="/staff" element={<Staff />} />
+                    <Route path="/staff/roles" element={<Staff />} />
+                    <Route path="/expenses" element={<Expenses />} />
+                    <Route path="/expenses/categories" element={<Expenses />} />
+                    <Route path="/expenses/monthly" element={<Expenses />} />
+                    <Route path="/reports" element={<Reports />} />
+                    <Route path="/reports/payments" element={<Reports />} />
+                    <Route path="/reports/export" element={<Reports />} />
+                    <Route path="/plans" element={<Plans />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/settings/notifications" element={<SettingsPage />} />
+                    <Route path="/support" element={<Support />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </AppLayout>
+              </RequireAuth>
             }
           />
         </Routes>

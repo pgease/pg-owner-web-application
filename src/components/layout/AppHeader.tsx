@@ -1,8 +1,18 @@
-import { Bell, Search, Moon, Sun, Menu } from "lucide-react";
+import { Bell, Search, Moon, Sun, Menu, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import pgeaseLogo from "@/assets/pgease-logo.jpg";
+import { authStorage } from "@/api/http";
+import { useNavigate } from "react-router-dom";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface AppHeaderProps {
   onMenuToggle?: () => void;
@@ -10,10 +20,16 @@ interface AppHeaderProps {
 
 const AppHeader = ({ onMenuToggle }: AppHeaderProps) => {
   const [isDark, setIsDark] = useState(false);
+  const navigate = useNavigate();
 
   const toggleTheme = () => {
     setIsDark(!isDark);
     document.documentElement.classList.toggle("dark");
+  };
+
+  const handleLogout = () => {
+    authStorage.clear();
+    navigate("/login", { replace: true });
   };
 
   return (
@@ -41,15 +57,27 @@ const AppHeader = ({ onMenuToggle }: AppHeaderProps) => {
           <Bell className="h-[18px] w-[18px]" />
           <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive" />
         </Button>
-        <div className="ml-2 flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-semibold">
-            RP
-          </div>
-          <div className="hidden md:block">
-            <p className="text-sm font-medium leading-none">Rajesh Patel</p>
-            <p className="text-xs text-muted-foreground">Owner</p>
-          </div>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="ml-2 flex items-center gap-2.5 rounded-full border border-border bg-card px-2 py-1 hover:bg-accent">
+              <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-semibold">
+                RP
+              </div>
+              <div className="hidden md:block text-left">
+                <p className="text-sm font-medium leading-none">Rajesh Patel</p>
+                <p className="text-xs text-muted-foreground">Owner</p>
+              </div>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuLabel>My account</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:bg-destructive/10">
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Logout</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );

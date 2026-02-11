@@ -1,5 +1,5 @@
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
@@ -33,6 +33,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import pgeaseLogo from "@/assets/pgease-logo.jpg";
+import { authStorage } from "@/api/http";
 
 interface NavChild {
   title: string;
@@ -140,7 +141,13 @@ interface AppSidebarProps {
 
 const AppSidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }: AppSidebarProps) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+
+  const handleLogout = () => {
+    authStorage.clear();
+    navigate("/login", { replace: true });
+  };
 
   const isChildActive = (item: NavItem) => {
     if (!item.children) return location.pathname === item.url;
@@ -242,6 +249,20 @@ const AppSidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }: AppSideb
           })}
         </ul>
       </nav>
+
+      {/* Logout button */}
+      <div className="border-t border-sidebar-border px-3 py-3">
+        <button
+          onClick={handleLogout}
+          className={cn(
+            "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-destructive",
+            "hover:bg-destructive/10 hover:text-destructive"
+          )}
+        >
+          <LogOut className="h-[18px] w-[18px]" />
+          {!collapsed && <span>Logout</span>}
+        </button>
+      </div>
 
       {/* Collapse toggle - desktop only */}
       <div className="hidden border-t border-sidebar-border p-3 md:block">
