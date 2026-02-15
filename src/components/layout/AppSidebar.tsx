@@ -12,22 +12,10 @@ import {
   ChevronLeft,
   ChevronDown,
   Receipt,
-  Clock,
-  FileText,
-  Shield,
-  PlusCircle,
-  Tag,
-  CalendarDays,
-  UserPlus,
-  Eye,
-  Wallet,
+  MessageSquareWarning,
   LogOut,
-  Bell,
-  User,
-  LifeBuoy,
   Home,
   BedDouble,
-  Landmark,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -63,6 +51,7 @@ const navItems: NavItem[] = [
     icon: Building2,
     children: [
       { title: "PG Details", url: "/my-pgs" },
+      { title: "Blocks, Floors & Rooms", url: "/my-pgs/structure" },
       { title: "Rooms & Beds", url: "/my-pgs/rooms" },
       { title: "Bank Account", url: "/my-pgs/bank" },
     ],
@@ -95,6 +84,11 @@ const navItems: NavItem[] = [
       { title: "Staff List", url: "/staff" },
       { title: "Roles & Permissions", url: "/staff/roles" },
     ],
+  },
+  {
+    title: "Complaints",
+    url: "/complaints",
+    icon: MessageSquareWarning,
   },
   {
     title: "Expenses",

@@ -10,7 +10,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { MapPin, CheckCircle2, Building2, User, Home, MapPinned, BedDouble, ArrowLeft, ArrowRight, Shield } from "lucide-react";
 import pgeaseLogo from "@/assets/pgease-logo.jpg";
 import { toast } from "@/components/ui/use-toast";
-import { DEFAULT_PROPERTY_TYPE_ID, createProperty, updateLanguage } from "@/api/propertyOwner";
+import {
+  createProperty,
+  updateLanguage,
+  getPropertyTypesAndAmenities,
+  PropertyType,
+} from "@/api/propertyOwner";
 
 type OnboardingStep = 1 | 2 | 3 | 4 | 5;
 type Lang = "en" | "hi";
@@ -106,6 +111,8 @@ const Onboarding = () => {
   const [lang, setLang] = useState<Lang>("en");
   const [step, setStep] = useState<OnboardingStep>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>([]);
+  const [loadingTypes, setLoadingTypes] = useState(false);
   const [form, setForm] = useState({
     fullName: "",
     email: "",

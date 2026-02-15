@@ -4,41 +4,17 @@ import {
   Plus,
   FileSpreadsheet,
   Send,
-  Filter,
-  MoreHorizontal,
+  Building2,
+  DoorOpen,
+  BedDouble,
   Phone,
-  Mail,
-  Download,
-  Eye,
-  Edit,
-  Trash2,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -46,247 +22,150 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AddTenantDialog } from "@/components/tenants/AddTenantDialog";
 
 const tenants = [
-  { id: 1, name: "Amit Sharma", phone: "9876543210", email: "amit@email.com", pg: "Sunshine PG", room: "201-A", bed: "B1", rent: 8500, deposit: 15000, joinDate: "2025-08-15", dueDate: 5, status: "active" },
-  { id: 2, name: "Priya Reddy", phone: "9876543211", email: "priya@email.com", pg: "Green Valley PG", room: "105-B", bed: "B2", rent: 9000, deposit: 18000, joinDate: "2025-11-01", dueDate: 1, status: "active" },
-  { id: 3, name: "Karthik Menon", phone: "9876543212", email: "karthik@email.com", pg: "Sunshine PG", room: "302-C", bed: "B1", rent: 7500, deposit: 12000, joinDate: "2025-06-10", dueDate: 5, status: "notice" },
-  { id: 4, name: "Sneha Gupta", phone: "9876543213", email: "sneha@email.com", pg: "Metro Stay", room: "401-A", bed: "B1", rent: 10000, deposit: 20000, joinDate: "2026-01-20", dueDate: 1, status: "active" },
-  { id: 5, name: "Ravi Kumar", phone: "9876543214", email: "ravi@email.com", pg: "Sunshine PG", room: "101-A", bed: "B2", rent: 8000, deposit: 14000, joinDate: "2024-12-01", dueDate: 5, status: "active" },
-  { id: 6, name: "Deepa Nair", phone: "9876543215", email: "deepa@email.com", pg: "Green Valley PG", room: "202-A", bed: "B1", rent: 9500, deposit: 17000, joinDate: "2025-09-15", dueDate: 1, status: "active" },
-  { id: 7, name: "Suresh Babu", phone: "9876543216", email: "suresh@email.com", pg: "City PG", room: "301-B", bed: "B3", rent: 7000, deposit: 10000, joinDate: "2025-03-01", dueDate: 5, status: "notice" },
-  { id: 8, name: "Anita Singh", phone: "9876543217", email: "anita@email.com", pg: "Metro Stay", room: "102-C", bed: "B1", rent: 11000, deposit: 22000, joinDate: "2026-02-01", dueDate: 1, status: "active" },
+  { id: "1", name: "Sathyam guptha", pg: "Sunshine PG", floor: 12, room: 23, bed: 2, rent: 15000, dueDate: "21 Jan 2026", aadharVerified: true, contactOk: true },
+  { id: "2", name: "Riya Sharma", pg: "Green Valley PG", floor: 1, room: 105, bed: 1, rent: 18000, dueDate: "15 Feb 2026", aadharVerified: true, contactOk: true },
+  { id: "3", name: "Vikram Singh", pg: "Sunshine PG", floor: 2, room: 205, bed: 2, rent: 12000, dueDate: "5 Mar 2026", aadharVerified: false, contactOk: true },
+  { id: "4", name: "Anjali Mehta", pg: "Metro Stay", floor: 3, room: 302, bed: 1, rent: 20000, dueDate: "30 Apr 2026", aadharVerified: true, contactOk: false },
 ];
 
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  active: { label: "Active", variant: "default" },
-  notice: { label: "Notice Period", variant: "destructive" },
-  inactive: { label: "Inactive", variant: "secondary" },
-};
+const rentTypes = [
+  { label: "Pending", value: "₹2,516", note: "Due: Jan 2026, Fixed: ₹6,000" },
+  { label: "Joining Fee", value: "Not fixed" },
+  { label: "Mess", value: "Not fixed" },
+  { label: "Electricity Bill", value: "Not fixed" },
+  { label: "Manual Late Fine", value: "Not fixed" },
+  { label: "Others", value: "Not fixed" },
+];
 
 const Tenants = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [pgFilter, setPgFilter] = useState("all");
 
-  const filteredTenants = tenants.filter(
-    (t) =>
+  const filtered = tenants.filter((t) => {
+    const matchSearch =
       t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.pg.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.room.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+      t.pg.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchPg = pgFilter === "all" || t.pg === pgFilter;
+    return matchSearch && matchPg;
+  });
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Tenants</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage all your tenants across PGs
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">Tenant list</h1>
+          <p className="text-sm text-muted-foreground">Manage all your tenants across PGs</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" className="gap-2">
             <FileSpreadsheet className="h-4 w-4" /> Import Excel
           </Button>
           <Button size="sm" variant="outline" className="gap-2">
             <Send className="h-4 w-4" /> Send Invite
           </Button>
-          <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="gap-2">
-                <Plus className="h-4 w-4" /> Add Tenant
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Add New Tenant</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
-                    <Input id="name" placeholder="Tenant name" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number</Label>
-                    <Input id="phone" placeholder="+91 XXXXX XXXXX" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" placeholder="email@example.com" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="joinDate">Joining Date</Label>
-                    <Input id="joinDate" type="date" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>PG</Label>
-                    <Select>
-                      <SelectTrigger><SelectValue placeholder="Select PG" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="sunshine">Sunshine PG</SelectItem>
-                        <SelectItem value="green">Green Valley PG</SelectItem>
-                        <SelectItem value="metro">Metro Stay</SelectItem>
-                        <SelectItem value="city">City PG</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="room">Room / Bed</Label>
-                    <Input id="room" placeholder="e.g. 201-A / B1" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="rent">Monthly Rent (₹)</Label>
-                    <Input id="rent" type="number" placeholder="8500" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="deposit">Deposit (₹)</Label>
-                    <Input id="deposit" type="number" placeholder="15000" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="dueDate">Due Date</Label>
-                    <Input id="dueDate" type="number" placeholder="5" min={1} max={28} />
-                  </div>
-                </div>
-                <div className="pt-2">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Additional Charges</p>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-1">
-                      <Label htmlFor="ac" className="text-xs">AC (₹)</Label>
-                      <Input id="ac" type="number" placeholder="0" />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="cooler" className="text-xs">Cooler (₹)</Label>
-                      <Input id="cooler" type="number" placeholder="0" />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="geyser" className="text-xs">Geyser (₹)</Label>
-                      <Input id="geyser" type="number" placeholder="0" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
-                <Button onClick={() => setAddDialogOpen(false)}>Add Tenant</Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <Button size="sm" className="gap-2" onClick={() => setAddDialogOpen(true)}>
+            <Plus className="h-4 w-4" /> Add Tenant
+          </Button>
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Rent types summary */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search by name, PG, room..."
-                className="pl-9"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <Select>
-              <SelectTrigger className="w-[160px]">
-                <SelectValue placeholder="All PGs" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All PGs</SelectItem>
-                <SelectItem value="sunshine">Sunshine PG</SelectItem>
-                <SelectItem value="green">Green Valley PG</SelectItem>
-                <SelectItem value="metro">Metro Stay</SelectItem>
-                <SelectItem value="city">City PG</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="notice">Notice Period</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="sm" className="gap-2 ml-auto">
-              <Download className="h-4 w-4" /> Export
-            </Button>
+          <p className="text-sm font-medium mb-3">Tenant meter / Rent types</p>
+          <div className="flex flex-wrap gap-4 text-sm">
+            {rentTypes.map((r) => (
+              <span key={r.label} className="text-muted-foreground">
+                {r.label} – {r.value}
+                {r.note && <span className="text-muted-foreground/80"> ({r.note})</span>}
+              </span>
+            ))}
           </div>
         </CardContent>
       </Card>
 
-      {/* Table */}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="w-[220px]">Tenant</TableHead>
-                <TableHead>PG</TableHead>
-                <TableHead>Room / Bed</TableHead>
-                <TableHead className="text-right">Rent (₹)</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredTenants.map((tenant) => {
-                const st = statusConfig[tenant.status];
-                return (
-                  <TableRow key={tenant.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                          {tenant.name.split(" ").map((n) => n[0]).join("")}
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{tenant.name}</p>
-                          <p className="text-xs text-muted-foreground">{tenant.phone}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm">{tenant.pg}</TableCell>
-                    <TableCell className="text-sm">{tenant.room} / {tenant.bed}</TableCell>
-                    <TableCell className="text-sm text-right font-medium">
-                      ₹{tenant.rent.toLocaleString("en-IN")}
-                    </TableCell>
-                    <TableCell className="text-sm">{tenant.dueDate}th of month</TableCell>
-                    <TableCell>
-                      <Badge variant={st.variant}>{st.label}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem><Eye className="mr-2 h-4 w-4" /> View Details</DropdownMenuItem>
-                          <DropdownMenuItem><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                          <DropdownMenuItem><Phone className="mr-2 h-4 w-4" /> Call</DropdownMenuItem>
-                          <DropdownMenuItem><Mail className="mr-2 h-4 w-4" /> Send Email</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Remove</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by name, PG, room..."
+            className="pl-9"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <Select value={pgFilter} onValueChange={setPgFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="All PGs" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All PGs</SelectItem>
+            <SelectItem value="Sunshine PG">Sunshine PG</SelectItem>
+            <SelectItem value="Green Valley PG">Green Valley PG</SelectItem>
+            <SelectItem value="Metro Stay">Metro Stay</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Tenant cards (like image 2) */}
+      <div className="space-y-4">
+        {filtered.map((t) => (
+          <Card key={t.id}>
+            <CardContent className="p-4">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold">
+                  {t.name.split(" ").map((n) => n[0]).join("")}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">{t.name}</p>
+                    {t.aadharVerified ? (
+                      <Badge variant="default" className="gap-1 text-xs bg-emerald-600">
+                        <CheckCircle2 className="h-3 w-3" /> Aadhar verified
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="gap-1 text-xs">
+                        <AlertCircle className="h-3 w-3" /> Pending verification
+                      </Badge>
+                    )}
+                    {t.contactOk ? (
+                      <span className="text-emerald-600" title="Contact verified">
+                        <Phone className="h-4 w-4" />
+                      </span>
+                    ) : (
+                      <span className="text-destructive" title="Contact issue">
+                        <Phone className="h-4 w-4" />
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Building2 className="h-3.5 w-3.5" /> floor: {t.floor}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <DoorOpen className="h-3.5 w-3.5" /> Room no: {t.room}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <BedDouble className="h-3.5 w-3.5" /> Bed no: {t.bed}
+                    </span>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-dashed flex flex-wrap items-center gap-4">
+                    <span className="font-medium">Rent: ₹{t.rent.toLocaleString("en-IN")}/mo</span>
+                    <span className="text-destructive text-sm">Rent due on {t.dueDate}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <AddTenantDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
     </div>
   );
 };

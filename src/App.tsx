@@ -19,6 +19,8 @@ import Support from "./pages/Support";
 import Login from "./pages/Login";
 import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
+import Structure from "./pages/Structure";
+import { AppProvider } from "./context/AppContext";
 
 const queryClient = new QueryClient();
 
@@ -39,19 +41,22 @@ const App = () => (
             path="/*"
             element={
               <RequireAuth>
-                <AppLayout>
+                <AppProvider>
+                  <AppLayout>
                   <Routes>
                     <Route path="/kpis" element={<Dashboard />} />
                     <Route path="/tenants" element={<Tenants />} />
                     <Route path="/tenants/onboarding" element={<Tenants />} />
                     <Route path="/tenants/guests" element={<Tenants />} />
                     <Route path="/my-pgs" element={<MyPGs />} />
+                    <Route path="/my-pgs/structure" element={<Structure />} />
                     <Route path="/my-pgs/rooms" element={<MyPGs />} />
                     <Route path="/my-pgs/bank" element={<MyPGs />} />
                     <Route path="/rent-payments" element={<RentPayments />} />
                     <Route path="/rent-payments/history" element={<RentPayments />} />
                     <Route path="/rent-payments/dues" element={<RentPayments />} />
                     <Route path="/staff" element={<Staff />} />
+                    <Route path="/complaints" element={<Complaints />} />
                     <Route path="/staff/roles" element={<Staff />} />
                     <Route path="/expenses" element={<Expenses />} />
                     <Route path="/expenses/categories" element={<Expenses />} />
@@ -66,6 +71,7 @@ const App = () => (
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </AppLayout>
+                </AppProvider>
               </RequireAuth>
             }
           />

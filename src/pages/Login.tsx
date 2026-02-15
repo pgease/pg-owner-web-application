@@ -253,6 +253,16 @@ export default function Login() {
       setIsVerifyingOtp(true);
       const data = await verifyOtp(phone, otpValue);
 
+      toast({
+        title: "Logged in successfully",
+        description: data.isNewUser ? "Let’s set up your first PG." : "Welcome back!",
+      });
+
+      if (data.isNewUser || !data.hasProperties) {
+        navigate("/onboarding", { replace: true });
+      } else {
+        navigate("/kpis", { replace: true });
+      }
       setShowSuccess(true);
       toast({ title: "Logged in successfully", description: data.isNewUser ? "Let's set up your first PG." : "Welcome back!" });
 

@@ -1,66 +1,36 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  Building2,
+  TrendingUp,
+  TrendingDown,
   Users,
-  BedDouble,
-  IndianRupee,
-  MessageSquareWarning,
-  Clock,
+  AlertTriangle,
+  Megaphone,
+  ChevronRight,
   UserPlus,
   FileSpreadsheet,
   Send,
-  TrendingUp,
-  TrendingDown,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Area,
-  AreaChart,
-} from "recharts";
+import { AddTenantDialog } from "@/components/tenants/AddTenantDialog";
 
-const stats = [
-  { label: "Total PGs", value: "4", icon: Building2, change: "+1 this month", trend: "up" as const },
-  { label: "Total Tenants", value: "187", icon: Users, change: "+12 this month", trend: "up" as const },
-  { label: "Vacant Beds", value: "23", icon: BedDouble, change: "across 4 PGs", trend: "neutral" as const },
-  { label: "Rent Due", value: "₹4,82,000", icon: IndianRupee, change: "68 tenants", trend: "down" as const },
-  { label: "Complaints", value: "8", icon: MessageSquareWarning, change: "3 critical", trend: "down" as const },
-  { label: "Notice Period", value: "5", icon: Clock, change: "ending this month", trend: "neutral" as const },
-];
-
-const monthlyData = [
-  { month: "Aug", collected: 680000, pending: 45000 },
-  { month: "Sep", collected: 720000, pending: 38000 },
-  { month: "Oct", collected: 695000, pending: 52000 },
-  { month: "Nov", collected: 740000, pending: 28000 },
-  { month: "Dec", collected: 710000, pending: 60000 },
-  { month: "Jan", collected: 755000, pending: 35000 },
-  { month: "Feb", collected: 482000, pending: 482000 },
-];
-
-const recentTenants = [
-  { name: "Amit Sharma", pg: "Sunshine PG", room: "201-A", date: "Feb 5, 2026", rent: "₹8,500" },
-  { name: "Priya Reddy", pg: "Green Valley PG", room: "105-B", date: "Feb 3, 2026", rent: "₹9,000" },
-  { name: "Karthik M.", pg: "Sunshine PG", room: "302-C", date: "Jan 28, 2026", rent: "₹7,500" },
-  { name: "Sneha Gupta", pg: "Metro Stay", room: "401-A", date: "Jan 25, 2026", rent: "₹10,000" },
+const manageItems = [
+  { title: "Staff Management", desc: "Manage your team", icon: Users, path: "/staff" },
+  { title: "Complaints", desc: "Manage tenants issues", icon: AlertTriangle, path: "/complaints" },
+  { title: "Announcement", desc: "Broadcast updates to all tenants", icon: Megaphone, path: "/support" },
 ];
 
 const Dashboard = () => {
+  const navigate = useNavigate();
+  const [addTenantOpen, setAddTenantOpen] = useState(false);
+
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Page header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
-            Welcome back, Rajesh. Here's your PG overview.
-          </p>
+          <p className="text-sm text-muted-foreground">Welcome back. Here's your PG overview.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" className="gap-2">
@@ -69,112 +39,89 @@ const Dashboard = () => {
           <Button size="sm" variant="outline" className="gap-2">
             <Send className="h-4 w-4" /> <span className="hidden sm:inline">Send</span> Invite
           </Button>
-          <Button size="sm" className="gap-2">
+          <Button size="sm" className="gap-2" onClick={() => setAddTenantOpen(true)}>
             <UserPlus className="h-4 w-4" /> Add Tenant
           </Button>
         </div>
       </div>
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        {stats.map((stat) => (
-          <Card key={stat.label} className="relative overflow-hidden">
+      {/* Finance overview */}
+      <section>
+        <h2 className="text-lg font-semibold mb-4">Finance overview</h2>
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="bg-muted/40">
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="rounded-lg bg-primary/10 p-2">
-                  <stat.icon className="h-4 w-4 text-primary" />
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-emerald-500/20 p-2">
+                  <TrendingUp className="h-5 w-5 text-emerald-600" />
                 </div>
-                {stat.trend === "up" && <TrendingUp className="h-4 w-4 text-success" />}
-                {stat.trend === "down" && <TrendingDown className="h-4 w-4 text-destructive" />}
+                <div>
+                  <p className="text-sm text-muted-foreground">Total inflow</p>
+                  <p className="text-2xl font-bold">50,000</p>
+                </div>
               </div>
-              <div className="mt-3">
-                <p className="text-2xl font-bold">{stat.value}</p>
-                <p className="text-xs text-muted-foreground">{stat.label}</p>
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">{stat.change}</p>
             </CardContent>
           </Card>
-        ))}
-      </div>
-
-      {/* Charts row */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">Monthly Collection</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <AreaChart data={monthlyData}>
-                <defs>
-                  <linearGradient id="colorCollected" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(180, 100%, 25%)" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(180, 100%, 25%)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(200, 15%, 90%)" />
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="hsl(200, 10%, 45%)" />
-                <YAxis
-                  tick={{ fontSize: 12 }}
-                  stroke="hsl(200, 10%, 45%)"
-                  tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
-                />
-                <Tooltip
-                  formatter={(value: number) => [`₹${value.toLocaleString("en-IN")}`, ""]}
-                  contentStyle={{
-                    borderRadius: "8px",
-                    border: "1px solid hsl(200, 15%, 90%)",
-                    fontSize: "13px",
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="collected"
-                  stroke="hsl(180, 100%, 25%)"
-                  strokeWidth={2}
-                  fill="url(#colorCollected)"
-                  name="Collected"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="pending"
-                  stroke="hsl(38, 92%, 50%)"
-                  strokeWidth={2}
-                  fill="hsl(38, 92%, 50%)"
-                  fillOpacity={0.1}
-                  name="Pending"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Recent tenants */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold">Recent Tenants</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {recentTenants.map((t) => (
-              <div key={t.name} className="flex items-center gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                  {t.name.split(" ").map((n) => n[0]).join("")}
+          <Card className="bg-muted/40">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-muted-foreground/20 p-2">
+                  <TrendingDown className="h-5 w-5 text-foreground" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{t.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {t.pg} · {t.room}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold">{t.rent}</p>
-                  <p className="text-xs text-muted-foreground">{t.date}</p>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Outflow</p>
+                  <p className="text-2xl font-bold">50,000</p>
                 </div>
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-muted/40">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-muted-foreground/20 p-2">
+                  <TrendingUp className="h-5 w-5 text-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Net Profit</p>
+                  <p className="text-2xl font-bold">5,000</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <div className="border-t border-dashed" />
+
+      {/* Manage */}
+      <section>
+        <h2 className="text-lg font-semibold mb-4">Manage</h2>
+        <div className="space-y-2">
+          {manageItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Card
+                key={item.title}
+                className="cursor-pointer hover:bg-muted/50 transition-colors bg-muted/30"
+                onClick={() => navigate(item.path)}
+              >
+                <CardContent className="flex items-center gap-4 p-4">
+                  <div className="rounded-lg bg-background p-2.5 shadow-sm">
+                    <Icon className="h-5 w-5 text-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold">{item.title}</p>
+                    <p className="text-sm text-muted-foreground">{item.desc}</p>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </section>
+
+      <AddTenantDialog open={addTenantOpen} onOpenChange={setAddTenantOpen} />
     </div>
   );
 };
