@@ -1,8 +1,8 @@
-import { Check, X } from "lucide-react";
+import { Check, X, Crown, Zap, Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Progress } from "@/components/ui/progress";
 
 const features = [
   { name: "Add tenants (Excel / Invite / Manual)", free: true, premium: true, pro: true },
@@ -27,146 +27,182 @@ const features = [
   { name: "Priority support", free: false, premium: true, pro: true },
 ];
 
+// Mock current plan — replace with real data from API/context
+const CURRENT_PLAN: string = "FREE";
+
 const plans = [
   {
-    name: "FREE",
+    key: "FREE",
+    icon: Zap,
     price: "₹0",
     period: "",
-    popular: false,
+    tagline: "Get started for free",
+    featureCount: features.filter((f) => f.free).length,
   },
   {
-    name: "PREMIUM",
+    key: "PREMIUM",
+    icon: Sparkles,
     price: "₹19",
-    period: "/bed",
+    period: "/bed/mo",
+    tagline: "Best for growing PGs",
     popular: true,
+    featureCount: features.filter((f) => f.premium).length,
   },
   {
-    name: "PRO",
+    key: "PRO",
+    icon: Crown,
     price: "₹39",
-    period: "/bed",
-    popular: false,
+    period: "/bed/mo",
+    tagline: "For professional operators",
+    featureCount: features.filter((f) => f.pro).length,
   },
 ];
 
-const Plans = () => (
-  <div className="space-y-6 animate-fade-in">
-    <div className="text-center max-w-2xl mx-auto">
-      <h1 className="text-3xl font-bold tracking-tight">Plans & Pricing</h1>
-      <p className="text-sm text-muted-foreground mt-2">
-        Choose the plan that fits your PG management needs. All plans billed per bed.
-      </p>
-    </div>
+const Plans = () => {
+  const totalFeatures = features.length;
 
-    {/* Feature Comparison Table */}
-    <Card className="overflow-hidden">
-      <CardHeader className="bg-muted/50 pb-4">
-        <CardTitle className="text-lg">Feature Comparison</CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/30">
-                <TableHead className="w-[300px] font-semibold">Feature / Plan</TableHead>
-                <TableHead className="text-center min-w-[140px]">
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="font-semibold">FREE</span>
-                    <span className="text-xs text-muted-foreground">₹0</span>
-                  </div>
-                </TableHead>
-                <TableHead className="text-center min-w-[140px]">
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="font-semibold">PREMIUM</span>
-                    <span className="text-xs text-muted-foreground">₹19/bed</span>
-                    {plans.find((p) => p.name === "PREMIUM")?.popular && (
-                      <Badge variant="default" className="text-[10px] px-1.5 py-0">
-                        Popular
-                      </Badge>
-                    )}
-                  </div>
-                </TableHead>
-                <TableHead className="text-center min-w-[140px]">
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="font-semibold">PRO</span>
-                    <span className="text-xs text-muted-foreground">₹39/bed</span>
-                  </div>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {features.map((feature, idx) => (
-                <TableRow key={idx} className={idx % 2 === 0 ? "bg-muted/20" : ""}>
-                  <TableCell className="font-medium text-sm">{feature.name}</TableCell>
-                  <TableCell className="text-center">
-                    {feature.free ? (
-                      <Check className="h-5 w-5 text-emerald-500 mx-auto" />
-                    ) : (
-                      <X className="h-5 w-5 text-muted-foreground mx-auto" />
-                    )}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {feature.premium ? (
-                      <Check className="h-5 w-5 text-emerald-500 mx-auto" />
-                    ) : (
-                      <X className="h-5 w-5 text-muted-foreground mx-auto" />
-                    )}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {feature.pro ? (
-                      <Check className="h-5 w-5 text-emerald-500 mx-auto" />
-                    ) : (
-                      <X className="h-5 w-5 text-muted-foreground mx-auto" />
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
+  return (
+    <div className="space-y-8 animate-fade-in max-w-5xl mx-auto pb-12">
+      {/* Header */}
+      <div className="text-center space-y-2">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Plans & Pricing</h1>
+        <p className="text-sm text-muted-foreground max-w-md mx-auto">
+          Simple, transparent pricing. Upgrade anytime as your PG grows.
+        </p>
+      </div>
 
-    {/* Plan Cards */}
-    <div className="grid gap-6 md:grid-cols-3 max-w-5xl mx-auto">
-      {plans.map((plan) => (
-        <Card
-          key={plan.name}
-          className={`relative transition-all ${
-            plan.popular ? "border-primary shadow-lg shadow-primary/10 scale-105" : ""
-          }`}
-        >
-          {plan.popular && (
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-              <Badge className="gap-1 bg-primary">
-                <span>Most Popular</span>
-              </Badge>
+      {/* Current Plan Banner */}
+      <Card className="border-primary/30 bg-primary/5">
+        <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 py-4 px-5">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+              {CURRENT_PLAN === "FREE" && <Zap className="h-5 w-5 text-primary" />}
+              {CURRENT_PLAN === "PREMIUM" && <Sparkles className="h-5 w-5 text-primary" />}
+              {CURRENT_PLAN === "PRO" && <Crown className="h-5 w-5 text-primary" />}
             </div>
-          )}
-          <CardHeader className="text-center pb-2 pt-6">
-            <CardTitle className="text-xl">{plan.name}</CardTitle>
-            <div className="mt-3">
-              <span className="text-4xl font-bold">{plan.price}</span>
-              <span className="text-sm text-muted-foreground ml-1">{plan.period}</span>
+            <div>
+              <p className="text-sm font-semibold">
+                You're on the <span className="text-primary">{CURRENT_PLAN}</span> plan
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {CURRENT_PLAN === "FREE"
+                  ? "Upgrade to unlock automation & advanced features"
+                  : CURRENT_PLAN === "PREMIUM"
+                  ? "You have access to automation features"
+                  : "You have full access to all features"}
+              </p>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button
-              className="w-full"
-              variant={plan.popular ? "default" : "outline"}
-              disabled={plan.name === "FREE"}
-            >
-              {plan.name === "FREE" ? "Current Plan" : "Upgrade"}
+          </div>
+          {CURRENT_PLAN !== "PRO" && (
+            <Button size="sm" className="shrink-0">
+              Upgrade Now
             </Button>
-            <p className="text-xs text-center text-muted-foreground">
-              {plan.name === "FREE" && "Perfect for getting started"}
-              {plan.name === "PREMIUM" && "Best for growing PGs"}
-              {plan.name === "PRO" && "For professional PG operators"}
-            </p>
-          </CardContent>
-        </Card>
-      ))}
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Plan Cards */}
+      <div className="grid gap-5 sm:grid-cols-3">
+        {plans.map((plan) => {
+          const isCurrent = plan.key === CURRENT_PLAN;
+          const Icon = plan.icon;
+          return (
+            <Card
+              key={plan.key}
+              className={`relative transition-all ${
+                plan.popular
+                  ? "border-primary shadow-lg shadow-primary/10 ring-1 ring-primary/20"
+                  : ""
+              } ${isCurrent ? "bg-primary/[0.03]" : ""}`}
+            >
+              {plan.popular && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <Badge className="bg-primary text-[10px] px-2">Most Popular</Badge>
+                </div>
+              )}
+              {isCurrent && (
+                <div className="absolute -top-3 right-4">
+                  <Badge variant="outline" className="text-[10px] px-2 border-primary text-primary bg-background">
+                    Current Plan
+                  </Badge>
+                </div>
+              )}
+              <CardHeader className="text-center pt-7 pb-3">
+                <div className="mx-auto h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+                  <Icon className="h-5 w-5 text-primary" />
+                </div>
+                <CardTitle className="text-lg">{plan.key}</CardTitle>
+                <div className="mt-2">
+                  <span className="text-3xl font-bold">{plan.price}</span>
+                  <span className="text-xs text-muted-foreground ml-1">{plan.period}</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{plan.tagline}</p>
+              </CardHeader>
+              <CardContent className="space-y-4 pb-6">
+                {/* Feature coverage bar */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-[11px] text-muted-foreground">
+                    <span>Features included</span>
+                    <span className="font-medium text-foreground">
+                      {plan.featureCount}/{totalFeatures}
+                    </span>
+                  </div>
+                  <Progress value={(plan.featureCount / totalFeatures) * 100} className="h-1.5" />
+                </div>
+
+                <Button
+                  className="w-full"
+                  variant={isCurrent ? "outline" : plan.popular ? "default" : "outline"}
+                  disabled={isCurrent}
+                >
+                  {isCurrent ? "Current Plan" : "Upgrade"}
+                </Button>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Feature Comparison */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Feature Comparison</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/40">
+                  <th className="text-left font-medium px-4 py-3 min-w-[200px]">Feature</th>
+                  {plans.map((p) => (
+                    <th key={p.key} className="text-center font-medium px-3 py-3 min-w-[100px]">
+                      <span className={p.key === CURRENT_PLAN ? "text-primary" : ""}>{p.key}</span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {features.map((f, i) => (
+                  <tr key={i} className={`border-b last:border-0 ${i % 2 === 0 ? "bg-muted/20" : ""}`}>
+                    <td className="px-4 py-2.5 text-sm">{f.name}</td>
+                    {(["free", "premium", "pro"] as const).map((tier) => (
+                      <td key={tier} className="text-center px-3 py-2.5">
+                        {f[tier] ? (
+                          <Check className="h-4 w-4 text-emerald-500 mx-auto" />
+                        ) : (
+                          <X className="h-4 w-4 text-muted-foreground mx-auto opacity-40" />
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
-  </div>
-);
+  );
+};
 
 export default Plans;
