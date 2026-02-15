@@ -24,7 +24,8 @@ const AppHeader = ({ onMenuToggle }: AppHeaderProps) => {
   const navigate = useNavigate();
   const { language, setLanguage, selectedPgId, setSelectedPgId, properties } = useApp();
   const owner = authStorage.getPropertyOwner?.();
-  const selectedPg = properties.find((p) => p.id === selectedPgId);
+  const list = Array.isArray(properties) ? properties : [];
+  const selectedPg = list.find((p) => p.id === selectedPgId);
 
   const toggleTheme = () => {
     setIsDark(!isDark);
@@ -89,10 +90,10 @@ const AppHeader = ({ onMenuToggle }: AppHeaderProps) => {
           <DropdownMenuContent align="end" className="min-w-[200px]">
             <DropdownMenuLabel>Switch PG</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {properties.length === 0 ? (
+            {list.length === 0 ? (
               <DropdownMenuItem disabled>No properties yet</DropdownMenuItem>
             ) : (
-              properties.map((pg) => (
+              list.map((pg) => (
                 <DropdownMenuItem key={pg.id} onClick={() => setSelectedPgId(pg.id)}>
                   <Building2 className="mr-2 h-4 w-4" />
                   {pg.name}

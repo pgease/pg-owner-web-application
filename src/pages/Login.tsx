@@ -270,7 +270,7 @@ export default function Login() {
         if (data.isNewUser || !data.hasProperties) {
           navigate("/onboarding", { replace: true });
         } else {
-          navigate("/*", { replace: true });
+          navigate("/kpis", { replace: true });
         }
       }, 800);
     } catch (error: any) {

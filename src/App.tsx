@@ -44,6 +44,7 @@ const App = () => (
                 <AppProvider>
                   <AppLayout>
                   <Routes>
+                    <Route path="/" element={<Dashboard />} />
                     <Route path="/kpis" element={<Dashboard />} />
                     <Route path="/tenants" element={<Tenants />} />
                     <Route path="/tenants/onboarding" element={<Tenants />} />

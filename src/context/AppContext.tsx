@@ -30,7 +30,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const refreshProperties = useCallback(async () => {
     try {
-      const list = await getProperties();
+      const raw = await getProperties();
+      const list = Array.isArray(raw) ? raw : (raw && typeof raw === "object" && "data" in raw && Array.isArray((raw as { data: unknown }).data) ? (raw as { data: PropertyResponse[] }).data : []);
       setProperties(list);
       setSelectedPgIdState((prev) => {
         const valid = list.some((p) => p.id === prev);
