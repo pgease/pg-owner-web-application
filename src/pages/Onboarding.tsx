@@ -15,6 +15,7 @@ import {
   updateLanguage,
   getPropertyTypesAndAmenities,
   PropertyType,
+  DEFAULT_PROPERTY_TYPE_ID,
 } from "@/api/propertyOwner";
 
 type OnboardingStep = 1 | 2 | 3 | 4 | 5;

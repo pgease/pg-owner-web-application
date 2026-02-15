@@ -69,8 +69,9 @@ export const appPrefs = {
   },
 };
 
-interface RequestOptions extends RequestInit {
+interface RequestOptions extends Omit<RequestInit, 'body'> {
   auth?: boolean;
+  body?: unknown;
 }
 
 export async function httpRequest<TResponse>(path: string, options: RequestOptions = {}): Promise<TResponse> {
