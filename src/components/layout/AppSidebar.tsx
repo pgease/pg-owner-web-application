@@ -38,10 +38,10 @@ interface NavItem {
 const navItems: NavItem[] = [
   {
     title: "Dashboard",
-    url: "/",
+    url: "/dashboard",
     icon: LayoutDashboard,
     children: [
-      { title: "Overview", url: "/" },
+      { title: "Overview", url: "/dashboard" },
       { title: "KPIs", url: "/kpis" },
     ],
   },

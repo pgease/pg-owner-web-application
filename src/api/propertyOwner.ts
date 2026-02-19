@@ -176,22 +176,39 @@ export async function getPropertyTypesAndAmenities() {
   });
 }
 
-// My Features
+// My Features (plan + features list)
+export interface PlanFeature {
+  id: string;
+  featureKey: string;
+  featureName: string;
+  featureDescription: string;
+  category: string;
+  limit: number | null;
+}
+
+export interface MyFeaturesResponse {
+  planName: string;
+  planDisplayName: string;
+  isDefault: boolean;
+  features: PlanFeature[];
+}
+
+export async function getMyFeatures() {
+  return httpRequest<MyFeaturesResponse>(`${PROPERTY_OWNER_BASE}/my-features`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+// Legacy alias if code expects Feature[]
 export interface Feature {
   id: string;
   featureKey: string;
   name: string;
   description: string;
   category: string;
-  displayOrder: number;
-  active: boolean;
-}
-
-export async function getMyFeatures() {
-  return httpRequest<Feature[]>(`${PROPERTY_OWNER_BASE}/my-features`, {
-    method: "GET",
-    auth: true,
-  });
+  displayOrder?: number;
+  active?: boolean;
 }
 
 // Tenant APIs
@@ -277,6 +294,108 @@ export async function getAllRoomsAndCounts(propertyId: string) {
   return httpRequest<RoomAndCount[]>(`${PROPERTY_OWNER_BASE}/all-rooms-and-counts/${propertyId}`, {
     method: "GET",
     auth: true,
+  });
+}
+
+// ─── Staff APIs (property-owner) ───────────────────────────────────────────
+
+export interface CreateStaffPayload {
+  propertyId: string;
+  name: string;
+  email: string;
+  mobileContactNumber: string;
+  countryCode?: string;
+  designation?: string;
+  staffPermissionTierId?: string;
+}
+
+export interface StaffMember {
+  id: string;
+  name: string;
+  email: string;
+  mobileContactNumber: string;
+  countryCode: string | null;
+  designation: string | null;
+  propertyId: string;
+  staffPermissionTierId: string | null;
+  createdAt: string;
+}
+
+export async function createStaff(payload: CreateStaffPayload) {
+  return httpRequest<StaffMember>(`${PROPERTY_OWNER_BASE}/create-staff`, {
+    method: "POST",
+    auth: true,
+    body: payload,
+  });
+}
+
+export interface StaffPermissionsAssignPayload {
+  permissions: string[];
+  permissionTierName: string;
+}
+
+export async function staffPermissionsAssign(staffId: string, payload: StaffPermissionsAssignPayload) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/staff/permissions/assign/${staffId}`, {
+    method: "POST",
+    auth: true,
+    body: payload,
+  });
+}
+
+export interface PermissionItem {
+  id: string;
+  name?: string;
+  featureKey?: string;
+}
+
+export async function getStaffPermissions() {
+  return httpRequest<PermissionItem[]>(`${PROPERTY_OWNER_BASE}/staff/permissions`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function getStaffPermissionsById(staffId: string) {
+  return httpRequest<PermissionItem[]>(`${PROPERTY_OWNER_BASE}/staff/${staffId}/permissions`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export interface Designation {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+export async function getDesignations() {
+  return httpRequest<Designation[]>(`${PROPERTY_OWNER_BASE}/designations`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export interface StaffWithPermissions extends StaffMember {
+  permissions?: PermissionItem[];
+  permissionTierName?: string;
+}
+
+export async function getAllStaffWithPermissions(propertyId: string) {
+  return httpRequest<StaffWithPermissions[]>(`${PROPERTY_OWNER_BASE}/get-all-staff-with-permissions/${propertyId}`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export interface UpdateStaffPermissionsPayload {
+  permissions: string[];
+}
+
+export async function updateStaffPermissions(staffId: string, payload: UpdateStaffPermissionsPayload) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/update-staff-permissions/${staffId}`, {
+    method: "POST",
+    auth: true,
+    body: payload,
   });
 }
 
