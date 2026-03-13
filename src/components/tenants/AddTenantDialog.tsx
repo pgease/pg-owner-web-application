@@ -18,6 +18,7 @@ import {
 import { useApp } from "@/context/AppContext";
 import { addTenant } from "@/api/propertyOwner";
 import { toast } from "@/components/ui/use-toast";
+import { useBlocks, useFloors, useRoomsList } from "@/hooks/usePropertyOwnerQueries";
 
 const paymentOptions = [
   { id: "upi", label: "UPI" },
@@ -34,6 +35,9 @@ interface AddTenantDialogProps {
 export function AddTenantDialog({ open, onOpenChange, onSuccess }: AddTenantDialogProps) {
   const { selectedPgId, properties } = useApp();
   const [submitting, setSubmitting] = useState(false);
+  const [selectedBlockId, setSelectedBlockId] = useState<string>("");
+  const [selectedFloorId, setSelectedFloorId] = useState<string>("");
+  const [selectedRoomId, setSelectedRoomId] = useState<string>("");
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -44,13 +48,17 @@ export function AddTenantDialog({ open, onOpenChange, onSuccess }: AddTenantDial
     cooler: "",
     geyser: "",
     securityDeposit: "",
-    block: "A",
-    floorNumber: "1",
-    roomNumber: "",
     bedNumber: "",
     rentDueDate: "5",
     paymentMethod: "upi",
   });
+
+  const blocks = useBlocks(selectedPgId).data ?? [];
+  const effectiveBlockId = selectedBlockId || blocks[0]?.id || "";
+  const floors = useFloors(selectedPgId, effectiveBlockId || undefined).data ?? [];
+  const effectiveFloorId = selectedFloorId || floors[0]?.id || "";
+  const rooms = useRoomsList(selectedPgId, effectiveBlockId || undefined, effectiveFloorId || undefined).data ?? [];
+  const effectiveRoomId = selectedRoomId || rooms[0]?.id || "";
 
   const update = (key: string, value: string) => setForm((p) => ({ ...p, [key]: value }));
 
@@ -61,11 +69,9 @@ export function AddTenantDialog({ open, onOpenChange, onSuccess }: AddTenantDial
     }
     const rent = parseInt(form.monthlyRent, 10) || 0;
     const security = parseInt(form.securityDeposit, 10) || 0;
-    const floor = parseInt(form.floorNumber, 10) || 1;
-    const room = parseInt(form.roomNumber, 10) || 0;
     const bed = parseInt(form.bedNumber, 10) || 0;
     const due = parseInt(form.rentDueDate, 10) || 5;
-    if (!form.name.trim() || !form.email.trim() || !form.phone.trim() || room <= 0 || bed <= 0) {
+    if (!form.name.trim() || !form.phone.trim() || !effectiveBlockId || !effectiveFloorId || !effectiveRoomId || bed <= 0) {
       toast({ title: "Fill required fields", variant: "destructive" });
       return;
     }
@@ -74,26 +80,28 @@ export function AddTenantDialog({ open, onOpenChange, onSuccess }: AddTenantDial
       setSubmitting(true);
       await addTenant(selectedPgId, {
         name: form.name.trim(),
-        email: form.email.trim(),
+        email: form.email.trim() || undefined,
         phone: form.phone.startsWith("+") ? form.phone : `+91${form.phone.replace(/\D/g, "")}`,
-        floorNumber: floor,
-        block: form.block,
-        roomNumber: room,
+        floorId: effectiveFloorId,
+        blockId: effectiveBlockId,
+        roomId: effectiveRoomId,
         bedNumber: bed,
         rentDueDate: due,
         monthlyRent: rent,
         electricityBill: 0,
         securityDeposit: security,
         joiningDate: form.joiningDate || undefined,
-        isNewRoom: true,
       });
       toast({ title: "Invite sent", description: "Tenant will receive an invite." });
       onOpenChange(false);
       setForm({
         name: "", email: "", phone: "", joiningDate: "", monthlyRent: "", ac: "", cooler: "", geyser: "",
-        securityDeposit: "", block: "A", floorNumber: "1", roomNumber: "", bedNumber: "", rentDueDate: "5",
+        securityDeposit: "", bedNumber: "", rentDueDate: "5",
         paymentMethod: "upi",
       });
+      setSelectedBlockId("");
+      setSelectedFloorId("");
+      setSelectedRoomId("");
       onSuccess?.();
     } catch (e: any) {
       toast({ title: "Failed to invite tenant", description: e?.message, variant: "destructive" });
@@ -151,24 +159,41 @@ export function AddTenantDialog({ open, onOpenChange, onSuccess }: AddTenantDial
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>BLOCK</Label>
-              <Select value={form.block} onValueChange={(v) => update("block", v)}>
+              <Select value={effectiveBlockId || "none"} onValueChange={(v) => { setSelectedBlockId(v); setSelectedFloorId(""); setSelectedRoomId(""); }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="A">A</SelectItem>
-                  <SelectItem value="B">B</SelectItem>
-                  <SelectItem value="C">C</SelectItem>
+                  {blocks.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                  ))}
+                  {blocks.length === 0 && <SelectItem value="none" disabled>No blocks</SelectItem>}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>FLOOR</Label>
-              <Input placeholder="Floor" value={form.floorNumber} onChange={(e) => update("floorNumber", e.target.value)} />
+              <Select value={effectiveFloorId || "none"} onValueChange={(v) => { setSelectedFloorId(v); setSelectedRoomId(""); }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {floors.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                  ))}
+                  {floors.length === 0 && <SelectItem value="none" disabled>No floors</SelectItem>}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>ROOM</Label>
-              <Input placeholder="Room no" value={form.roomNumber} onChange={(e) => update("roomNumber", e.target.value)} />
+              <Select value={effectiveRoomId || "none"} onValueChange={setSelectedRoomId}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {rooms.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>{String(r.roomNumber)}</SelectItem>
+                  ))}
+                  {rooms.length === 0 && <SelectItem value="none" disabled>No rooms</SelectItem>}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>BED NO.</Label>

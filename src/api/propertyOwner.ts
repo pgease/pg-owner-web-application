@@ -99,8 +99,13 @@ export async function createProperty(payload: CreatePropertyPayload) {
   });
 }
 
+export interface GetPropertiesResponse {
+  properties: PropertyResponse[];
+  total: number;
+}
+
 export async function getProperties() {
-  return httpRequest<PropertyResponse[]>(`${PROPERTY_OWNER_BASE}/properties`, {
+  return httpRequest<GetPropertiesResponse | PropertyResponse[]>(`${PROPERTY_OWNER_BASE}/properties`, {
     method: "GET",
     auth: true,
   });
@@ -243,19 +248,21 @@ export async function checkRoomAvailability(propertyId: string, params?: CheckRo
 
 export interface AddTenantPayload {
   name: string;
-  email: string;
+  email?: string;
   phone: string;
-  floorNumber: number;
-  block: string;
+  floorId?: string;
+  blockId?: string;
+  floorNumber?: number;
+  block?: string;
   roomId?: string;
-  roomNumber: number;
+  roomNumber?: number | string;
   bedNumber: number;
   rentDueDate: number;
   monthlyRent: number;
-  electricityBill: number;
+  electricityBill?: number;
   securityDeposit: number;
   joiningDate?: string;
-  isNewRoom: boolean;
+  isNewRoom?: boolean;
 }
 
 export interface TenantResponse {
@@ -394,6 +401,273 @@ export interface UpdateStaffPermissionsPayload {
 export async function updateStaffPermissions(staffId: string, payload: UpdateStaffPermissionsPayload) {
   return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/update-staff-permissions/${staffId}`, {
     method: "POST",
+    auth: true,
+    body: payload,
+  });
+}
+
+// ─── Complaints APIs ────────────────────────────────────────────────────────
+
+export interface Complaint {
+  id: string;
+  propertyId: string;
+  tenantId?: string;
+  subject?: string;
+  description?: string;
+  category?: string;
+  priority?: string;
+  status: string;
+  remarks?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export async function getComplaintsByProperty(
+  propertyId: string,
+  params?: { priority?: string }
+) {
+  const query = new URLSearchParams();
+  if (params?.priority) query.append("priority", params.priority);
+  const qs = query.toString();
+  const url = `${PROPERTY_OWNER_BASE}/properties/${propertyId}/complaints${qs ? `?${qs}` : ""}`;
+  return httpRequest<Complaint[]>(url, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export interface UpdateComplaintStatusPayload {
+  status: string;
+  remarks?: string;
+}
+
+export async function updateComplaintStatus(
+  complaintId: string,
+  payload: UpdateComplaintStatusPayload
+) {
+  return httpRequest<Complaint>(`${PROPERTY_OWNER_BASE}/complaints/${complaintId}`, {
+    method: "PUT",
+    auth: true,
+    body: payload,
+  });
+}
+
+// ─── Structure APIs (blocks/floors/rooms) ───────────────────────────────────
+
+export interface BlockItem {
+  id: string;
+  name: string;
+  propertyId: string;
+  createdAt?: string;
+}
+
+export interface FloorItem {
+  id: string;
+  name: string;
+  blockId: string;
+  propertyId: string;
+  createdAt?: string;
+}
+
+export interface SharingWisePricingItem {
+  sharingCount: number;
+  monthlyRent: number;
+  securityDeposit: number;
+}
+
+export interface RoomItem {
+  id: string;
+  propertyId: string;
+  floorId: string;
+  blockId?: string;
+  roomNumber: string;
+  numberOfBeds: number;
+  sharingWisePricing?: SharingWisePricingItem[];
+  occupiedBeds?: number;
+  availableBeds?: number;
+  createdAt?: string;
+}
+
+export async function getBlocks(propertyId: string) {
+  return httpRequest<BlockItem[]>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/blocks`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function createBlock(propertyId: string, payload: { name: string }) {
+  return httpRequest<BlockItem>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/blocks`, {
+    method: "POST",
+    auth: true,
+    body: payload,
+  });
+}
+
+export async function getFloors(propertyId: string, blockId: string) {
+  return httpRequest<FloorItem[]>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/blocks/${blockId}/floors`,
+    {
+      method: "GET",
+      auth: true,
+    }
+  );
+}
+
+export async function createFloor(propertyId: string, blockId: string, payload: { name: string }) {
+  return httpRequest<FloorItem>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/blocks/${blockId}/floors`,
+    {
+      method: "POST",
+      auth: true,
+      body: payload,
+    }
+  );
+}
+
+export interface GetRoomsParams {
+  page?: number;
+  limit?: number;
+  blockId?: string;
+  floorId?: string;
+}
+
+export async function getRooms(propertyId: string, params?: GetRoomsParams) {
+  const query = new URLSearchParams();
+  if (params?.page) query.append("page", String(params.page));
+  if (params?.limit) query.append("limit", String(params.limit));
+  if (params?.blockId) query.append("blockId", params.blockId);
+  if (params?.floorId) query.append("floorId", params.floorId);
+  const qs = query.toString();
+
+  return httpRequest<RoomItem[] | { data?: RoomItem[] }>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/rooms${qs ? `?${qs}` : ""}`,
+    {
+      method: "GET",
+      auth: true,
+    }
+  );
+}
+
+export async function getRoomsList(propertyId: string, params?: { blockId?: string; floorId?: string }) {
+  const query = new URLSearchParams();
+  if (params?.blockId) query.append("blockId", params.blockId);
+  if (params?.floorId) query.append("floorId", params.floorId);
+  const qs = query.toString();
+
+  return httpRequest<RoomItem[] | { data?: RoomItem[] }>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/rooms/list${qs ? `?${qs}` : ""}`,
+    {
+      method: "GET",
+      auth: true,
+    }
+  );
+}
+
+export interface CreateRoomPayload {
+  floorId: string;
+  roomNumber: string;
+  numberOfBeds: number;
+  sharingWisePricing?: SharingWisePricingItem[];
+}
+
+export async function createRoom(propertyId: string, payload: CreateRoomPayload) {
+  return httpRequest<RoomItem>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/rooms`, {
+    method: "POST",
+    auth: true,
+    body: payload,
+  });
+}
+
+// ─── Amenities/Restrictions APIs ─────────────────────────────────────────────
+
+export interface PropertyAmenity {
+  id: string;
+  name: string;
+  scope?: string;
+}
+
+export interface PropertyRestriction {
+  id: string;
+  name: string;
+}
+
+export async function getPropertyAmenities(propertyId: string) {
+  return httpRequest<PropertyAmenity[]>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/amenities`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function createCustomAmenity(propertyId: string, payload: { name: string }) {
+  return httpRequest<PropertyAmenity>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/amenities/custom`, {
+    method: "POST",
+    auth: true,
+    body: payload,
+  });
+}
+
+export async function linkAmenities(propertyId: string, payload: { amenityIds: string[] }) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/amenities`, {
+    method: "PUT",
+    auth: true,
+    body: payload,
+  });
+}
+
+export async function getPropertyRestrictions(propertyId: string) {
+  return httpRequest<PropertyRestriction[]>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/restrictions`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function createCustomRestriction(propertyId: string, payload: { name: string }) {
+  return httpRequest<PropertyRestriction>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/restrictions/custom`,
+    {
+      method: "POST",
+      auth: true,
+      body: payload,
+    }
+  );
+}
+
+export async function linkRestrictions(propertyId: string, payload: { restrictionIds: string[] }) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/restrictions`, {
+    method: "PUT",
+    auth: true,
+    body: payload,
+  });
+}
+
+// ─── Dining schedule APIs ────────────────────────────────────────────────────
+
+export interface DiningSlot {
+  menu: string;
+  startTime: string;
+  endTime: string;
+}
+
+export interface DiningDaySchedule {
+  dayOfWeek: number;
+  breakfast?: DiningSlot;
+  lunch?: DiningSlot;
+  dinner?: DiningSlot;
+}
+
+export async function getDiningSchedule(propertyId: string) {
+  return httpRequest<DiningDaySchedule[] | { schedule?: DiningDaySchedule[] }>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/dining-schedule`,
+    {
+      method: "GET",
+      auth: true,
+    }
+  );
+}
+
+export async function updateDiningSchedule(propertyId: string, payload: { schedule: DiningDaySchedule[] }) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/dining-schedule`, {
+    method: "PUT",
     auth: true,
     body: payload,
   });

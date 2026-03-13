@@ -1,8 +1,10 @@
-import { Check, X, Crown, Zap, Sparkles } from "lucide-react";
+import { Check, X, Crown, Zap, Sparkles, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { PageHeader } from "@/components/common/PageHeader";
+import { useMyFeaturesQuery } from "@/hooks/usePropertyOwnerQueries";
 
 const features = [
   { name: "Add tenants (Excel / Invite / Manual)", free: true, premium: true, pro: true },
@@ -27,8 +29,13 @@ const features = [
   { name: "Priority support", free: false, premium: true, pro: true },
 ];
 
-// Mock current plan — replace with real data from API/context
-const CURRENT_PLAN: string = "FREE";
+function normalizePlanKey(planName?: string, planDisplayName?: string): string {
+  const raw = (planDisplayName || planName || "").toUpperCase();
+  if (raw.includes("FREE")) return "FREE";
+  if (raw.includes("PREMIUM")) return "PREMIUM";
+  if (raw.includes("PRO")) return "PRO";
+  return raw || "FREE";
+}
 
 const plans = [
   {
@@ -59,16 +66,37 @@ const plans = [
 ];
 
 const Plans = () => {
+  const { data: featuresData, isLoading, isError, refetch } = useMyFeaturesQuery();
+  const currentPlanKey = featuresData
+    ? normalizePlanKey(featuresData.planName, featuresData.planDisplayName)
+    : "FREE";
+
   const totalFeatures = features.length;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 space-y-4">
+        <p className="text-sm text-muted-foreground">Failed to load plan information.</p>
+        <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-fade-in max-w-5xl mx-auto pb-12">
-      {/* Header */}
-      <div className="text-center space-y-2">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Plans & Pricing</h1>
-        <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          Simple, transparent pricing. Upgrade anytime as your PG grows.
-        </p>
+      <div className="text-center">
+        <PageHeader
+          title="Plans & Pricing"
+          description="Simple, transparent pricing. Upgrade anytime as your PG grows."
+        />
       </div>
 
       {/* Current Plan Banner */}
@@ -76,26 +104,26 @@ const Plans = () => {
         <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 py-4 px-5">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-              {CURRENT_PLAN === "FREE" && <Zap className="h-5 w-5 text-primary" />}
-              {CURRENT_PLAN === "PREMIUM" && <Sparkles className="h-5 w-5 text-primary" />}
-              {CURRENT_PLAN === "PRO" && <Crown className="h-5 w-5 text-primary" />}
+              {currentPlanKey === "FREE" && <Zap className="h-5 w-5 text-primary" />}
+              {currentPlanKey === "PREMIUM" && <Sparkles className="h-5 w-5 text-primary" />}
+              {currentPlanKey === "PRO" && <Crown className="h-5 w-5 text-primary" />}
             </div>
             <div>
               <p className="text-sm font-semibold">
-                You're on the <span className="text-primary">{CURRENT_PLAN}</span> plan
+                You're on the <span className="text-primary">{currentPlanKey}</span> plan
               </p>
               <p className="text-xs text-muted-foreground">
-                {CURRENT_PLAN === "FREE"
+                {currentPlanKey === "FREE"
                   ? "Upgrade to unlock automation & advanced features"
-                  : CURRENT_PLAN === "PREMIUM"
+                  : currentPlanKey === "PREMIUM"
                   ? "You have access to automation features"
                   : "You have full access to all features"}
               </p>
             </div>
           </div>
-          {CURRENT_PLAN !== "PRO" && (
-            <Button size="sm" className="shrink-0">
-              Upgrade Now
+          {currentPlanKey !== "PRO" && (
+            <Button size="sm" className="shrink-0" disabled>
+              Contact sales
             </Button>
           )}
         </CardContent>
@@ -104,7 +132,7 @@ const Plans = () => {
       {/* Plan Cards */}
       <div className="grid gap-5 sm:grid-cols-3">
         {plans.map((plan) => {
-          const isCurrent = plan.key === CURRENT_PLAN;
+          const isCurrent = plan.key === currentPlanKey;
           const Icon = plan.icon;
           return (
             <Card
@@ -139,7 +167,6 @@ const Plans = () => {
                 <p className="text-xs text-muted-foreground mt-1">{plan.tagline}</p>
               </CardHeader>
               <CardContent className="space-y-4 pb-6">
-                {/* Feature coverage bar */}
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-[11px] text-muted-foreground">
                     <span>Features included</span>
@@ -153,9 +180,9 @@ const Plans = () => {
                 <Button
                   className="w-full"
                   variant={isCurrent ? "outline" : plan.popular ? "default" : "outline"}
-                  disabled={isCurrent}
+                  disabled
                 >
-                  {isCurrent ? "Current Plan" : "Upgrade"}
+                  {isCurrent ? "Current Plan" : "Contact sales"}
                 </Button>
               </CardContent>
             </Card>
@@ -176,7 +203,7 @@ const Plans = () => {
                   <th className="text-left font-medium px-4 py-3 min-w-[200px]">Feature</th>
                   {plans.map((p) => (
                     <th key={p.key} className="text-center font-medium px-3 py-3 min-w-[100px]">
-                      <span className={p.key === CURRENT_PLAN ? "text-primary" : ""}>{p.key}</span>
+                      <span className={p.key === currentPlanKey ? "text-primary" : ""}>{p.key}</span>
                     </th>
                   ))}
                 </tr>

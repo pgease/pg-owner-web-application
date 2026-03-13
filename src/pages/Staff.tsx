@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
-import { UserCog, Plus, Shield, Phone, Mail, Loader2 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { useState } from "react";
+import { Plus, Shield, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -18,144 +18,130 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useApp } from "@/context/AppContext";
 import { toast } from "@/components/ui/use-toast";
+import { PageHeader } from "@/components/common/PageHeader";
+import { DataTableContainer } from "@/components/common/DataTableContainer";
 import {
-  getAllStaffWithPermissions,
-  createStaff,
-  getDesignations,
-  getMyFeatures,
-  type CreateStaffPayload,
-  type Designation,
-  type StaffWithPermissions,
-} from "@/api/propertyOwner";
+  useStaffList,
+  useDesignationsQuery,
+  useMyFeaturesQuery,
+  useCreateStaffMutation,
+} from "@/hooks/usePropertyOwnerQueries";
+
+const INITIAL_FORM = {
+  name: "",
+  email: "",
+  mobileContactNumber: "",
+  countryCode: "+91",
+  designation: "",
+  staffPermissionTierId: "",
+};
 
 const Staff = () => {
   const { selectedPgId, properties } = useApp();
-  const [staff, setStaff] = useState<StaffWithPermissions[]>([]);
-  const [designations, setDesignations] = useState<Designation[]>([]);
-  const [planInfo, setPlanInfo] = useState<{ planDisplayName: string } | null>(null);
-  const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    mobileContactNumber: "",
-    countryCode: "+91",
-    designation: "",
-    staffPermissionTierId: "",
-  });
+  const [form, setForm] = useState(INITIAL_FORM);
 
-  const selectedPg = Array.isArray(properties) ? properties.find((p) => p.id === selectedPgId) : null;
+  const selectedPg = Array.isArray(properties)
+    ? properties.find((p) => p.id === selectedPgId)
+    : null;
 
-  const loadStaff = async () => {
-    if (!selectedPgId) {
-      setStaff([]);
-      setLoading(false);
-      return;
-    }
-    try {
-      setLoading(true);
-      const list = await getAllStaffWithPermissions(selectedPgId);
-      setStaff(Array.isArray(list) ? list : []);
-    } catch (e) {
-      setStaff([]);
-      toast({ title: "Failed to load staff", variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    data: staff = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useStaffList(selectedPgId);
 
-  const loadDesignations = async () => {
-    try {
-      const list = await getDesignations();
-      setDesignations(Array.isArray(list) ? list : []);
-    } catch {
-      setDesignations([]);
-    }
-  };
+  const { data: designations = [] } = useDesignationsQuery();
+  const { data: featuresData } = useMyFeaturesQuery();
 
-  const loadPlanInfo = async () => {
-    try {
-      const res = await getMyFeatures();
-      setPlanInfo(
-        res && typeof res === "object" && "planDisplayName" in res
-          ? { planDisplayName: (res as { planDisplayName: string }).planDisplayName }
-          : null
-      );
-    } catch {
-      setPlanInfo(null);
-    }
-  };
+  const createStaffMutation = useCreateStaffMutation(selectedPgId);
 
-  useEffect(() => {
-    loadStaff();
-  }, [selectedPgId]);
-
-  useEffect(() => {
-    loadDesignations();
-    loadPlanInfo();
-  }, []);
+  const isFreePlan =
+    featuresData &&
+    (/free/i.test(featuresData.planDisplayName ?? "") ||
+      /free/i.test(featuresData.planName ?? ""));
 
   const handleAddStaff = async () => {
-    if (!selectedPgId || !form.name.trim() || !form.email.trim() || !form.mobileContactNumber.trim()) {
+    if (
+      !selectedPgId ||
+      !form.name.trim() ||
+      !form.email.trim() ||
+      !form.mobileContactNumber.trim()
+    ) {
       toast({ title: "Fill required fields", variant: "destructive" });
       return;
     }
+
     try {
-      setSubmitting(true);
-      const payload: CreateStaffPayload = {
+      await createStaffMutation.mutateAsync({
         propertyId: selectedPgId,
         name: form.name.trim(),
         email: form.email.trim(),
-        mobileContactNumber: form.mobileContactNumber.replace(/\D/g, "").slice(0, 10),
+        mobileContactNumber: form.mobileContactNumber
+          .replace(/\D/g, "")
+          .slice(0, 10),
         countryCode: form.countryCode || undefined,
         designation: form.designation || undefined,
         staffPermissionTierId: form.staffPermissionTierId || undefined,
-      };
-      await createStaff(payload);
+      });
       toast({ title: "Staff added successfully" });
       setAddOpen(false);
-      setForm({ name: "", email: "", mobileContactNumber: "", countryCode: "+91", designation: "", staffPermissionTierId: "" });
-      loadStaff();
+      setForm(INITIAL_FORM);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to add staff";
       toast({ title: msg, variant: "destructive" });
-    } finally {
-      setSubmitting(false);
     }
   };
 
+  const staffList = Array.isArray(staff) ? staff : [];
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Staff</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your PG staff and roles {selectedPg ? `— ${selectedPg.name}` : ""}
-          </p>
-        </div>
-        <Button
-          size="sm"
-          className="gap-2"
-          disabled={!selectedPgId}
-          onClick={() => setAddOpen(true)}
-        >
-          <Plus className="h-4 w-4" /> Add Staff
-        </Button>
-      </div>
+      <PageHeader
+        title="Staff"
+        description={`Manage your PG staff and roles${selectedPg ? ` — ${selectedPg.name}` : ""}`}
+        actions={
+          <Button
+            size="sm"
+            className="gap-2"
+            disabled={!selectedPgId}
+            onClick={() => setAddOpen(true)}
+          >
+            <Plus className="h-4 w-4" /> Add Staff
+          </Button>
+        }
+      />
 
-      {planInfo && (
+      {isFreePlan && (
         <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
           <Shield className="h-5 w-5 text-primary" />
           <div>
-            <p className="text-sm font-medium">Current plan: {planInfo.planDisplayName}</p>
+            <p className="text-sm font-medium">
+              Current plan: {featuresData?.planDisplayName}
+            </p>
             <p className="text-xs text-muted-foreground">
-              Staff roles & advanced permissions are available on higher plans. Upgrade to assign complaints, track activity, and manage staff permissions.
+              Staff roles & advanced permissions are available on higher plans.
+              Upgrade to assign complaints, track activity, and manage staff
+              permissions.
             </p>
           </div>
-          <Button size="sm" variant="outline" className="ml-auto shrink-0" onClick={() => window.location.href = "/plans"}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-auto shrink-0"
+            onClick={() => (window.location.href = "/plans")}
+          >
             Upgrade
           </Button>
         </div>
@@ -167,37 +153,72 @@ const Staff = () => {
             Select a PG from the header to view and manage staff.
           </CardContent>
         </Card>
-      ) : loading ? (
+      ) : isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
+      ) : isError ? (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-3 p-6 text-center">
+            <AlertCircle className="h-8 w-8 text-destructive" />
+            <p className="text-sm text-muted-foreground">
+              Failed to load staff. Please try again.
+            </p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      ) : staffList.length === 0 ? (
+        <Card>
+          <CardContent className="p-6 text-center text-muted-foreground">
+            No staff members yet. Click "Add Staff" to get started.
+          </CardContent>
+        </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {staff.length === 0 ? (
-            <Card>
-              <CardContent className="p-6 text-center text-muted-foreground">
-                No staff yet. Add staff to get started.
-              </CardContent>
-            </Card>
-          ) : (
-            staff.map((s) => (
-              <Card key={s.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="flex items-center gap-4 p-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                    {s.name.split(" ").map((n) => n[0]).join("")}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{s.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {s.designation || "Staff"} · {selectedPg?.name ?? ""}
-                    </p>
-                  </div>
-                  <Badge variant="default">Active</Badge>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
+        <DataTableContainer>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Mobile</TableHead>
+                <TableHead>Designation</TableHead>
+                <TableHead>Permissions</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {staffList.map((s) => (
+                <TableRow key={s.id}>
+                  <TableCell className="font-medium">{s.name}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {s.email}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {s.countryCode ? `${s.countryCode} ` : ""}
+                    {s.mobileContactNumber}
+                  </TableCell>
+                  <TableCell>
+                    {s.designation ? (
+                      <Badge variant="secondary">{s.designation}</Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">
+                      {s.permissions?.length ?? 0}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Badge variant="default">Active</Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </DataTableContainer>
       )}
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
@@ -211,7 +232,9 @@ const Staff = () => {
               <Input
                 placeholder="Full name"
                 value={form.name}
-                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, name: e.target.value }))
+                }
               />
             </div>
             <div className="space-y-2">
@@ -220,13 +243,20 @@ const Staff = () => {
                 type="email"
                 placeholder="email@example.com"
                 value={form.email}
-                onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, email: e.target.value }))
+                }
               />
             </div>
             <div className="space-y-2">
               <Label>Mobile</Label>
               <div className="flex gap-2">
-                <Select value={form.countryCode} onValueChange={(v) => setForm((p) => ({ ...p, countryCode: v }))}>
+                <Select
+                  value={form.countryCode}
+                  onValueChange={(v) =>
+                    setForm((p) => ({ ...p, countryCode: v }))
+                  }
+                >
                   <SelectTrigger className="w-20">
                     <SelectValue />
                   </SelectTrigger>
@@ -238,7 +268,14 @@ const Staff = () => {
                 <Input
                   placeholder="10-digit number"
                   value={form.mobileContactNumber}
-                  onChange={(e) => setForm((p) => ({ ...p, mobileContactNumber: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
+                  onChange={(e) =>
+                    setForm((p) => ({
+                      ...p,
+                      mobileContactNumber: e.target.value
+                        .replace(/\D/g, "")
+                        .slice(0, 10),
+                    }))
+                  }
                   className="flex-1"
                 />
               </div>
@@ -246,22 +283,34 @@ const Staff = () => {
             {designations.length > 0 && (
               <div className="space-y-2">
                 <Label>Designation (optional)</Label>
-                <Select value={form.designation} onValueChange={(v) => setForm((p) => ({ ...p, designation: v }))}>
+                <Select
+                  value={form.designation}
+                  onValueChange={(v) =>
+                    setForm((p) => ({ ...p, designation: v }))
+                  }
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select designation" />
                   </SelectTrigger>
                   <SelectContent>
                     {designations.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             )}
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-              <Button onClick={handleAddStaff} disabled={submitting}>
-                {submitting ? (
+              <Button variant="outline" onClick={() => setAddOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAddStaff}
+                disabled={createStaffMutation.isPending}
+              >
+                {createStaffMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" /> Adding...
                   </>

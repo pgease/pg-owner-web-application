@@ -1,75 +1,84 @@
+import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
+import { useQuery } from "@tanstack/react-query";
+import { getMe } from "@/api/propertyOwner";
+import { useApp } from "@/context/AppContext";
+import { PageHeader } from "@/components/common/PageHeader";
 
-const SettingsPage = () => (
+const SettingsPage = () => {
+  const { language, setLanguage } = useApp();
+  const meQuery = useQuery({
+    queryKey: ["property-owner", "me"],
+    queryFn: getMe,
+  });
+  const me = meQuery.data;
+
+  return (
   <div className="space-y-6 animate-fade-in max-w-2xl">
-    <div>
-      <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-      <p className="text-sm text-muted-foreground">Manage your account and preferences</p>
-    </div>
+    <PageHeader title="Settings" description="Manage your account and preferences" />
 
     <Card>
       <CardHeader><CardTitle className="text-base">Profile</CardTitle></CardHeader>
       <CardContent className="space-y-4">
+        {meQuery.isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : meQuery.isError ? (
+          <div className="space-y-3 text-center">
+            <p className="text-sm text-muted-foreground">Failed to load profile.</p>
+            <Button size="sm" variant="outline" onClick={() => meQuery.refetch()}>Retry</Button>
+          </div>
+        ) : (
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Full Name</Label>
-            <Input defaultValue="Rajesh Patel" />
+            <Input value={me?.name ?? ""} readOnly className="bg-muted/50" />
           </div>
           <div className="space-y-2">
             <Label>Email</Label>
-            <Input defaultValue="rajesh@pgease.in" />
+            <Input value={me?.email ?? ""} readOnly className="bg-muted/50" />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        )}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label>Phone</Label>
-            <Input defaultValue="+91 98765 43210" />
+            <Input value={`${me?.countryCode ?? ""}${me?.mobileContactNumber ?? ""}`} readOnly className="bg-muted/50" />
           </div>
           <div className="space-y-2">
-            <Label>Business Name</Label>
-            <Input defaultValue="Rajesh PG Management" />
+            <Label>Preferred Language</Label>
+            <div className="flex gap-2">
+              <Button size="sm" variant={language === "en-US" ? "default" : "outline"} onClick={() => setLanguage("en-US")}>English</Button>
+              <Button size="sm" variant={language === "hi-IN" ? "default" : "outline"} onClick={() => setLanguage("hi-IN")}>Hindi</Button>
+            </div>
           </div>
         </div>
-        <Button size="sm">Save Changes</Button>
       </CardContent>
     </Card>
 
     <Card>
       <CardHeader><CardTitle className="text-base">Notifications</CardTitle></CardHeader>
-      <CardContent className="space-y-4">
-        {[
-          { label: "Email notifications", desc: "Receive rent & complaint updates via email", checked: true },
-          { label: "WhatsApp reminders", desc: "Send rent reminders to tenants", checked: true },
-          { label: "SMS notifications", desc: "Receive SMS for critical alerts", checked: false },
-        ].map((n) => (
-          <div key={n.label} className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">{n.label}</p>
-              <p className="text-xs text-muted-foreground">{n.desc}</p>
-            </div>
-            <Switch defaultChecked={n.checked} />
-          </div>
-        ))}
+      <CardContent>
+        <p className="text-sm text-muted-foreground">
+          Notification preferences will be configurable in an upcoming update.
+        </p>
       </CardContent>
     </Card>
 
     <Card>
       <CardHeader><CardTitle className="text-base">PG Rules & Terms</CardTitle></CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground mb-3">Define default rules shown in tenant agreements.</p>
-        <textarea
-          className="w-full rounded-md border bg-muted/50 p-3 text-sm resize-none h-32 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          defaultValue="1. Rent is due by the 5th of every month.&#10;2. Security deposit is non-refundable if notice period is not served.&#10;3. Guests are not allowed to stay overnight without prior permission."
-        />
-        <Button size="sm" className="mt-3">Save Rules</Button>
+        <p className="text-sm text-muted-foreground">
+          Custom PG rules and terms management will be available in an upcoming update.
+        </p>
       </CardContent>
     </Card>
   </div>
-);
+  );
+};
 
 export default SettingsPage;

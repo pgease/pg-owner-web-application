@@ -69,9 +69,41 @@ export const appPrefs = {
   },
 };
 
+/* ─── Token refresh with single-flight dedup ─────────────────────────────── */
+
+let _refreshPromise: Promise<boolean> | null = null;
+
+async function attemptTokenRefresh(): Promise<boolean> {
+  const rt = authStorage.getRefreshToken();
+  if (!rt) return false;
+  try {
+    const res = await fetch(`${API_BASE_URL}/property-owners/refresh-token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken: rt }),
+    });
+    if (!res.ok) return false;
+    const json = await res.json();
+    authStorage.set({ accessToken: json.accessToken, refreshToken: json.refreshToken });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function forceLogout() {
+  authStorage.clear();
+  if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+    window.location.href = "/login";
+  }
+}
+
+/* ─── HTTP client ─────────────────────────────────────────────────────────── */
+
 interface RequestOptions extends Omit<RequestInit, 'body'> {
   auth?: boolean;
   body?: unknown;
+  _retried?: boolean;
 }
 
 export async function httpRequest<TResponse>(path: string, options: RequestOptions = {}): Promise<TResponse> {
@@ -81,7 +113,6 @@ export async function httpRequest<TResponse>(path: string, options: RequestOptio
     ...(options.headers || {}),
   };
 
-  // Only set Content-Type for JSON requests (not for FormData)
   if (!(options.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
@@ -93,7 +124,6 @@ export async function httpRequest<TResponse>(path: string, options: RequestOptio
     }
   }
 
-  // Convert body to JSON string if it's not FormData
   const body = options.body instanceof FormData ? options.body : options.body ? JSON.stringify(options.body) : undefined;
 
   const response = await fetch(url, {
@@ -104,6 +134,21 @@ export async function httpRequest<TResponse>(path: string, options: RequestOptio
 
   const isJson = response.headers.get("content-type")?.includes("application/json");
   const data = isJson ? await response.json() : undefined;
+
+  if (response.status === 401 && options.auth && !options._retried) {
+    if (!_refreshPromise) {
+      _refreshPromise = attemptTokenRefresh().finally(() => { _refreshPromise = null; });
+    }
+    const refreshed = await _refreshPromise;
+    if (refreshed) {
+      return httpRequest<TResponse>(path, { ...options, _retried: true });
+    }
+    forceLogout();
+    const error: HttpError = new Error("Session expired. Please log in again.");
+    error.status = 401;
+    error.data = data;
+    throw error;
+  }
 
   if (!response.ok) {
     const error: HttpError = new Error((data as any)?.message || "Something went wrong");
