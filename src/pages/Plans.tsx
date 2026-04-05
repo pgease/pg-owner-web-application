@@ -1,40 +1,42 @@
-import { Check, X, Crown, Zap, Sparkles, Loader2 } from "lucide-react";
+import { Check, X, Crown, Zap, Sparkles, Loader2, Lock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { PageHeader } from "@/components/common/PageHeader";
 import { useMyFeaturesQuery } from "@/hooks/usePropertyOwnerQueries";
+import { buildFeatureKeySet, userHasFeatureForRow, type PlanTierKey } from "@/lib/planFeatures";
 
+/** `featureKey` must match `featureKey` from GET /property-owners/my-features so “Your plan” can show locked/unlocked. */
 const features = [
-  { name: "Add tenants (Excel / Invite / Manual)", free: true, premium: true, pro: true },
-  { name: "Multi-PG / Multi-Building", free: true, premium: true, pro: true },
-  { name: "Notice period tracker", free: true, premium: true, pro: true },
-  { name: "Vacancy & tenant dashboard", free: true, premium: true, pro: true },
-  { name: "Manual rent add", free: true, premium: true, pro: true },
-  { name: "Manual receipts upload", free: true, premium: true, pro: true },
-  { name: "Complaint logging", free: true, premium: true, pro: true },
-  { name: "Automatic rent collection (UPI)", free: false, premium: true, pro: true },
-  { name: "WhatsApp rent reminders", free: false, premium: true, pro: true },
-  { name: "Aadhaar verification", free: false, premium: true, pro: true },
-  { name: "Auto rent receipts", free: false, premium: true, pro: true },
-  { name: "Guest tracking (automatic)", free: false, premium: true, pro: true },
-  { name: "Automated late fees", free: false, premium: true, pro: true },
-  { name: "Staff roles & permissions", free: false, premium: false, pro: true },
-  { name: "Expense & bill tracking", free: false, premium: false, pro: true },
-  { name: "Complaint threading & assignment", free: false, premium: false, pro: true },
-  { name: "PG Website (pgname.pgease.in)", free: false, premium: false, pro: true },
-  { name: "Group notifications / Broadcast", free: false, premium: false, pro: true },
-  { name: "Advanced reports (PDF / Excel)", free: false, premium: false, pro: true },
-  { name: "Priority support", free: false, premium: true, pro: true },
+  { name: "Add tenants (Excel / Invite / Manual)", featureKey: "TENANT_ONBOARDING_EXCEL", free: true, premium: true, pro: true },
+  { name: "Multi-PG / Multi-Building", featureKey: "MULTI_PROPERTY", free: true, premium: true, pro: true },
+  { name: "Notice period tracker", featureKey: "NOTICE_PERIOD", free: true, premium: true, pro: true },
+  { name: "Vacancy & tenant dashboard", featureKey: "VACANCY_DASHBOARD", free: true, premium: true, pro: true },
+  { name: "Manual rent add", featureKey: "MANUAL_RENT", free: true, premium: true, pro: true },
+  { name: "Manual receipts upload", featureKey: "MANUAL_RECEIPTS", free: true, premium: true, pro: true },
+  { name: "Complaint logging", featureKey: "COMPLAINTS_BASIC", free: true, premium: true, pro: true },
+  { name: "Automatic rent collection (UPI)", featureKey: "AUTO_RENT_UPI", free: false, premium: true, pro: true },
+  { name: "WhatsApp rent reminders", featureKey: "WHATSAPP_REMINDERS", free: false, premium: true, pro: true },
+  { name: "Aadhaar verification", featureKey: "AADHAAR_KYC", free: false, premium: true, pro: true },
+  { name: "Auto rent receipts", featureKey: "AUTO_RECEIPTS", free: false, premium: true, pro: true },
+  { name: "Guest tracking (automatic)", featureKey: "GUEST_TRACKING", free: false, premium: true, pro: true },
+  { name: "Automated late fees", featureKey: "LATE_FEES", free: false, premium: true, pro: true },
+  { name: "Staff roles & permissions", featureKey: "STAFF_ROLES", free: false, premium: false, pro: true },
+  { name: "Expense & bill tracking", featureKey: "EXPENSE_TRACKING", free: false, premium: false, pro: true },
+  { name: "Complaint threading & assignment", featureKey: "COMPLAINTS_ADVANCED", free: false, premium: false, pro: true },
+  { name: "PG Website (pgname.pgease.in)", featureKey: "PG_WEBSITE", free: false, premium: false, pro: true },
+  { name: "Group notifications / Broadcast", featureKey: "BROADCAST", free: false, premium: false, pro: true },
+  { name: "Advanced reports (PDF / Excel)", featureKey: "ADVANCED_REPORTS", free: false, premium: false, pro: true },
+  { name: "Priority support", featureKey: "PRIORITY_SUPPORT", free: false, premium: true, pro: true },
 ];
 
-function normalizePlanKey(planName?: string, planDisplayName?: string): string {
+function normalizePlanKey(planName?: string, planDisplayName?: string): PlanTierKey {
   const raw = (planDisplayName || planName || "").toUpperCase();
   if (raw.includes("FREE")) return "FREE";
   if (raw.includes("PREMIUM")) return "PREMIUM";
   if (raw.includes("PRO")) return "PRO";
-  return raw || "FREE";
+  return "FREE";
 }
 
 const plans = [
@@ -70,6 +72,9 @@ const Plans = () => {
   const currentPlanKey = featuresData
     ? normalizePlanKey(featuresData.planName, featuresData.planDisplayName)
     : "FREE";
+
+  const apiFeatureKeys = buildFeatureKeySet(featuresData?.features);
+  const hasExplicitApiList = (featuresData?.features?.length ?? 0) > 0;
 
   const totalFeatures = features.length;
 
@@ -125,6 +130,50 @@ const Plans = () => {
             <Button size="sm" className="shrink-0" disabled>
               Contact sales
             </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Live features from API: GET /property-owners/my-features */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Features in your plan</CardTitle>
+          <p className="text-xs text-muted-foreground font-normal">
+            Loaded from <code className="rounded bg-muted px-1 py-0.5 text-[11px]">GET /property-owners/my-features</code>
+            . Keys here should match the <span className="font-medium">featureKey</span> column in the comparison table
+            below.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {!hasExplicitApiList ? (
+            <div className="rounded-lg border border-dashed bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
+              No feature rows returned yet. When the backend sends a non-empty <code className="text-[11px]">features</code>{" "}
+              array, each item appears here. Until then, &quot;Your plan&quot; in the table uses your plan name (Free /
+              Premium / Pro) only.
+            </div>
+          ) : (
+            <ul className="grid gap-3 sm:grid-cols-2">
+              {featuresData!.features.map((f) => (
+                <li
+                  key={f.id}
+                  className="rounded-lg border bg-card px-3 py-2.5 text-left shadow-sm"
+                >
+                  <p className="text-sm font-medium leading-snug">{f.featureName}</p>
+                  {f.featureDescription ? (
+                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{f.featureDescription}</p>
+                  ) : null}
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                    <Badge variant="secondary" className="font-mono text-[10px]">
+                      {f.featureKey}
+                    </Badge>
+                    {f.category ? (
+                      <span className="rounded bg-muted px-1.5 py-0.5">{f.category}</span>
+                    ) : null}
+                    {f.limit != null ? <span>Limit: {f.limit}</span> : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
         </CardContent>
       </Card>
@@ -194,6 +243,11 @@ const Plans = () => {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Feature Comparison</CardTitle>
+          <p className="text-xs text-muted-foreground font-normal">
+            The <span className="font-medium">Your plan</span> column uses your enabled{" "}
+            <span className="font-medium">featureKey</span>s when the API returns them; otherwise it follows Free /
+            Premium / Pro tiers.
+          </p>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -206,23 +260,48 @@ const Plans = () => {
                       <span className={p.key === currentPlanKey ? "text-primary" : ""}>{p.key}</span>
                     </th>
                   ))}
+                  <th className="text-center font-medium px-3 py-3 min-w-[88px] bg-primary/5">
+                    <span className="text-primary">Your plan</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {features.map((f, i) => (
-                  <tr key={i} className={`border-b last:border-0 ${i % 2 === 0 ? "bg-muted/20" : ""}`}>
-                    <td className="px-4 py-2.5 text-sm">{f.name}</td>
-                    {(["free", "premium", "pro"] as const).map((tier) => (
-                      <td key={tier} className="text-center px-3 py-2.5">
-                        {f[tier] ? (
-                          <Check className="h-4 w-4 text-emerald-500 mx-auto" />
+                {features.map((f, i) => {
+                  const youHave = userHasFeatureForRow(
+                    f,
+                    apiFeatureKeys,
+                    hasExplicitApiList,
+                    currentPlanKey
+                  );
+                  return (
+                    <tr key={i} className={`border-b last:border-0 ${i % 2 === 0 ? "bg-muted/20" : ""}`}>
+                      <td className="px-4 py-2.5 text-sm">
+                        <span>{f.name}</span>
+                        {f.featureKey ? (
+                          <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground">{f.featureKey}</span>
+                        ) : null}
+                      </td>
+                      {(["free", "premium", "pro"] as const).map((tier) => (
+                        <td key={tier} className="text-center px-3 py-2.5">
+                          {f[tier] ? (
+                            <Check className="h-4 w-4 text-emerald-500 mx-auto" />
+                          ) : (
+                            <X className="h-4 w-4 text-muted-foreground mx-auto opacity-40" />
+                          )}
+                        </td>
+                      ))}
+                      <td className="text-center px-3 py-2.5 bg-primary/[0.03]">
+                        {youHave ? (
+                          <Check className="h-4 w-4 text-emerald-600 mx-auto" aria-label="Included" />
                         ) : (
-                          <X className="h-4 w-4 text-muted-foreground mx-auto opacity-40" />
+                          <span className="inline-flex items-center justify-center" title="Not included in your plan">
+                            <Lock className="h-4 w-4 text-amber-600/90 mx-auto" aria-label="Locked" />
+                          </span>
                         )}
                       </td>
-                    ))}
-                  </tr>
-                ))}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

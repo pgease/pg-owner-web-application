@@ -673,3 +673,211 @@ export async function updateDiningSchedule(propertyId: string, payload: { schedu
   });
 }
 
+// ─── Dashboard (property-owner) ─────────────────────────────────────────────
+
+export async function getDashboardDetails(propertyId: string) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/dashboard-details/${propertyId}`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function getDashboardKpis() {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/dashboard/kpis`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+// ─── KYC ───────────────────────────────────────────────────────────────────
+
+export async function getKycApplications() {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/kyc/applications`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function getKycByRoomTenantId(roomTenantId: string) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/kyc/${roomTenantId}`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function approveKycApplication(roomTenantId: string) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/kyc/${roomTenantId}/approve`, {
+    method: "PATCH",
+    auth: true,
+  });
+}
+
+export async function rejectKycApplication(roomTenantId: string, reason: string) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/kyc/${roomTenantId}/reject`, {
+    method: "PATCH",
+    auth: true,
+    body: { reason },
+  });
+}
+
+// ─── Rent collections ─────────────────────────────────────────────────────
+
+export interface ManualRentCollectionPayload {
+  roomTenantId: string;
+  tenantId: string;
+  periodMonth: number;
+  periodYear: number;
+  amountPaid: number;
+}
+
+export async function postManualRentCollection(propertyId: string, payload: ManualRentCollectionPayload) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/rent-collections/manual`, {
+    method: "POST",
+    auth: true,
+    body: payload,
+  });
+}
+
+/** Row shape may include extra fields from the API; camelCase or snake_case accepted in helpers. */
+export interface RentDashboardTenantRow {
+  roomTenantId?: string;
+  tenantId?: string;
+  room_tenant_id?: string;
+  tenant_id?: string;
+  tenantName?: string;
+  name?: string;
+  tenant_name?: string;
+  amount?: number;
+  amountDue?: number;
+  amount_due?: number;
+  amountPaid?: number;
+  amount_paid?: number;
+  pendingAmount?: number;
+  roomNumber?: string | number;
+  room_number?: string | number;
+  [key: string]: unknown;
+}
+
+export interface RentCollectionDashboardResponse {
+  period?: { month: number; year: number };
+  emptyBedsCount?: number;
+  totalCollectedThisPeriod?: number;
+  totalRevenueAllTime?: number;
+  paidCount?: number;
+  unpaidCount?: number;
+  paidTenants?: RentDashboardTenantRow[];
+  unpaidTenants?: RentDashboardTenantRow[];
+}
+
+export async function getRentCollectionDashboard(
+  propertyId: string,
+  periodMonth: number,
+  periodYear: number
+) {
+  const q = new URLSearchParams({
+    periodMonth: String(periodMonth),
+    periodYear: String(periodYear),
+  });
+  return httpRequest<RentCollectionDashboardResponse>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/rent-collections/dashboard?${q}`,
+    {
+      method: "GET",
+      auth: true,
+    }
+  );
+}
+
+// ─── Analytics ──────────────────────────────────────────────────────────────
+
+export async function getAnalyticsPgGrowth() {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/analytics/pg-growth`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function getAnalyticsRevenue(propertyId: string) {
+  return httpRequest<unknown>(
+    `${PROPERTY_OWNER_BASE}/analytics/revenue?propertyId=${encodeURIComponent(propertyId)}`,
+    {
+      method: "GET",
+      auth: true,
+    }
+  );
+}
+
+export async function getAnalyticsOccupancy(propertyId: string) {
+  return httpRequest<unknown>(
+    `${PROPERTY_OWNER_BASE}/analytics/occupancy?propertyId=${encodeURIComponent(propertyId)}`,
+    {
+      method: "GET",
+      auth: true,
+    }
+  );
+}
+
+// ─── Staff: permission tiers & roles (Postman “Temp” + extended) ────────────
+
+export interface StaffPermissionTierPayload {
+  name: string;
+  description?: string;
+  active?: boolean;
+}
+
+export async function createStaffPermissionTier(payload: StaffPermissionTierPayload) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/staff/permission-tiers`, {
+    method: "POST",
+    auth: true,
+    body: payload,
+  });
+}
+
+export async function getStaffPermissionTiers() {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/staff/permission-tiers`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function linkPermissionToStaffTier(tierId: string, permissionId: string) {
+  return httpRequest<unknown>(
+    `${PROPERTY_OWNER_BASE}/staff/permission-tiers/${tierId}/permissions/${permissionId}`,
+    {
+      method: "POST",
+      auth: true,
+    }
+  );
+}
+
+export async function assignStaffRole(payload: { staffId: string; permissionTierId: string }) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/staff/roles/assign`, {
+    method: "POST",
+    auth: true,
+    body: payload,
+  });
+}
+
+export async function getStaffMemberRoles(staffId: string) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/staff/${staffId}/roles`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export interface CreateStaffPermissionDefinitionPayload {
+  featureKey: string;
+  featureId: string;
+  action: string;
+  description?: string;
+  active?: boolean;
+}
+
+/** Creates a staff-scoped permission definition (admin-style; exposed for completeness). */
+export async function createStaffPermissionDefinition(payload: CreateStaffPermissionDefinitionPayload) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/staff/permissions`, {
+    method: "POST",
+    auth: true,
+    body: payload,
+  });
+}
+

@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useLocation } from "react-router-dom";
+import { CanAccessPage } from "@/components/PermissionGuard";
 import { Plus, Shield, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +38,7 @@ import {
   useMyFeaturesQuery,
   useCreateStaffMutation,
 } from "@/hooks/usePropertyOwnerQueries";
+import StaffRoles from "./StaffRoles";
 
 const INITIAL_FORM = {
   name: "",
@@ -46,7 +49,7 @@ const INITIAL_FORM = {
   staffPermissionTierId: "",
 };
 
-const Staff = () => {
+const StaffListContent = () => {
   const { selectedPgId, properties } = useApp();
   const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState(INITIAL_FORM);
@@ -323,6 +326,22 @@ const Staff = () => {
         </DialogContent>
       </Dialog>
     </div>
+  );
+};
+
+const Staff = () => {
+  const location = useLocation();
+  if (location.pathname === "/staff/roles") {
+    return (
+      <CanAccessPage permission="team_property_access">
+        <StaffRoles />
+      </CanAccessPage>
+    );
+  }
+  return (
+    <CanAccessPage permission="team_view_members">
+      <StaffListContent />
+    </CanAccessPage>
   );
 };
 

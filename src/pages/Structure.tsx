@@ -21,6 +21,7 @@ import {
   useFloors,
   useRooms,
 } from "@/hooks/usePropertyOwnerQueries";
+import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
 
 const Structure = () => {
   const { selectedPgId, properties } = useApp();
@@ -102,6 +103,7 @@ const Structure = () => {
   };
 
   return (
+    <CanAccessPage permission="room_view">
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Blocks, Floors & Rooms</h1>
@@ -177,14 +179,16 @@ const Structure = () => {
             <p className="text-sm text-muted-foreground mb-3">Total: {blocks.length}</p>
             <div className="space-y-2">
               <Input placeholder="Block name" value={blockName} onChange={(e) => setBlockName(e.target.value)} />
-              <Button
-                size="sm"
-                className="gap-2 w-full"
-                onClick={addBlock}
-                disabled={!selectedPgId || createBlockMutation.isPending}
-              >
-                <Plus className="h-4 w-4" /> {createBlockMutation.isPending ? "Adding..." : "Add Block"}
-              </Button>
+              <CanAccess permission="room_add">
+                <Button
+                  size="sm"
+                  className="gap-2 w-full"
+                  onClick={addBlock}
+                  disabled={!selectedPgId || createBlockMutation.isPending}
+                >
+                  <Plus className="h-4 w-4" /> {createBlockMutation.isPending ? "Adding..." : "Add Block"}
+                </Button>
+              </CanAccess>
             </div>
           </CardContent>
         </Card>
@@ -198,15 +202,17 @@ const Structure = () => {
             <p className="text-sm text-muted-foreground mb-3">Total: {floors.length}</p>
             <div className="space-y-2">
               <Input placeholder="Floor name/number" value={floorName} onChange={(e) => setFloorName(e.target.value)} />
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-2 w-full"
-                onClick={addFloor}
-                disabled={!selectedPgId || !effectiveBlockId || createFloorMutation.isPending}
-              >
-                <Plus className="h-4 w-4" /> {createFloorMutation.isPending ? "Adding..." : "Add Floor"}
-              </Button>
+              <CanAccess permission="room_add">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2 w-full"
+                  onClick={addFloor}
+                  disabled={!selectedPgId || !effectiveBlockId || createFloorMutation.isPending}
+                >
+                  <Plus className="h-4 w-4" /> {createFloorMutation.isPending ? "Adding..." : "Add Floor"}
+                </Button>
+              </CanAccess>
             </div>
           </CardContent>
         </Card>
@@ -220,15 +226,17 @@ const Structure = () => {
             <p className="text-sm text-muted-foreground mb-3">Total: {rooms.length}</p>
             <div className="space-y-2">
               <Input placeholder="Room number (e.g. A-101)" value={roomNumber} onChange={(e) => setRoomNumber(e.target.value)} />
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-2 w-full"
-                onClick={addRoom}
-                disabled={!selectedPgId || !effectiveFloorId || createRoomMutation.isPending}
-              >
-                <Plus className="h-4 w-4" /> {createRoomMutation.isPending ? "Adding..." : "Add Room"}
-              </Button>
+              <CanAccess permission="room_add">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2 w-full"
+                  onClick={addRoom}
+                  disabled={!selectedPgId || !effectiveFloorId || createRoomMutation.isPending}
+                >
+                  <Plus className="h-4 w-4" /> {createRoomMutation.isPending ? "Adding..." : "Add Room"}
+                </Button>
+              </CanAccess>
             </div>
           </CardContent>
         </Card>
@@ -259,6 +267,7 @@ const Structure = () => {
         </Card>
       )}
     </div>
+    </CanAccessPage>
   );
 };
 

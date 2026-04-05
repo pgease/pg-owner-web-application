@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useApp } from "@/context/AppContext";
-import { addTenant } from "@/api/propertyOwner";
+import { addTenant, checkRoomAvailability } from "@/api/propertyOwner";
 import { toast } from "@/components/ui/use-toast";
 import { useBlocks, useFloors, useRoomsList } from "@/hooks/usePropertyOwnerQueries";
 
@@ -58,7 +58,8 @@ export function AddTenantDialog({ open, onOpenChange, onSuccess }: AddTenantDial
   const floors = useFloors(selectedPgId, effectiveBlockId || undefined).data ?? [];
   const effectiveFloorId = selectedFloorId || floors[0]?.id || "";
   const rooms = useRoomsList(selectedPgId, effectiveBlockId || undefined, effectiveFloorId || undefined).data ?? [];
-  const effectiveRoomId = selectedRoomId || rooms[0]?.id || "";
+  const vacantRooms = rooms.filter((r) => (Number(r.availableBeds) || 0) > 0);
+  const effectiveRoomId = selectedRoomId || vacantRooms[0]?.id || "";
 
   const update = (key: string, value: string) => setForm((p) => ({ ...p, [key]: value }));
 
@@ -78,6 +79,26 @@ export function AddTenantDialog({ open, onOpenChange, onSuccess }: AddTenantDial
 
     try {
       setSubmitting(true);
+      const selectedRoom = vacantRooms.find((r) => r.id === effectiveRoomId);
+      const roomNumParsed = selectedRoom
+        ? parseInt(String(selectedRoom.roomNumber).replace(/\D/g, "").slice(0, 8), 10)
+        : NaN;
+      const blockName = blocks.find((b) => b.id === effectiveBlockId)?.name;
+      const floorName = floors.find((f) => f.id === effectiveFloorId)?.name;
+      const availability = await checkRoomAvailability(selectedPgId, {
+        block: blockName,
+        floorNumber: floorName,
+        roomNumber: Number.isFinite(roomNumParsed) ? roomNumParsed : undefined,
+        bedNumber: String(bed),
+      });
+      if (!availability.available) {
+        toast({
+          title: "Bed not available",
+          description: availability.message || "Room check failed.",
+          variant: "destructive",
+        });
+        return;
+      }
       await addTenant(selectedPgId, {
         name: form.name.trim(),
         email: form.email.trim() || undefined,
@@ -188,10 +209,12 @@ export function AddTenantDialog({ open, onOpenChange, onSuccess }: AddTenantDial
               <Select value={effectiveRoomId || "none"} onValueChange={setSelectedRoomId}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {rooms.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>{String(r.roomNumber)}</SelectItem>
+                  {vacantRooms.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {String(r.roomNumber)} ({r.availableBeds} available)
+                    </SelectItem>
                   ))}
-                  {rooms.length === 0 && <SelectItem value="none" disabled>No rooms</SelectItem>}
+                  {vacantRooms.length === 0 && <SelectItem value="none" disabled>No vacant rooms</SelectItem>}
                 </SelectContent>
               </Select>
             </div>

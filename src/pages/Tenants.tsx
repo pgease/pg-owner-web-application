@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   Search,
   Plus,
@@ -25,8 +26,10 @@ import { useApp } from "@/context/AppContext";
 import { useBlocks, useFloors, useRoomsList } from "@/hooks/usePropertyOwnerQueries";
 import { PageHeader } from "@/components/common/PageHeader";
 import { FilterBar } from "@/components/common/FilterBar";
+import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
 
 const Tenants = () => {
+  const location = useLocation();
   const { properties, selectedPgId, setSelectedPgId } = useApp();
   const [searchQuery, setSearchQuery] = useState("");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -43,21 +46,33 @@ const Tenants = () => {
   const roomsQuery = useRoomsList(selectedPgId, effectiveBlockId || undefined, effectiveFloorId || undefined);
   const rooms = roomsQuery.data ?? [];
 
-  const filteredRooms = useMemo(() => {
+  const searchFilteredRooms = useMemo(() => {
     if (!searchQuery.trim()) return rooms;
     const q = searchQuery.toLowerCase();
     return rooms.filter((r) => String(r.roomNumber).toLowerCase().includes(q));
   }, [rooms, searchQuery]);
+
+  const isVacantRoomsPage = location.pathname === "/tenants/vacant-rooms";
+
+  const filteredRooms = useMemo(() => {
+    if (!isVacantRoomsPage) return searchFilteredRooms;
+    return searchFilteredRooms.filter((r) => (Number(r.availableBeds) || 0) > 0);
+  }, [isVacantRoomsPage, searchFilteredRooms]);
 
   const occupiedBeds = filteredRooms.reduce((sum, r) => sum + (Number(r.occupiedBeds) || 0), 0);
   const availableBeds = filteredRooms.reduce((sum, r) => sum + (Number(r.availableBeds) || 0), 0);
   const totalBeds = filteredRooms.reduce((sum, r) => sum + (Number(r.numberOfBeds) || 0), 0);
 
   return (
+    <CanAccessPage permission="tenant_view">
     <div className="space-y-6 animate-fade-in">
       <PageHeader
-        title="Tenant list"
-        description="Manage all your tenants across PGs"
+        title={isVacantRoomsPage ? "Vacant Rooms" : "Tenant list"}
+        description={
+          isVacantRoomsPage
+            ? "View rooms with available beds for fast tenant allocation"
+            : "Manage all your tenants across PGs"
+        }
         actions={
           <>
           <Button size="sm" variant="outline" className="gap-2" disabled>
@@ -66,9 +81,11 @@ const Tenants = () => {
           <Button size="sm" variant="outline" className="gap-2" disabled>
             <Send className="h-4 w-4" /> Send Invite
           </Button>
-          <Button size="sm" className="gap-2" onClick={() => setAddDialogOpen(true)}>
-            <Plus className="h-4 w-4" /> Add Tenant
-          </Button>
+          <CanAccess permission="tenant_add">
+            <Button size="sm" className="gap-2" onClick={() => setAddDialogOpen(true)}>
+              <Plus className="h-4 w-4" /> Add Tenant
+            </Button>
+          </CanAccess>
           </>
         }
       />
@@ -76,11 +93,14 @@ const Tenants = () => {
       {/* Rent types — no API in collection */}
       <Card>
         <CardContent className="p-4">
-          <p className="text-sm font-medium mb-3">Occupancy overview</p>
+          <p className="text-sm font-medium mb-3">
+            {isVacantRoomsPage ? "Vacancy overview" : "Occupancy overview"}
+          </p>
           <div className="text-sm text-muted-foreground flex flex-wrap gap-5">
             <span>Total beds: {totalBeds}</span>
             <span>Occupied: {occupiedBeds}</span>
             <span>Available: {availableBeds}</span>
+            <span>Rooms shown: {filteredRooms.length}</span>
           </div>
         </CardContent>
       </Card>
@@ -152,9 +172,13 @@ const Tenants = () => {
       ) : filteredRooms.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center text-muted-foreground">
-            <p className="font-medium">No room inventory found</p>
+            <p className="font-medium">
+              {isVacantRoomsPage ? "No vacant rooms found" : "No room inventory found"}
+            </p>
             <p className="text-sm mt-1">
-              Add blocks/floors/rooms in Structure and use Add Tenant to assign occupants.
+              {isVacantRoomsPage
+                ? "Try another block/floor, or add rooms in Structure."
+                : "Add blocks/floors/rooms in Structure and use Add Tenant to assign occupants."}
             </p>
           </CardContent>
         </Card>
@@ -196,6 +220,7 @@ const Tenants = () => {
 
       <AddTenantDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
     </div>
+    </CanAccessPage>
   );
 };
 

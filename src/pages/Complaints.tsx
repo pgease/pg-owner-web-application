@@ -29,6 +29,7 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { FilterBar } from "@/components/common/FilterBar";
 import { DataTableContainer } from "@/components/common/DataTableContainer";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
 
 const statusOptions: { value: string; label: string }[] = [
   { value: "open", label: "Open" },
@@ -73,6 +74,7 @@ const Complaints = () => {
   const resolvedCount = complaints.filter((c) => (c.status || "").toLowerCase() === "resolved").length;
 
   return (
+    <CanAccessPage permission="complaint_view_all">
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Complaints"
@@ -165,7 +167,9 @@ const Complaints = () => {
                           <TableCell className="text-sm">{date}</TableCell>
                           <TableCell><StatusBadge status={c.status} /></TableCell>
                           <TableCell>
-                            <Button variant="ghost" size="sm" onClick={() => openUpdate(c)}>Update</Button>
+                            <CanAccess permission="complaint_edit_assign">
+                              <Button variant="ghost" size="sm" onClick={() => openUpdate(c)}>Update</Button>
+                            </CanAccess>
                           </TableCell>
                         </TableRow>
                       );
@@ -203,13 +207,16 @@ const Complaints = () => {
                 rows={3}
               />
             </div>
-            <Button onClick={handleUpdateStatus} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? "Saving..." : "Save"}
-            </Button>
+            <CanAccess permission="complaint_edit_assign">
+              <Button onClick={handleUpdateStatus} disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? "Saving..." : "Save"}
+              </Button>
+            </CanAccess>
           </div>
         </DialogContent>
       </Dialog>
     </div>
+    </CanAccessPage>
   );
 };
 

@@ -1,4 +1,5 @@
-import { Loader2 } from "lucide-react";
+import { useRef } from "react";
+import { Loader2, Upload } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,14 +8,35 @@ import { useQuery } from "@tanstack/react-query";
 import { getMe } from "@/api/propertyOwner";
 import { useApp } from "@/context/AppContext";
 import { PageHeader } from "@/components/common/PageHeader";
+import { useUploadPhotoMutation } from "@/hooks/usePropertyOwnerQueries";
+import { toast } from "@/components/ui/use-toast";
 
 const SettingsPage = () => {
   const { language, setLanguage } = useApp();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const uploadMut = useUploadPhotoMutation();
   const meQuery = useQuery({
     queryKey: ["property-owner", "me"],
     queryFn: getMe,
   });
   const me = meQuery.data;
+
+  const onPickPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      await uploadMut.mutateAsync(file);
+      toast({ title: "Photo uploaded" });
+      void meQuery.refetch();
+    } catch (err: unknown) {
+      toast({
+        title: "Upload failed",
+        description: err instanceof Error ? err.message : undefined,
+        variant: "destructive",
+      });
+    }
+    e.target.value = "";
+  };
 
   return (
   <div className="space-y-6 animate-fade-in max-w-2xl">
@@ -44,6 +66,25 @@ const SettingsPage = () => {
           </div>
         </div>
         )}
+        <div className="space-y-2 pt-2">
+          <Label>Profile photo</Label>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickPhoto} />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            disabled={uploadMut.isPending}
+            onClick={() => fileRef.current?.click()}
+          >
+            {uploadMut.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Upload className="h-4 w-4" />
+            )}
+            POST /upload-photo
+          </Button>
+        </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label>Phone</Label>

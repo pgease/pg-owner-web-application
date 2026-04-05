@@ -20,11 +20,14 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AddTenantDialog } from "@/components/tenants/AddTenantDialog";
+import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
 import { PageHeader } from "@/components/common/PageHeader";
 import { useApp } from "@/context/AppContext";
 import {
   useAllRoomsAndCounts,
   useComplaints,
+  useDashboardDetails,
+  useDashboardKpis,
   useStaffList,
 } from "@/hooks/usePropertyOwnerQueries";
 
@@ -45,6 +48,8 @@ const Dashboard = () => {
   const roomsQuery = useAllRoomsAndCounts(selectedPgId);
   const complaintsQuery = useComplaints(selectedPgId);
   const staffQuery = useStaffList(selectedPgId);
+  const dashboardDetailsQuery = useDashboardDetails(selectedPgId);
+  const dashboardKpisQuery = useDashboardKpis();
 
   const isLoading = roomsQuery.isLoading || complaintsQuery.isLoading || staffQuery.isLoading;
   const isError = roomsQuery.isError || complaintsQuery.isError || staffQuery.isError;
@@ -74,6 +79,8 @@ const Dashboard = () => {
     if (roomsQuery.isError) roomsQuery.refetch();
     if (complaintsQuery.isError) complaintsQuery.refetch();
     if (staffQuery.isError) staffQuery.refetch();
+    if (dashboardDetailsQuery.isError) dashboardDetailsQuery.refetch();
+    if (dashboardKpisQuery.isError) dashboardKpisQuery.refetch();
   };
 
   if (!selectedPgId) {
@@ -106,6 +113,7 @@ const Dashboard = () => {
   ];
 
   return (
+    <CanAccessPage permission="dashboard_access">
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title={isKpiPage ? "KPIs" : "Dashboard Overview"}
@@ -124,9 +132,11 @@ const Dashboard = () => {
               <Send className="h-4 w-4" />
               <span className="hidden sm:inline">Send</span> Invite
             </Button>
-            <Button size="sm" className="gap-2" onClick={() => setAddTenantOpen(true)}>
-              <UserPlus className="h-4 w-4" /> Add Tenant
-            </Button>
+            <CanAccess permission="tenant_add">
+              <Button size="sm" className="gap-2" onClick={() => setAddTenantOpen(true)}>
+                <UserPlus className="h-4 w-4" /> Add Tenant
+              </Button>
+            </CanAccess>
           </div>
         }
       />
@@ -177,6 +187,51 @@ const Dashboard = () => {
                   </Card>
                 );
               })}
+            </div>
+          </section>
+
+          {/* Backend dashboard-details + dashboard/kpis (Postman) */}
+          <section>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              API dashboard
+            </h2>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Card className="border-border/80">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xs font-medium text-muted-foreground">
+                    GET /dashboard-details/:propertyId
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {dashboardDetailsQuery.isLoading ? (
+                    <p className="text-xs text-muted-foreground">Loading…</p>
+                  ) : dashboardDetailsQuery.isError ? (
+                    <p className="text-xs text-destructive">Unavailable</p>
+                  ) : (
+                    <pre className="text-[11px] bg-muted/40 rounded-md p-3 max-h-40 overflow-auto whitespace-pre-wrap break-all">
+                      {JSON.stringify(dashboardDetailsQuery.data, null, 2)}
+                    </pre>
+                  )}
+                </CardContent>
+              </Card>
+              <Card className="border-border/80">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xs font-medium text-muted-foreground">
+                    GET /dashboard/kpis
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  {dashboardKpisQuery.isLoading ? (
+                    <p className="text-xs text-muted-foreground">Loading…</p>
+                  ) : dashboardKpisQuery.isError ? (
+                    <p className="text-xs text-destructive">Unavailable</p>
+                  ) : (
+                    <pre className="text-[11px] bg-muted/40 rounded-md p-3 max-h-40 overflow-auto whitespace-pre-wrap break-all">
+                      {JSON.stringify(dashboardKpisQuery.data, null, 2)}
+                    </pre>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </section>
 
@@ -308,6 +363,7 @@ const Dashboard = () => {
 
       <AddTenantDialog open={addTenantOpen} onOpenChange={setAddTenantOpen} />
     </div>
+    </CanAccessPage>
   );
 };
 

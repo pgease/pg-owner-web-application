@@ -1,5 +1,7 @@
 const API_BASE_URL = "https://pg-ease-nest.vercel.app/api";
 
+/** Spec alias for PermissionContext — same value as access token after login */
+export const PGEASE_TOKEN_KEY = "pgease_token";
 const ACCESS_TOKEN_KEY = "pgEase_accessToken";
 const REFRESH_TOKEN_KEY = "pgEase_refreshToken";
 const PROPERTY_OWNER_KEY = "pgEase_propertyOwner";
@@ -17,20 +19,23 @@ export const authStorage = {
   set(tokens: { accessToken: string; refreshToken: string; propertyOwner?: unknown }) {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
+    window.localStorage.setItem(PGEASE_TOKEN_KEY, tokens.accessToken);
     window.localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
     if (tokens.propertyOwner) {
       window.localStorage.setItem(PROPERTY_OWNER_KEY, JSON.stringify(tokens.propertyOwner));
     }
+    window.dispatchEvent(new Event("pgease-auth-token-updated"));
   },
   clear() {
     if (typeof window === "undefined") return;
     window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+    window.localStorage.removeItem(PGEASE_TOKEN_KEY);
     window.localStorage.removeItem(REFRESH_TOKEN_KEY);
     window.localStorage.removeItem(PROPERTY_OWNER_KEY);
   },
   getAccessToken() {
     if (typeof window === "undefined") return null;
-    return window.localStorage.getItem(ACCESS_TOKEN_KEY);
+    return window.localStorage.getItem(PGEASE_TOKEN_KEY) || window.localStorage.getItem(ACCESS_TOKEN_KEY);
   },
   getRefreshToken() {
     if (typeof window === "undefined") return null;

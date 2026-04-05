@@ -20,7 +20,13 @@ import Login from "./pages/Login";
 import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
 import Structure from "./pages/Structure";
+import Kyc from "./pages/Kyc";
 import { AppProvider } from "./context/AppContext";
+import { PermissionProvider } from "./context/PermissionContext";
+import TeamIndex from "./pages/team/TeamIndex";
+import AddStaff from "./pages/team/AddStaff";
+import EditStaffPermissions from "./pages/team/EditStaffPermissions";
+import { FeaturePlaceholder } from "./pages/FeaturePlaceholder";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,37 +59,64 @@ const App = () => (
             element={
               <RequireAuth>
                 <AppProvider>
-                  <AppLayout>
-                  <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/kpis" element={<Dashboard />} />
-                    <Route path="/tenants" element={<Tenants />} />
-                    <Route path="/tenants/onboarding" element={<Tenants />} />
-                    <Route path="/tenants/guests" element={<Tenants />} />
-                    <Route path="/my-pgs" element={<MyPGs />} />
-                    <Route path="/my-pgs/structure" element={<Structure />} />
-                    <Route path="/my-pgs/rooms" element={<MyPGs />} />
-                    <Route path="/my-pgs/bank" element={<MyPGs />} />
-                    <Route path="/rent-payments" element={<RentPayments />} />
-                    <Route path="/rent-payments/history" element={<RentPayments />} />
-                    <Route path="/rent-payments/dues" element={<RentPayments />} />
-                    <Route path="/staff" element={<Staff />} />
-                    <Route path="/complaints" element={<Complaints />} />
-                    <Route path="/staff/roles" element={<Staff />} />
-                    <Route path="/expenses" element={<Expenses />} />
-                    <Route path="/expenses/categories" element={<Expenses />} />
-                    <Route path="/expenses/monthly" element={<Expenses />} />
-                    <Route path="/reports" element={<Reports />} />
-                    <Route path="/reports/payments" element={<Reports />} />
-                    <Route path="/reports/export" element={<Reports />} />
-                    <Route path="/plans" element={<Plans />} />
-                    <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="/settings/notifications" element={<SettingsPage />} />
-                    <Route path="/support" element={<Support />} />
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </AppLayout>
+                  <PermissionProvider>
+                    <AppLayout>
+                      <Routes>
+                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/dashboard" element={<Dashboard />} />
+                        <Route path="/kpis" element={<Dashboard />} />
+                        <Route path="/tenants" element={<Tenants />} />
+                        <Route path="/tenants/vacant-rooms" element={<Tenants />} />
+                        <Route path="/tenants/onboarding" element={<Tenants />} />
+                        <Route path="/tenants/guests" element={<Tenants />} />
+                        <Route path="/tenants/kyc" element={<Kyc />} />
+                        <Route path="/my-pgs" element={<MyPGs />} />
+                        <Route path="/my-pgs/structure" element={<Structure />} />
+                        <Route path="/my-pgs/rooms" element={<MyPGs />} />
+                        <Route path="/my-pgs/bank" element={<MyPGs />} />
+                        <Route path="/rent-payments" element={<RentPayments />} />
+                        <Route path="/rent-payments/history" element={<RentPayments />} />
+                        <Route path="/rent-payments/dues" element={<RentPayments />} />
+                        <Route path="/staff" element={<Staff />} />
+                        <Route path="/complaints" element={<Complaints />} />
+                        <Route path="/staff/roles" element={<Staff />} />
+                        <Route path="/expenses" element={<Expenses />} />
+                        <Route path="/expenses/categories" element={<Expenses />} />
+                        <Route path="/expenses/monthly" element={<Expenses />} />
+                        <Route path="/reports" element={<Reports />} />
+                        <Route path="/reports/payments" element={<Reports />} />
+                        <Route path="/reports/export" element={<Reports />} />
+                        <Route path="/plans" element={<Plans />} />
+                        <Route path="/settings" element={<SettingsPage />} />
+                        <Route path="/settings/notifications" element={<SettingsPage />} />
+                        <Route path="/support" element={<Support />} />
+                        <Route path="/team" element={<TeamIndex />} />
+                        <Route path="/team/add-staff" element={<AddStaff />} />
+                        <Route path="/team/:staffId/permissions" element={<EditStaffPermissions />} />
+                        <Route
+                          path="/food"
+                          element={<FeaturePlaceholder title="Food Menu" permission="food_view_edit" />}
+                        />
+                        <Route
+                          path="/nightout"
+                          element={<FeaturePlaceholder title="Night Out" permission="nightout_view" />}
+                        />
+                        <Route
+                          path="/attendance"
+                          element={<FeaturePlaceholder title="Attendance" permission="attend_view" />}
+                        />
+                        <Route
+                          path="/eviction"
+                          element={<FeaturePlaceholder title="Eviction" permission="eviction_approve" />}
+                        />
+                        <Route
+                          path="/refunds"
+                          element={<FeaturePlaceholder title="Refunds" permission="refund_add" />}
+                        />
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </AppLayout>
+                  </PermissionProvider>
                 </AppProvider>
               </RequireAuth>
             }

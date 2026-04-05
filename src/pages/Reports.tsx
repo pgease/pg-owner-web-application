@@ -1,51 +1,90 @@
-import { BarChart3, FileSpreadsheet } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { PageHeader } from "@/components/common/PageHeader";
+import { useApp } from "@/context/AppContext";
+import {
+  useAnalyticsOccupancy,
+  useAnalyticsPgGrowth,
+  useAnalyticsRevenue,
+} from "@/hooks/usePropertyOwnerQueries";
+import { CanAccessPage } from "@/components/PermissionGuard";
 
-const reportTypes = [
-  { title: "Tenant List", description: "Complete list of all tenants across PGs", format: "Excel" },
-  { title: "Rent Collection Report", description: "Monthly rent collection summary", format: "PDF / Excel" },
-  { title: "Vacancy Report", description: "Current vacancy status across all PGs", format: "Excel" },
-  { title: "Notice Period Report", description: "Tenants in notice period with exit dates", format: "PDF" },
-  { title: "Revenue Summary", description: "Monthly and quarterly revenue breakdown", format: "PDF" },
-  { title: "Complaint Analytics", description: "Complaint trends and resolution times", format: "PDF" },
-];
+function JsonBlock({ title, data }: { title: string; data: unknown }) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {data === undefined ? (
+          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+          </div>
+        ) : (
+          <pre className="text-xs bg-muted/50 rounded-md p-3 overflow-auto max-h-72 whitespace-pre-wrap break-all">
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
-const Reports = () => (
-  <div className="space-y-6 animate-fade-in">
-    <PageHeader
-      title="Reports"
-      description="Generate and download reports"
-    />
+const Reports = () => {
+  const { selectedPgId, properties, setSelectedPgId } = useApp();
+  const pgGrowth = useAnalyticsPgGrowth();
+  const revenue = useAnalyticsRevenue(selectedPgId);
+  const occupancy = useAnalyticsOccupancy(selectedPgId);
 
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {reportTypes.map((r) => (
-        <Card key={r.title}>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <div className="rounded-lg bg-primary/10 p-2">
-                <BarChart3 className="h-4 w-4 text-primary" />
-              </div>
-              <Badge variant="outline">Coming soon</Badge>
-            </div>
-            <CardTitle className="text-base mt-2">{r.title}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">{r.description}</p>
-            <div className="flex items-center gap-1.5 mt-2">
-              <FileSpreadsheet className="h-3.5 w-3.5 text-primary" />
-              <p className="text-xs text-primary font-medium">{r.format}</p>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+  return (
+    <CanAccessPage permission="report_people">
+    <div className="space-y-6 animate-fade-in">
+      <PageHeader
+        title="Analytics & reports"
+        description="Analytics endpoints from your Postman collection (revenue, occupancy, pg-growth)"
+      />
+
+      <div className="flex flex-wrap gap-3 items-end">
+        <div className="space-y-1">
+          <Label>Property for revenue/occupancy</Label>
+          <Select value={selectedPgId ?? "none"} onValueChange={(v) => { if (v !== "none") setSelectedPgId(v); }}>
+            <SelectTrigger className="w-[240px]">
+              <SelectValue placeholder="Select PG" />
+            </SelectTrigger>
+            <SelectContent>
+              {properties.map((p) => (
+                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <JsonBlock
+          title="GET /analytics/pg-growth"
+          data={pgGrowth.isLoading ? undefined : pgGrowth.isError ? { error: "Failed to load" } : pgGrowth.data}
+        />
+        <JsonBlock
+          title="GET /analytics/revenue?propertyId=…"
+          data={!selectedPgId ? { message: "Select a property" } : revenue.isLoading ? undefined : revenue.isError ? { error: "Failed to load" } : revenue.data}
+        />
+      </div>
+      <JsonBlock
+        title="GET /analytics/occupancy?propertyId=…"
+        data={!selectedPgId ? { message: "Select a property" } : occupancy.isLoading ? undefined : occupancy.isError ? { error: "Failed to load" } : occupancy.data}
+      />
     </div>
-
-    <p className="text-sm text-muted-foreground text-center">
-      Report generation and export will be available in an upcoming update.
-    </p>
-  </div>
-);
+    </CanAccessPage>
+  );
+};
 
 export default Reports;

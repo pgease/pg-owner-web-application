@@ -28,6 +28,7 @@ import {
   useUpdateDiningSchedule,
 } from "@/hooks/usePropertyOwnerQueries";
 import type { DiningDaySchedule } from "@/api/propertyOwner";
+import { CanAccessPage } from "@/components/PermissionGuard";
 
 const MyPGs = () => {
   const navigate = useNavigate();
@@ -156,6 +157,7 @@ const MyPGs = () => {
 
   if (isBankPage) {
     return (
+      <CanAccessPage permission="room_view">
       <div className="space-y-6 animate-fade-in">
         <Button variant="ghost" size="sm" className="gap-2 -ml-2" onClick={() => navigate("/my-pgs")}>
           <ArrowLeft className="h-4 w-4" /> Back to My PG
@@ -176,10 +178,12 @@ const MyPGs = () => {
           </CardContent>
         </Card>
       </div>
+      </CanAccessPage>
     );
   }
 
   return (
+    <CanAccessPage permission="room_view">
     <div className="space-y-8 animate-fade-in">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">My PG</h1>
@@ -360,6 +364,7 @@ const MyPGs = () => {
         </Card>
       </section>
     </div>
+    </CanAccessPage>
   );
 };
 

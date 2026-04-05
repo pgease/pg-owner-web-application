@@ -1,34 +1,58 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  assignStaffRole,
+  approveKycApplication,
+  createStaffPermissionDefinition,
+  createStaffPermissionTier,
+  getAllRoomsAndCounts,
+  getAllStaffWithPermissions,
+  getAnalyticsOccupancy,
+  getAnalyticsPgGrowth,
+  getAnalyticsRevenue,
+  getBlocks,
+  getComplaintsByProperty,
+  getDashboardDetails,
+  getDashboardKpis,
+  getDesignations,
+  getDiningSchedule,
+  getFloors,
+  getKycApplications,
+  getKycByRoomTenantId,
+  getMyFeatures,
+  getPropertyAmenities,
+  getPropertyRestrictions,
+  getRentCollectionDashboard,
+  getRooms,
+  getRoomsList,
+  getStaffMemberRoles,
+  getStaffPermissionTiers,
+  getStaffPermissions,
+  getStaffPermissionsById,
+  linkAmenities,
+  linkPermissionToStaffTier,
+  linkRestrictions,
+  postManualRentCollection,
+  rejectKycApplication,
+  staffPermissionsAssign,
+  updateComplaintStatus,
+  updateDiningSchedule,
+  updateStaffPermissions,
+  uploadPhoto,
   createBlock,
   createCustomAmenity,
   createCustomRestriction,
   createFloor,
   createRoom,
   createStaff,
-  getAllRoomsAndCounts,
-  getAllStaffWithPermissions,
-  getBlocks,
-  getComplaintsByProperty,
-  getDesignations,
-  getDiningSchedule,
-  getFloors,
-  getMyFeatures,
-  getPropertyAmenities,
-  getPropertyRestrictions,
-  getRooms,
-  getRoomsList,
-  getStaffPermissions,
-  linkAmenities,
-  linkRestrictions,
-  updateComplaintStatus,
-  updateDiningSchedule,
-  updateStaffPermissions,
   type CreateRoomPayload,
   type CreateStaffPayload,
+  type CreateStaffPermissionDefinitionPayload,
   type DiningDaySchedule,
+  type ManualRentCollectionPayload,
+  type StaffPermissionTierPayload,
   type UpdateComplaintStatusPayload,
   type UpdateStaffPermissionsPayload,
+  type StaffPermissionsAssignPayload,
 } from "@/api/propertyOwner";
 
 /**
@@ -308,6 +332,157 @@ export function useCreateStaffMutation(propertyId?: string | null) {
   });
 }
 
+export function useDashboardDetails(propertyId?: string | null) {
+  return useQuery({
+    queryKey: ["dashboard-details", propertyId],
+    queryFn: () => getDashboardDetails(propertyId!),
+    enabled: Boolean(propertyId),
+  });
+}
+
+export function useDashboardKpis() {
+  return useQuery({
+    queryKey: ["dashboard-kpis"],
+    queryFn: getDashboardKpis,
+  });
+}
+
+export function useKycApplications() {
+  return useQuery({
+    queryKey: ["kyc-applications"],
+    queryFn: async () => {
+      const raw = await getKycApplications();
+      return toArray(raw);
+    },
+  });
+}
+
+export function useApproveKycMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (applicationId: string) => approveKycApplication(applicationId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["kyc-applications"] }),
+  });
+}
+
+export function useRejectKycMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ applicationId, reason }: { applicationId: string; reason: string }) =>
+      rejectKycApplication(applicationId, reason),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["kyc-applications"] }),
+  });
+}
+
+export function useKycDetail(roomTenantId?: string | null) {
+  return useQuery({
+    queryKey: ["kyc-detail", roomTenantId],
+    queryFn: () => getKycByRoomTenantId(roomTenantId!),
+    enabled: Boolean(roomTenantId),
+  });
+}
+
+export function useRentCollectionDashboard(
+  propertyId?: string | null,
+  periodMonth?: number,
+  periodYear?: number
+) {
+  return useQuery({
+    queryKey: ["rent-collection-dashboard", propertyId, periodMonth, periodYear],
+    queryFn: () => getRentCollectionDashboard(propertyId!, periodMonth!, periodYear!),
+    enabled: Boolean(propertyId && periodMonth != null && periodYear != null),
+  });
+}
+
+export function usePostManualRentMutation(propertyId?: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ManualRentCollectionPayload) => {
+      if (!propertyId) throw new Error("Select a PG first");
+      return postManualRentCollection(propertyId, payload);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["rent-collection-dashboard"] });
+    },
+  });
+}
+
+export function useAnalyticsPgGrowth() {
+  return useQuery({
+    queryKey: ["analytics-pg-growth"],
+    queryFn: getAnalyticsPgGrowth,
+  });
+}
+
+export function useAnalyticsRevenue(propertyId?: string | null) {
+  return useQuery({
+    queryKey: ["analytics-revenue", propertyId],
+    queryFn: () => getAnalyticsRevenue(propertyId!),
+    enabled: Boolean(propertyId),
+  });
+}
+
+export function useAnalyticsOccupancy(propertyId?: string | null) {
+  return useQuery({
+    queryKey: ["analytics-occupancy", propertyId],
+    queryFn: () => getAnalyticsOccupancy(propertyId!),
+    enabled: Boolean(propertyId),
+  });
+}
+
+export function useStaffPermissionTiers() {
+  return useQuery({
+    queryKey: ["staff-permission-tiers"],
+    queryFn: async () => {
+      const raw = await getStaffPermissionTiers();
+      return toArray(raw);
+    },
+  });
+}
+
+export function useCreateStaffPermissionTierMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: StaffPermissionTierPayload) => createStaffPermissionTier(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["staff-permission-tiers"] }),
+  });
+}
+
+export function useLinkPermissionToTierMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tierId, permissionId }: { tierId: string; permissionId: string }) =>
+      linkPermissionToStaffTier(tierId, permissionId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["staff-permission-tiers"] }),
+  });
+}
+
+export function useAssignStaffRoleMutation(propertyId?: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { staffId: string; permissionTierId: string }) => assignStaffRole(payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.staff(propertyId) });
+    },
+  });
+}
+
+export function useStaffMemberRolesQuery(staffId?: string | null) {
+  return useQuery({
+    queryKey: ["staff-member-roles", staffId],
+    queryFn: () => getStaffMemberRoles(staffId!),
+    enabled: Boolean(staffId),
+  });
+}
+
+export function useStaffPermissionsByIdQuery(staffId?: string | null) {
+  return useQuery({
+    queryKey: ["staff-permissions-by-staff", staffId],
+    queryFn: () => getStaffPermissionsById(staffId!),
+    enabled: Boolean(staffId),
+  });
+}
+
 export function useUpdateStaffPermissionsMutation(propertyId?: string | null) {
   const qc = useQueryClient();
   return useMutation({
@@ -315,6 +490,38 @@ export function useUpdateStaffPermissionsMutation(propertyId?: string | null) {
       updateStaffPermissions(staffId, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.staff(propertyId) });
+      qc.invalidateQueries({ queryKey: ["staff-permissions-by-staff"] });
+    },
+  });
+}
+
+export function useCreateStaffPermissionDefinitionMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateStaffPermissionDefinitionPayload) => createStaffPermissionDefinition(payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.staffPermissions() });
+    },
+  });
+}
+
+export function useStaffPermissionsAssignMutation(propertyId?: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ staffId, payload }: { staffId: string; payload: StaffPermissionsAssignPayload }) =>
+      staffPermissionsAssign(staffId, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.staff(propertyId) });
+    },
+  });
+}
+
+export function useUploadPhotoMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => uploadPhoto(file),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["property-owner", "me"] });
     },
   });
 }

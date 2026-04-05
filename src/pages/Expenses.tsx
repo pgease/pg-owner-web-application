@@ -1,8 +1,10 @@
 import { Receipt } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/common/PageHeader";
+import { CanAccessPage } from "@/components/PermissionGuard";
 
 const Expenses = () => (
+  <CanAccessPage permission="expense_view">
   <div className="space-y-6 animate-fade-in">
     <PageHeader
       title="Expenses"
@@ -22,6 +24,7 @@ const Expenses = () => (
       </CardContent>
     </Card>
   </div>
+  </CanAccessPage>
 );
 
 export default Expenses;
