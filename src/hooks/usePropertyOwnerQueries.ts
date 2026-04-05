@@ -36,6 +36,7 @@ import {
   staffPermissionsAssign,
   updateComplaintStatus,
   updateDiningSchedule,
+  updateProperty,
   updateStaffPermissions,
   uploadPhoto,
   createBlock,
@@ -49,8 +50,10 @@ import {
   type CreateStaffPermissionDefinitionPayload,
   type DiningDaySchedule,
   type ManualRentCollectionPayload,
+  type RoomItem,
   type StaffPermissionTierPayload,
   type UpdateComplaintStatusPayload,
+  type UpdatePropertyPayload,
   type UpdateStaffPermissionsPayload,
   type StaffPermissionsAssignPayload,
 } from "@/api/propertyOwner";
@@ -70,6 +73,99 @@ function toArray<T>(raw: unknown): T[] {
     }
   }
   return [];
+}
+
+function coerceNum(v: unknown): number {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (v == null || v === "") return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Map API room objects to the shape the UI expects (numberOfBeds, roomNumber, availableBeds). */
+function normalizeRoomItem(item: unknown): RoomItem {
+  const r = item as Record<string, unknown>;
+  const bedsArr = Array.isArray(r.beds) ? (r.beds as Record<string, unknown>[]) : null;
+
+  let numberOfBeds =
+    coerceNum(r.numberOfBeds) ||
+    coerceNum(r.capacity) ||
+    (bedsArr ? bedsArr.length : 0);
+
+  let occupiedBeds = coerceNum(r.occupiedBeds);
+  if (bedsArr && bedsArr.length > 0) {
+    const fromBeds = bedsArr.filter((b) => b && b.isOccupied === true).length;
+    if (fromBeds > 0 || bedsArr.some((b) => b && Object.prototype.hasOwnProperty.call(b, "isOccupied"))) {
+      occupiedBeds = fromBeds;
+    }
+  }
+
+  const hasExplicitAvailable =
+    r.availableBeds !== undefined && r.availableBeds !== null && String(r.availableBeds).trim() !== "";
+  let availableBeds: number;
+  if (hasExplicitAvailable) {
+    const av = coerceNum(r.availableBeds);
+    availableBeds = Math.max(0, av);
+  } else if (bedsArr && bedsArr.length > 0) {
+    availableBeds = bedsArr.filter((b) => b && b.isOccupied !== true).length;
+  } else {
+    availableBeds = Math.max(0, numberOfBeds - occupiedBeds);
+  }
+
+  const isVacantFlag =
+    typeof r.isVacant === "boolean"
+      ? r.isVacant
+      : r.status === "vacant" || String(r.status ?? "").toLowerCase() === "vacant";
+
+  if (numberOfBeds === 0 && availableBeds === 0 && isVacantFlag && !hasExplicitAvailable) {
+    numberOfBeds = 1;
+    availableBeds = 1;
+  }
+
+  return {
+    id: String(r.id ?? ""),
+    propertyId: String(r.propertyId ?? ""),
+    floorId: String(r.floorId ?? ""),
+    blockId: r.blockId != null ? String(r.blockId) : undefined,
+    name: r.name != null ? String(r.name) : undefined,
+    roomNumber: String(r.roomNumber ?? r.name ?? ""),
+    numberOfBeds,
+    capacity: coerceNum(r.capacity) > 0 ? coerceNum(r.capacity) : undefined,
+    sharingWisePricing: r.sharingWisePricing as RoomItem["sharingWisePricing"],
+    occupiedBeds,
+    availableBeds,
+    isVacant: isVacantFlag,
+    status: r.status != null ? String(r.status) : undefined,
+    floor:
+      r.floor != null && typeof r.floor !== "object" && String(r.floor).trim() !== ""
+        ? String(r.floor)
+        : undefined,
+    block:
+      r.block != null && typeof r.block !== "object" && String(r.block).trim() !== ""
+        ? String(r.block)
+        : undefined,
+    createdAt: r.createdAt != null ? String(r.createdAt) : undefined,
+  };
+}
+
+/** GET /rooms may return an array, `{ data: [] }`, `{ rooms: [] }`, or nested pagination. */
+function roomsFromListResponse(raw: unknown): RoomItem[] {
+  if (Array.isArray(raw)) return raw.map(normalizeRoomItem);
+  if (!raw || typeof raw !== "object") return [];
+  const obj = raw as Record<string, unknown>;
+
+  if (Array.isArray(obj.data)) return obj.data.map(normalizeRoomItem);
+  if (Array.isArray(obj.rooms)) return obj.rooms.map(normalizeRoomItem);
+  if (Array.isArray(obj.items)) return obj.items.map(normalizeRoomItem);
+
+  if (obj.data && typeof obj.data === "object") {
+    const inner = obj.data as Record<string, unknown>;
+    if (Array.isArray(inner.rooms)) return inner.rooms.map(normalizeRoomItem);
+    if (Array.isArray(inner.items)) return inner.items.map(normalizeRoomItem);
+    if (Array.isArray(inner.data)) return inner.data.map(normalizeRoomItem);
+  }
+
+  return toArray<RoomItem>(raw).map(normalizeRoomItem);
 }
 
 export const queryKeys = {
@@ -115,7 +211,7 @@ export function useRooms(propertyId?: string | null, blockId?: string | null, fl
     queryFn: async () => {
       if (!propertyId) return [];
       const raw = await getRooms(propertyId, { page: 1, limit: 50, blockId: blockId || undefined, floorId: floorId || undefined });
-      return Array.isArray(raw) ? raw : raw?.data ?? [];
+      return roomsFromListResponse(raw);
     },
     enabled: Boolean(propertyId),
   });
@@ -127,7 +223,23 @@ export function useRoomsList(propertyId?: string | null, blockId?: string | null
     queryFn: async () => {
       if (!propertyId) return [];
       const raw = await getRoomsList(propertyId, { blockId: blockId || undefined, floorId: floorId || undefined });
-      return Array.isArray(raw) ? raw : raw?.data ?? [];
+      let rooms = roomsFromListResponse(raw);
+      if (rooms.length === 0 && blockId && floorId) {
+        const rawAlt = await getRooms(propertyId, {
+          page: 1,
+          limit: 200,
+          blockId,
+          floorId,
+        });
+        rooms = roomsFromListResponse(rawAlt);
+      }
+      if (floorId) {
+        rooms = rooms.filter((room) => !room.floorId || room.floorId === floorId);
+      }
+      if (blockId) {
+        rooms = rooms.filter((room) => !room.blockId || room.blockId === blockId);
+      }
+      return rooms;
     },
     enabled: Boolean(propertyId),
   });
@@ -172,6 +284,13 @@ export function useCreateRoom(propertyId?: string | null, blockId?: string | nul
       qc.invalidateQueries({ queryKey: queryKeys.rooms(propertyId, blockId, floorId) });
       qc.invalidateQueries({ queryKey: queryKeys.roomsList(propertyId, blockId, floorId) });
     },
+  });
+}
+
+export function useUpdatePropertyMutation() {
+  return useMutation({
+    mutationFn: ({ propertyId, payload }: { propertyId: string; payload: UpdatePropertyPayload }) =>
+      updateProperty(propertyId, payload),
   });
 }
 

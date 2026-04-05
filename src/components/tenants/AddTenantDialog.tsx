@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useApp } from "@/context/AppContext";
-import { addTenant, checkRoomAvailability } from "@/api/propertyOwner";
+import { addTenant, checkRoomAvailability, roomHasVacancyForAllocation } from "@/api/propertyOwner";
 import { toast } from "@/components/ui/use-toast";
 import { useBlocks, useFloors, useRoomsList } from "@/hooks/usePropertyOwnerQueries";
 
@@ -33,6 +34,7 @@ interface AddTenantDialogProps {
 }
 
 export function AddTenantDialog({ open, onOpenChange, onSuccess }: AddTenantDialogProps) {
+  const queryClient = useQueryClient();
   const { selectedPgId, properties } = useApp();
   const [submitting, setSubmitting] = useState(false);
   const [selectedBlockId, setSelectedBlockId] = useState<string>("");
@@ -58,7 +60,14 @@ export function AddTenantDialog({ open, onOpenChange, onSuccess }: AddTenantDial
   const floors = useFloors(selectedPgId, effectiveBlockId || undefined).data ?? [];
   const effectiveFloorId = selectedFloorId || floors[0]?.id || "";
   const rooms = useRoomsList(selectedPgId, effectiveBlockId || undefined, effectiveFloorId || undefined).data ?? [];
-  const vacantRooms = rooms.filter((r) => (Number(r.availableBeds) || 0) > 0);
+
+  useEffect(() => {
+    if (open && selectedPgId) {
+      queryClient.invalidateQueries({ queryKey: ["property", selectedPgId, "rooms-list"] });
+    }
+  }, [open, selectedPgId, queryClient]);
+
+  const vacantRooms = rooms.filter(roomHasVacancyForAllocation);
   const effectiveRoomId = selectedRoomId || vacantRooms[0]?.id || "";
 
   const update = (key: string, value: string) => setForm((p) => ({ ...p, [key]: value }));
@@ -80,15 +89,21 @@ export function AddTenantDialog({ open, onOpenChange, onSuccess }: AddTenantDial
     try {
       setSubmitting(true);
       const selectedRoom = vacantRooms.find((r) => r.id === effectiveRoomId);
+      const roomNumStr = selectedRoom ? String(selectedRoom.roomNumber).trim() : "";
       const roomNumParsed = selectedRoom
         ? parseInt(String(selectedRoom.roomNumber).replace(/\D/g, "").slice(0, 8), 10)
         : NaN;
       const blockName = blocks.find((b) => b.id === effectiveBlockId)?.name;
       const floorName = floors.find((f) => f.id === effectiveFloorId)?.name;
+      const blockParam = selectedRoom?.block ?? blockName;
+      const floorParam = selectedRoom?.floor ?? floorName;
       const availability = await checkRoomAvailability(selectedPgId, {
-        block: blockName,
-        floorNumber: floorName,
+        block: blockParam || undefined,
+        floorNumber: floorParam || undefined,
+        floorId: effectiveFloorId,
+        blockId: effectiveBlockId,
         roomNumber: Number.isFinite(roomNumParsed) ? roomNumParsed : undefined,
+        roomNumberRaw: roomNumStr || undefined,
         bedNumber: String(bed),
       });
       if (!availability.available) {

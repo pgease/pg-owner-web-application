@@ -81,6 +81,8 @@ export interface PropertyResponse {
   latitude: string;
   longitude: string;
   locationPin: string;
+  /** Present when API returns it (edit-properties / GET properties). */
+  bedRange?: string;
   journeyCompletionPercentage: number;
   status: string;
   active: boolean;
@@ -108,6 +110,26 @@ export async function getProperties() {
   return httpRequest<GetPropertiesResponse | PropertyResponse[]>(`${PROPERTY_OWNER_BASE}/properties`, {
     method: "GET",
     auth: true,
+  });
+}
+
+/** PUT /property-owners/properties/:propertyId — Postman "edit-properties" */
+export interface UpdatePropertyPayload {
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  locationPin: string;
+  bedRange: string;
+  propertyTypeId: string;
+  photos?: unknown[];
+}
+
+export async function updateProperty(propertyId: string, payload: UpdatePropertyPayload) {
+  return httpRequest<PropertyResponse>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}`, {
+    method: "PUT",
+    auth: true,
+    body: payload,
   });
 }
 
@@ -218,10 +240,14 @@ export interface Feature {
 
 // Tenant APIs
 export interface CheckRoomAvailabilityParams {
-  propertyId: string;
   floorNumber?: string;
   block?: string;
+  /** Prefer sending with floor/block labels when the API supports UUID-based lookup. */
+  floorId?: string;
+  blockId?: string;
   roomNumber?: number;
+  /** When roomNumber is not purely numeric (e.g. "A-101"), pass the raw value for the query string. */
+  roomNumberRaw?: string;
   bedNumber?: string;
 }
 
@@ -230,20 +256,57 @@ export interface RoomAvailabilityResponse {
   message?: string;
 }
 
+/** Backend responses vary: `{ available }`, `{ isAvailable }`, `{ data: { available } }`, etc. */
+export function normalizeRoomAvailabilityResponse(raw: unknown): RoomAvailabilityResponse {
+  const msg = (m: unknown): string | undefined => (typeof m === "string" ? m : undefined);
+
+  if (raw == null || typeof raw !== "object") {
+    return { available: false, message: "Invalid availability response" };
+  }
+  const o = raw as Record<string, unknown>;
+
+  if (typeof o.available === "boolean") {
+    return { available: o.available, message: msg(o.message) };
+  }
+  if (typeof o.isAvailable === "boolean") {
+    return { available: o.isAvailable, message: msg(o.message ?? o.reason) };
+  }
+
+  if (o.data && typeof o.data === "object") {
+    const d = o.data as Record<string, unknown>;
+    if (typeof d.available === "boolean") {
+      return { available: d.available, message: msg(d.message) };
+    }
+    if (typeof d.isAvailable === "boolean") {
+      return { available: d.isAvailable, message: msg(d.message) };
+    }
+  }
+
+  return { available: false, message: msg(o.message) ?? "Could not verify room availability" };
+}
+
 export async function checkRoomAvailability(propertyId: string, params?: CheckRoomAvailabilityParams) {
   const queryParams = new URLSearchParams();
   if (params?.floorNumber) queryParams.append("floorNumber", params.floorNumber);
   if (params?.block) queryParams.append("block", params.block);
-  if (params?.roomNumber) queryParams.append("roomNumber", params.roomNumber.toString());
+  if (params?.floorId) queryParams.append("floorId", params.floorId);
+  if (params?.blockId) queryParams.append("blockId", params.blockId);
+  const roomQ =
+    params?.roomNumberRaw?.trim() ||
+    (params?.roomNumber !== undefined && params?.roomNumber !== null
+      ? String(params.roomNumber)
+      : "");
+  if (roomQ) queryParams.append("roomNumber", roomQ);
   if (params?.bedNumber) queryParams.append("bedNumber", params.bedNumber);
 
   const queryString = queryParams.toString();
   const url = `${PROPERTY_OWNER_BASE}/check-room-availability/${propertyId}${queryString ? `?${queryString}` : ""}`;
 
-  return httpRequest<RoomAvailabilityResponse>(url, {
+  const raw = await httpRequest<unknown>(url, {
     method: "GET",
     auth: true,
   });
+  return normalizeRoomAvailabilityResponse(raw);
 }
 
 export interface AddTenantPayload {
@@ -480,12 +543,35 @@ export interface RoomItem {
   propertyId: string;
   floorId: string;
   blockId?: string;
+  /** Some list APIs return label as `name` instead of `roomNumber`. */
+  name?: string;
   roomNumber: string;
+  /** Backend may send bed count as `capacity` instead of `numberOfBeds`. */
   numberOfBeds: number;
+  capacity?: number;
   sharingWisePricing?: SharingWisePricingItem[];
   occupiedBeds?: number;
+  /** When omitted, derive from capacity/numberOfBeds − occupiedBeds in the client. */
   availableBeds?: number;
+  isVacant?: boolean;
+  status?: string;
+  /** Denormalized labels from API (e.g. floor "1", block "2") — use for check-room-availability. */
+  floor?: string;
+  block?: string;
   createdAt?: string;
+}
+
+/** POST /properties/:id/rooms often returns `{ room, beds }` instead of a bare room. */
+export type CreateRoomResponse = RoomItem | { room: RoomItem; beds?: unknown[] };
+
+/** True if the room can be chosen when adding a tenant (free bed, or vacant with unknown counts from API). */
+export function roomHasVacancyForAllocation(r: RoomItem): boolean {
+  const avail = Number(r.availableBeds) || 0;
+  if (avail > 0) return true;
+  const total = Number(r.numberOfBeds) || Number(r.capacity) || 0;
+  const occupied = Number(r.occupiedBeds) || 0;
+  if (total > 0) return occupied < total;
+  return r.isVacant === true || String(r.status ?? "").toLowerCase() === "vacant";
 }
 
 export async function getBlocks(propertyId: string) {
@@ -571,11 +657,18 @@ export interface CreateRoomPayload {
 }
 
 export async function createRoom(propertyId: string, payload: CreateRoomPayload) {
-  return httpRequest<RoomItem>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/rooms`, {
-    method: "POST",
-    auth: true,
-    body: payload,
-  });
+  const raw = await httpRequest<CreateRoomResponse>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/rooms`,
+    {
+      method: "POST",
+      auth: true,
+      body: payload,
+    }
+  );
+  if (raw && typeof raw === "object" && "room" in raw && raw.room) {
+    return raw.room;
+  }
+  return raw as RoomItem;
 }
 
 // ─── Amenities/Restrictions APIs ─────────────────────────────────────────────

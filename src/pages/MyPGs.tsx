@@ -9,7 +9,7 @@ import {
   Loader2,
   UtensilsCrossed,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,14 +26,15 @@ import {
   useLinkRestrictions,
   useRestrictions,
   useUpdateDiningSchedule,
+  useUpdatePropertyMutation,
 } from "@/hooks/usePropertyOwnerQueries";
-import type { DiningDaySchedule } from "@/api/propertyOwner";
-import { CanAccessPage } from "@/components/PermissionGuard";
+import { DEFAULT_PROPERTY_TYPE_ID, type DiningDaySchedule } from "@/api/propertyOwner";
+import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
 
 const MyPGs = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { selectedPgId, properties } = useApp();
+  const { selectedPgId, properties, refreshProperties } = useApp();
   const isBankPage = location.pathname === "/my-pgs/bank";
   const selectedPg = Array.isArray(properties) ? properties.find((p) => p.id === selectedPgId) : null;
 
@@ -46,6 +47,15 @@ const MyPGs = () => {
   const createRestriction = useCreateCustomRestriction(selectedPgId);
   const linkRestrictionMutation = useLinkRestrictions(selectedPgId);
   const updateDiningMutation = useUpdateDiningSchedule(selectedPgId);
+  const updatePropertyMutation = useUpdatePropertyMutation();
+
+  const [pgName, setPgName] = useState("");
+  const [pgAddress, setPgAddress] = useState("");
+  const [pgLat, setPgLat] = useState("");
+  const [pgLng, setPgLng] = useState("");
+  const [pgPin, setPgPin] = useState("");
+  const [pgBedRange, setPgBedRange] = useState("");
+  const [pgTypeId, setPgTypeId] = useState(DEFAULT_PROPERTY_TYPE_ID);
 
   const [newAmenity, setNewAmenity] = useState("");
   const [newRestriction, setNewRestriction] = useState("");
@@ -61,6 +71,17 @@ const MyPGs = () => {
   const [lunchEnd, setLunchEnd] = useState("14:00");
   const [dinnerStart, setDinnerStart] = useState("20:00");
   const [dinnerEnd, setDinnerEnd] = useState("21:00");
+
+  useEffect(() => {
+    if (!selectedPg) return;
+    setPgName(selectedPg.name);
+    setPgAddress(selectedPg.address);
+    setPgLat(String(selectedPg.latitude ?? ""));
+    setPgLng(String(selectedPg.longitude ?? ""));
+    setPgPin(String(selectedPg.locationPin ?? ""));
+    setPgBedRange(selectedPg.bedRange ?? "50-100");
+    setPgTypeId(selectedPg.propertyTypeId ?? DEFAULT_PROPERTY_TYPE_ID);
+  }, [selectedPg]);
 
   useEffect(() => {
     setSelectedAmenityIds(amenities.map((a) => a.id));
@@ -100,6 +121,39 @@ const MyPGs = () => {
       refetchAmenities();
     } catch (e: any) {
       toast({ title: "Failed to update amenities", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  const savePropertyDetails = async () => {
+    if (!selectedPgId || !selectedPg) return;
+    const lat = parseFloat(pgLat);
+    const lng = parseFloat(pgLng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      toast({ title: "Enter valid latitude and longitude", variant: "destructive" });
+      return;
+    }
+    try {
+      await updatePropertyMutation.mutateAsync({
+        propertyId: selectedPgId,
+        payload: {
+          name: pgName.trim(),
+          address: pgAddress.trim(),
+          latitude: lat,
+          longitude: lng,
+          locationPin: pgPin.trim(),
+          bedRange: pgBedRange.trim() || "50-100",
+          propertyTypeId: pgTypeId.trim() || DEFAULT_PROPERTY_TYPE_ID,
+          photos: [],
+        },
+      });
+      await refreshProperties();
+      toast({ title: "Property details saved" });
+    } catch (e: unknown) {
+      toast({
+        title: "Failed to update property",
+        description: e instanceof Error ? e.message : undefined,
+        variant: "destructive",
+      });
     }
   };
 
@@ -200,6 +254,56 @@ const MyPGs = () => {
         </Card>
       ) : (
         <>
+          <section>
+            <h2 className="text-lg font-semibold mb-4">Property details</h2>
+            <Card className="mb-8">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Edit PG details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label>Name</Label>
+                    <Input value={pgName} onChange={(e) => setPgName(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Location PIN</Label>
+                    <Input value={pgPin} onChange={(e) => setPgPin(e.target.value)} />
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label>Address</Label>
+                    <Input value={pgAddress} onChange={(e) => setPgAddress(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Latitude</Label>
+                    <Input value={pgLat} onChange={(e) => setPgLat(e.target.value)} inputMode="decimal" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Longitude</Label>
+                    <Input value={pgLng} onChange={(e) => setPgLng(e.target.value)} inputMode="decimal" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Bed range</Label>
+                    <Input value={pgBedRange} onChange={(e) => setPgBedRange(e.target.value)} placeholder="e.g. 50-100" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Property type ID</Label>
+                    <Input value={pgTypeId} onChange={(e) => setPgTypeId(e.target.value)} className="font-mono text-xs" />
+                  </div>
+                </div>
+                <CanAccess permission="room_edit">
+                  <Button
+                    type="button"
+                    onClick={savePropertyDetails}
+                    disabled={updatePropertyMutation.isPending}
+                  >
+                    {updatePropertyMutation.isPending ? "Saving…" : "Save property details"}
+                  </Button>
+                </CanAccess>
+              </CardContent>
+            </Card>
+          </section>
+
           <section>
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <UtensilsCrossed className="h-5 w-5" /> Amenities

@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { AddTenantDialog } from "@/components/tenants/AddTenantDialog";
 import { useApp } from "@/context/AppContext";
+import { roomHasVacancyForAllocation } from "@/api/propertyOwner";
 import { useBlocks, useFloors, useRoomsList } from "@/hooks/usePropertyOwnerQueries";
 import { PageHeader } from "@/components/common/PageHeader";
 import { FilterBar } from "@/components/common/FilterBar";
@@ -56,7 +57,7 @@ const Tenants = () => {
 
   const filteredRooms = useMemo(() => {
     if (!isVacantRoomsPage) return searchFilteredRooms;
-    return searchFilteredRooms.filter((r) => (Number(r.availableBeds) || 0) > 0);
+    return searchFilteredRooms.filter(roomHasVacancyForAllocation);
   }, [isVacantRoomsPage, searchFilteredRooms]);
 
   const occupiedBeds = filteredRooms.reduce((sum, r) => sum + (Number(r.occupiedBeds) || 0), 0);
