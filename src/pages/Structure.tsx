@@ -82,6 +82,7 @@ const Structure = () => {
   const addRoom = async () => {
     const room = roomNumber.trim();
     const numberOfBeds = Number(beds);
+    if (!effectiveBlockId) return toast({ title: "Select a block first", variant: "destructive" });
     if (!effectiveFloorId) return toast({ title: "Select a floor first", variant: "destructive" });
     if (!room) return toast({ title: "Room number is required", variant: "destructive" });
     if (!Number.isFinite(numberOfBeds) || numberOfBeds < 1) {
@@ -232,7 +233,7 @@ const Structure = () => {
                   variant="outline"
                   className="gap-2 w-full"
                   onClick={addRoom}
-                  disabled={!selectedPgId || !effectiveFloorId || createRoomMutation.isPending}
+                  disabled={!selectedPgId || !effectiveBlockId || !effectiveFloorId || createRoomMutation.isPending}
                 >
                   <Plus className="h-4 w-4" /> {createRoomMutation.isPending ? "Adding..." : "Add Room"}
                 </Button>

@@ -2,6 +2,14 @@ import { authStorage, httpRequest } from "./http";
 
 const PROPERTY_OWNER_BASE = "/property-owners";
 
+/**
+ * Property id is **only** in the URL path (not repeated in the body).
+ * `POST /api/property-owners/add-tenant/:propertyId`
+ */
+function propertyOwnerAddTenantPath(propertyId: string): string {
+  return `${PROPERTY_OWNER_BASE}/add-tenant/${propertyId}`;
+}
+
 export interface RequestOtpResponse {
   message: string;
   expiresIn: number;
@@ -238,94 +246,25 @@ export interface Feature {
   active?: boolean;
 }
 
-// Tenant APIs
-export interface CheckRoomAvailabilityParams {
-  floorNumber?: string;
-  block?: string;
-  /** Prefer sending with floor/block labels when the API supports UUID-based lookup. */
-  floorId?: string;
-  blockId?: string;
-  roomNumber?: number;
-  /** When roomNumber is not purely numeric (e.g. "A-101"), pass the raw value for the query string. */
-  roomNumberRaw?: string;
-  bedNumber?: string;
-}
+// Tenant APIs — add-tenant only (no separate check-room call).
 
-export interface RoomAvailabilityResponse {
-  available: boolean;
-  message?: string;
-}
-
-/** Backend responses vary: `{ available }`, `{ isAvailable }`, `{ data: { available } }`, etc. */
-export function normalizeRoomAvailabilityResponse(raw: unknown): RoomAvailabilityResponse {
-  const msg = (m: unknown): string | undefined => (typeof m === "string" ? m : undefined);
-
-  if (raw == null || typeof raw !== "object") {
-    return { available: false, message: "Invalid availability response" };
-  }
-  const o = raw as Record<string, unknown>;
-
-  if (typeof o.available === "boolean") {
-    return { available: o.available, message: msg(o.message) };
-  }
-  if (typeof o.isAvailable === "boolean") {
-    return { available: o.isAvailable, message: msg(o.message ?? o.reason) };
-  }
-
-  if (o.data && typeof o.data === "object") {
-    const d = o.data as Record<string, unknown>;
-    if (typeof d.available === "boolean") {
-      return { available: d.available, message: msg(d.message) };
-    }
-    if (typeof d.isAvailable === "boolean") {
-      return { available: d.isAvailable, message: msg(d.message) };
-    }
-  }
-
-  return { available: false, message: msg(o.message) ?? "Could not verify room availability" };
-}
-
-export async function checkRoomAvailability(propertyId: string, params?: CheckRoomAvailabilityParams) {
-  const queryParams = new URLSearchParams();
-  if (params?.floorNumber) queryParams.append("floorNumber", params.floorNumber);
-  if (params?.block) queryParams.append("block", params.block);
-  if (params?.floorId) queryParams.append("floorId", params.floorId);
-  if (params?.blockId) queryParams.append("blockId", params.blockId);
-  const roomQ =
-    params?.roomNumberRaw?.trim() ||
-    (params?.roomNumber !== undefined && params?.roomNumber !== null
-      ? String(params.roomNumber)
-      : "");
-  if (roomQ) queryParams.append("roomNumber", roomQ);
-  if (params?.bedNumber) queryParams.append("bedNumber", params.bedNumber);
-
-  const queryString = queryParams.toString();
-  const url = `${PROPERTY_OWNER_BASE}/check-room-availability/${propertyId}${queryString ? `?${queryString}` : ""}`;
-
-  const raw = await httpRequest<unknown>(url, {
-    method: "GET",
-    auth: true,
-  });
-  return normalizeRoomAvailabilityResponse(raw);
-}
-
+/**
+ * Body for `POST …/property-owners/add-tenant/:propertyId`.
+ * `propertyId` goes in the URL only; this payload includes `floorId`, `blockId`, `roomId`.
+ */
 export interface AddTenantPayload {
   name: string;
-  email?: string;
   phone: string;
-  floorId?: string;
-  blockId?: string;
-  floorNumber?: number;
-  block?: string;
-  roomId?: string;
-  roomNumber?: number | string;
+  floorId: string;
+  blockId: string;
+  roomId: string;
   bedNumber: number;
-  rentDueDate: number;
   monthlyRent: number;
-  electricityBill?: number;
   securityDeposit: number;
+  rentDueDate: number;
   joiningDate?: string;
-  isNewRoom?: boolean;
+  electricityBill?: number;
+  email?: string;
 }
 
 export interface TenantResponse {
@@ -342,12 +281,166 @@ export interface TenantResponse {
   createdAt: string;
 }
 
+/** JSON body: always includes floorId, blockId, roomId (UUID strings). */
+function serializeAddTenantBody(payload: AddTenantPayload): Record<string, unknown> {
+  const floorId = String(payload.floorId ?? "").trim();
+  const blockId = String(payload.blockId ?? "").trim();
+  const roomId = String(payload.roomId ?? "").trim();
+  if (!floorId || !blockId || !roomId) {
+    throw new Error("floorId, blockId, and roomId are required in the add-tenant body");
+  }
+
+  const bed = Math.trunc(Number(payload.bedNumber));
+  if (!Number.isFinite(bed) || bed < 1) {
+    throw new Error("Invalid bed number for add-tenant");
+  }
+
+  const monthlyRent = Number(payload.monthlyRent);
+  const securityDeposit = Number(payload.securityDeposit);
+  const rentDue = Math.trunc(Number(payload.rentDueDate));
+
+  const body: Record<string, unknown> = {
+    name: String(payload.name).trim(),
+    phone: String(payload.phone).trim(),
+    floorId,
+    blockId,
+    roomId,
+    bedNumber: bed,
+    monthlyRent: Number.isFinite(monthlyRent) ? monthlyRent : 0,
+    securityDeposit: Number.isFinite(securityDeposit) ? securityDeposit : 0,
+    rentDueDate: Number.isFinite(rentDue) ? rentDue : 5,
+  };
+
+  if (payload.joiningDate && String(payload.joiningDate).trim() !== "") {
+    body.joiningDate = String(payload.joiningDate).trim();
+  }
+  if (payload.electricityBill !== undefined && payload.electricityBill !== null) {
+    const e = Number(payload.electricityBill);
+    body.electricityBill = Number.isFinite(e) ? e : 0;
+  }
+  if (payload.email && String(payload.email).trim() !== "") {
+    body.email = String(payload.email).trim();
+  }
+
+  return body;
+}
+
+/** `propertyId` = selected PG id in the URL; `payload` must include `floorId`, `blockId`, `roomId`. */
 export async function addTenant(propertyId: string, payload: AddTenantPayload) {
-  return httpRequest<TenantResponse>(`${PROPERTY_OWNER_BASE}/add-tenant/${propertyId}`, {
+  return httpRequest<TenantResponse>(propertyOwnerAddTenantPath(propertyId), {
     method: "POST",
     auth: true,
-    body: payload,
+    body: serializeAddTenantBody(payload),
   });
+}
+
+/** Nested shapes from `GET …/properties/:propertyId/tenants` (`{ tenants: [...] }`). */
+export interface PropertyTenantRoomAssignment {
+  id: string;
+  rentAmount?: string;
+  securityDeposit?: string;
+  startDate?: string;
+  status?: string;
+  bedNumberOnAssignment?: number;
+}
+
+export interface PropertyTenantRoomInfo {
+  id: string;
+  name?: string;
+  roomNumber?: string;
+}
+
+export interface PropertyTenantFloorInfo {
+  id: string;
+  name?: string;
+  displayOrder?: number;
+}
+
+export interface PropertyTenantBlockInfo {
+  id: string;
+  name?: string;
+  displayOrder?: number;
+}
+
+export interface PropertyTenantBedInfo {
+  id: string;
+  bedNumber?: string;
+  isOccupied?: boolean;
+}
+
+export interface PropertyTenantNotice {
+  isOnNotice?: boolean;
+  noticeStartedAt?: string | null;
+  vacateOn?: string | null;
+  daysUntilVacate?: number | null;
+}
+
+export interface PropertyTenant {
+  id: string;
+  name?: string;
+  phone?: string;
+  email?: string;
+  roomTenant?: PropertyTenantRoomAssignment;
+  room?: PropertyTenantRoomInfo;
+  floor?: PropertyTenantFloorInfo;
+  block?: PropertyTenantBlockInfo;
+  bed?: PropertyTenantBedInfo;
+  notice?: PropertyTenantNotice;
+  /** KYC / Aadhaar — set when API sends it */
+  kycVerified?: boolean;
+  aadhaarVerified?: boolean;
+}
+
+/** @deprecated use PropertyTenant */
+export type PropertyTenantListItem = PropertyTenant;
+
+export function normalizePropertyTenantsList(raw: unknown): PropertyTenant[] {
+  if (Array.isArray(raw)) return raw as PropertyTenant[];
+  if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    if (Array.isArray(o.data)) return o.data as PropertyTenant[];
+    if (Array.isArray(o.tenants)) return o.tenants as PropertyTenant[];
+    if (Array.isArray(o.items)) return o.items as PropertyTenant[];
+    if (o.data && typeof o.data === "object") {
+      const inner = o.data as Record<string, unknown>;
+      if (Array.isArray(inner.tenants)) return inner.tenants as PropertyTenant[];
+    }
+  }
+  return [];
+}
+
+/** PATCH body — basic profile only (matches owner “edit tenant basic”). */
+export interface UpdatePropertyTenantPayload {
+  name?: string;
+  phone?: string;
+  email?: string;
+}
+
+export async function updatePropertyTenant(
+  propertyId: string,
+  tenantId: string,
+  payload: UpdatePropertyTenantPayload,
+) {
+  return httpRequest<unknown>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/tenants/${tenantId}`,
+    {
+      method: "PATCH",
+      auth: true,
+      body: payload,
+    },
+  );
+}
+
+/** GET `/api/property-owners/properties/:propertyId/tenants` */
+export async function getPropertyTenants(propertyId: string) {
+  const raw = await httpRequest<unknown>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/tenants`,
+    {
+      method: "GET",
+      auth: true,
+    }
+  );
+  return normalizePropertyTenantsList(raw);
 }
 
 export interface RoomAndCount {
@@ -555,7 +648,7 @@ export interface RoomItem {
   availableBeds?: number;
   isVacant?: boolean;
   status?: string;
-  /** Denormalized labels from API (e.g. floor "1", block "2") — use for check-room-availability. */
+  /** Denormalized labels from API (e.g. floor "1", block "2"). */
   floor?: string;
   block?: string;
   createdAt?: string;
@@ -571,7 +664,10 @@ export function roomHasVacancyForAllocation(r: RoomItem): boolean {
   const total = Number(r.numberOfBeds) || Number(r.capacity) || 0;
   const occupied = Number(r.occupiedBeds) || 0;
   if (total > 0) return occupied < total;
-  return r.isVacant === true || String(r.status ?? "").toLowerCase() === "vacant";
+  if (r.isVacant === true || String(r.status ?? "").toLowerCase() === "vacant") return true;
+  // List responses often omit bed counts entirely; allow selection and let add-tenant validate.
+  if (r.id && r.isVacant !== false && total === 0 && occupied === 0) return true;
+  return false;
 }
 
 export async function getBlocks(propertyId: string) {
@@ -617,6 +713,7 @@ export interface GetRoomsParams {
   floorId?: string;
 }
 
+/** GET …/properties/{propertyId}/rooms?page=&limit=&blockId=&floorId= */
 export async function getRooms(propertyId: string, params?: GetRoomsParams) {
   const query = new URLSearchParams();
   if (params?.page) query.append("page", String(params.page));
@@ -634,6 +731,7 @@ export async function getRooms(propertyId: string, params?: GetRoomsParams) {
   );
 }
 
+/** GET …/properties/{propertyId}/rooms/list?blockId=&floorId= */
 export async function getRoomsList(propertyId: string, params?: { blockId?: string; floorId?: string }) {
   const query = new URLSearchParams();
   if (params?.blockId) query.append("blockId", params.blockId);
@@ -656,6 +754,7 @@ export interface CreateRoomPayload {
   sharingWisePricing?: SharingWisePricingItem[];
 }
 
+/** POST …/properties/{propertyId}/rooms — body includes floorId (not in URL path). */
 export async function createRoom(propertyId: string, payload: CreateRoomPayload) {
   const raw = await httpRequest<CreateRoomResponse>(
     `${PROPERTY_OWNER_BASE}/properties/${propertyId}/rooms`,

@@ -22,6 +22,7 @@ import {
   getPropertyAmenities,
   getPropertyRestrictions,
   getRentCollectionDashboard,
+  getPropertyTenants,
   getRooms,
   getRoomsList,
   getStaffMemberRoles,
@@ -82,10 +83,31 @@ function coerceNum(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** Floor/block labels from API may be strings or nested `{ name }` objects. */
+function coerceFloorBlockLabel(v: unknown): string | undefined {
+  if (v == null) return undefined;
+  if (typeof v === "string") {
+    const s = v.trim();
+    return s !== "" ? s : undefined;
+  }
+  if (typeof v === "number" && Number.isFinite(v)) return String(v);
+  if (typeof v === "object" && v !== null && "name" in v) {
+    const n = (v as { name: unknown }).name;
+    if (typeof n === "string" && n.trim()) return n.trim();
+    if (typeof n === "number" && Number.isFinite(n)) return String(n);
+  }
+  return undefined;
+}
+
 /** Map API room objects to the shape the UI expects (numberOfBeds, roomNumber, availableBeds). */
 function normalizeRoomItem(item: unknown): RoomItem {
   const r = item as Record<string, unknown>;
   const bedsArr = Array.isArray(r.beds) ? (r.beds as Record<string, unknown>[]) : null;
+
+  const hasExplicitTotal =
+    r.numberOfBeds !== undefined && r.numberOfBeds !== null && String(r.numberOfBeds).trim() !== "";
+  const hasExplicitCapacity =
+    r.capacity !== undefined && r.capacity !== null && String(r.capacity).trim() !== "";
 
   let numberOfBeds =
     coerceNum(r.numberOfBeds) ||
@@ -117,13 +139,25 @@ function normalizeRoomItem(item: unknown): RoomItem {
       ? r.isVacant
       : r.status === "vacant" || String(r.status ?? "").toLowerCase() === "vacant";
 
-  if (numberOfBeds === 0 && availableBeds === 0 && isVacantFlag && !hasExplicitAvailable) {
+  const missingInventory =
+    numberOfBeds === 0 &&
+    availableBeds === 0 &&
+    !hasExplicitAvailable &&
+    !hasExplicitTotal &&
+    !hasExplicitCapacity &&
+    (!bedsArr || bedsArr.length === 0);
+
+  if (missingInventory) {
     numberOfBeds = 1;
+    occupiedBeds = 0;
     availableBeds = 1;
   }
 
+  const rawRoomId = r.id ?? (r as Record<string, unknown>).roomId;
+  const idStr = rawRoomId != null && String(rawRoomId).trim() !== "" ? String(rawRoomId) : "";
+
   return {
-    id: String(r.id ?? ""),
+    id: idStr,
     propertyId: String(r.propertyId ?? ""),
     floorId: String(r.floorId ?? ""),
     blockId: r.blockId != null ? String(r.blockId) : undefined,
@@ -136,14 +170,8 @@ function normalizeRoomItem(item: unknown): RoomItem {
     availableBeds,
     isVacant: isVacantFlag,
     status: r.status != null ? String(r.status) : undefined,
-    floor:
-      r.floor != null && typeof r.floor !== "object" && String(r.floor).trim() !== ""
-        ? String(r.floor)
-        : undefined,
-    block:
-      r.block != null && typeof r.block !== "object" && String(r.block).trim() !== ""
-        ? String(r.block)
-        : undefined,
+    floor: coerceFloorBlockLabel(r.floor),
+    block: coerceFloorBlockLabel(r.block),
     createdAt: r.createdAt != null ? String(r.createdAt) : undefined,
   };
 }
@@ -176,6 +204,7 @@ export const queryKeys = {
     ["property", propertyId, "rooms", { blockId, floorId }] as const,
   roomsList: (propertyId?: string | null, blockId?: string | null, floorId?: string | null) =>
     ["property", propertyId, "rooms-list", { blockId, floorId }] as const,
+  tenants: (propertyId?: string | null) => ["property", propertyId, "tenants"] as const,
   allRoomsAndCounts: (propertyId?: string | null) =>
     ["property", propertyId, "all-rooms-and-counts"] as const,
   complaints: (propertyId?: string | null, priority?: string) =>
@@ -210,37 +239,78 @@ export function useRooms(propertyId?: string | null, blockId?: string | null, fl
     queryKey: queryKeys.rooms(propertyId, blockId, floorId),
     queryFn: async () => {
       if (!propertyId) return [];
-      const raw = await getRooms(propertyId, { page: 1, limit: 50, blockId: blockId || undefined, floorId: floorId || undefined });
+      const raw = await getRooms(propertyId, {
+        page: 1,
+        limit: 50,
+        blockId: blockId || undefined,
+        floorId: floorId || undefined,
+      });
       return roomsFromListResponse(raw);
     },
-    enabled: Boolean(propertyId),
+    enabled: Boolean(propertyId && blockId && floorId),
   });
 }
 
-export function useRoomsList(propertyId?: string | null, blockId?: string | null, floorId?: string | null) {
+export type UseRoomsListOptions = {
+  /**
+   * When `true` (default, e.g. Add Tenant), rooms load only after block + floor are known.
+   * When `false` (e.g. Tenants → Rooms & beds), load via fallbacks so the list isn’t empty while blocks/floors load or if only propertyId is set.
+   */
+  requireBlockAndFloor?: boolean;
+};
+
+export function useRoomsList(
+  propertyId?: string | null,
+  blockId?: string | null,
+  floorId?: string | null,
+  options?: UseRoomsListOptions,
+) {
+  const strict = options?.requireBlockAndFloor !== false;
+
   return useQuery({
-    queryKey: queryKeys.roomsList(propertyId, blockId, floorId),
+    queryKey: [...queryKeys.roomsList(propertyId, blockId, floorId), strict ? "strict" : "loose"] as const,
     queryFn: async () => {
       if (!propertyId) return [];
-      const raw = await getRoomsList(propertyId, { blockId: blockId || undefined, floorId: floorId || undefined });
-      let rooms = roomsFromListResponse(raw);
-      if (rooms.length === 0 && blockId && floorId) {
-        const rawAlt = await getRooms(propertyId, {
+      const bid = blockId?.trim();
+      const fid = floorId?.trim();
+
+      if (bid && fid) {
+        const raw = await getRoomsList(propertyId, { blockId: bid, floorId: fid });
+        let rooms = roomsFromListResponse(raw);
+        if (rooms.length === 0) {
+          const rawAlt = await getRooms(propertyId, {
+            page: 1,
+            limit: 200,
+            blockId: bid,
+            floorId: fid,
+          });
+          rooms = roomsFromListResponse(rawAlt);
+        }
+        return rooms;
+      }
+
+      if (strict) return [];
+
+      if (bid && !fid) {
+        const raw = await getRooms(propertyId, {
           page: 1,
-          limit: 200,
-          blockId,
-          floorId,
+          limit: 400,
+          blockId: bid,
         });
-        rooms = roomsFromListResponse(rawAlt);
+        return roomsFromListResponse(raw);
       }
-      if (floorId) {
-        rooms = rooms.filter((room) => !room.floorId || room.floorId === floorId);
-      }
-      if (blockId) {
-        rooms = rooms.filter((room) => !room.blockId || room.blockId === blockId);
-      }
-      return rooms;
+
+      const rawAll = await getRooms(propertyId, { page: 1, limit: 500 });
+      return roomsFromListResponse(rawAll);
     },
+    enabled: strict ? Boolean(propertyId && blockId && floorId) : Boolean(propertyId),
+  });
+}
+
+export function usePropertyTenants(propertyId?: string | null) {
+  return useQuery({
+    queryKey: queryKeys.tenants(propertyId),
+    queryFn: () => getPropertyTenants(propertyId!),
     enabled: Boolean(propertyId),
   });
 }
@@ -276,13 +346,18 @@ export function useCreateRoom(propertyId?: string | null, blockId?: string | nul
   return useMutation({
     mutationFn: (payload: Omit<CreateRoomPayload, "floorId"> & { floorId?: string }) => {
       if (!propertyId) throw new Error("Select a PG first");
-      const finalFloorId = payload.floorId || floorId;
+      const finalFloorId = payload.floorId ?? floorId;
       if (!finalFloorId) throw new Error("Select a floor first");
-      return createRoom(propertyId, { ...payload, floorId: finalFloorId });
+      return createRoom(propertyId, {
+        floorId: finalFloorId,
+        roomNumber: payload.roomNumber,
+        numberOfBeds: payload.numberOfBeds,
+        sharingWisePricing: payload.sharingWisePricing,
+      });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.rooms(propertyId, blockId, floorId) });
-      qc.invalidateQueries({ queryKey: queryKeys.roomsList(propertyId, blockId, floorId) });
+      qc.invalidateQueries({ queryKey: ["property", propertyId, "rooms-list"] });
     },
   });
 }

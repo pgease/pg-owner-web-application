@@ -103,6 +103,18 @@ function forceLogout() {
   }
 }
 
+function formatApiErrorMessage(data: unknown): string {
+  if (data != null && typeof data === "object" && "message" in data) {
+    const m = (data as { message: unknown }).message;
+    if (Array.isArray(m)) {
+      const parts = m.filter((x): x is string => typeof x === "string");
+      if (parts.length) return parts.join(" ");
+    }
+    if (typeof m === "string" && m.trim()) return m;
+  }
+  return "Something went wrong";
+}
+
 /* ─── HTTP client ─────────────────────────────────────────────────────────── */
 
 interface RequestOptions extends Omit<RequestInit, 'body'> {
@@ -129,12 +141,20 @@ export async function httpRequest<TResponse>(path: string, options: RequestOptio
     }
   }
 
-  const body = options.body instanceof FormData ? options.body : options.body ? JSON.stringify(options.body) : undefined;
+  const serializedBody =
+    options.body instanceof FormData
+      ? options.body
+      : options.body !== undefined && options.body !== null
+        ? JSON.stringify(options.body)
+        : undefined;
+
+  // Do not spread `options` into fetch: it carries raw `body` and custom flags (`auth`, `_retried`).
+  const { auth: _a, body: _b, _retried: _r, headers: _incomingHeaders, ...rest } = options;
 
   const response = await fetch(url, {
-    ...options,
+    ...rest,
     headers,
-    body,
+    body: serializedBody,
   });
 
   const isJson = response.headers.get("content-type")?.includes("application/json");
@@ -156,7 +176,7 @@ export async function httpRequest<TResponse>(path: string, options: RequestOptio
   }
 
   if (!response.ok) {
-    const error: HttpError = new Error((data as any)?.message || "Something went wrong");
+    const error: HttpError = new Error(formatApiErrorMessage(data));
     error.status = response.status;
     error.data = data;
     throw error;

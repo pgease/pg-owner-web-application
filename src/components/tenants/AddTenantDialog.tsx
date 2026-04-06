@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -17,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useApp } from "@/context/AppContext";
-import { addTenant, checkRoomAvailability, roomHasVacancyForAllocation } from "@/api/propertyOwner";
+import { addTenant } from "@/api/propertyOwner";
 import { toast } from "@/components/ui/use-toast";
 import { useBlocks, useFloors, useRoomsList } from "@/hooks/usePropertyOwnerQueries";
 
@@ -26,6 +27,15 @@ const paymentOptions = [
   { id: "bank", label: "Bank Transfer" },
   { id: "cash", label: "Cash" },
 ];
+
+function idStr(id: unknown): string {
+  if (id === undefined || id === null) return "";
+  return String(id).trim();
+}
+
+function hasSelectValue(id: unknown): boolean {
+  return idStr(id) !== "";
+}
 
 interface AddTenantDialogProps {
   open: boolean;
@@ -55,78 +65,113 @@ export function AddTenantDialog({ open, onOpenChange, onSuccess }: AddTenantDial
     paymentMethod: "upi",
   });
 
-  const blocks = useBlocks(selectedPgId).data ?? [];
-  const effectiveBlockId = selectedBlockId || blocks[0]?.id || "";
-  const floors = useFloors(selectedPgId, effectiveBlockId || undefined).data ?? [];
-  const effectiveFloorId = selectedFloorId || floors[0]?.id || "";
-  const rooms = useRoomsList(selectedPgId, effectiveBlockId || undefined, effectiveFloorId || undefined).data ?? [];
+  const blocksQuery = useBlocks(selectedPgId);
+  const blocks = blocksQuery.data ?? [];
+
+  const effectiveBlockId = useMemo(() => {
+    if (hasSelectValue(selectedBlockId)) return idStr(selectedBlockId);
+    const first = blocks[0];
+    return first ? idStr(first.id) : "";
+  }, [selectedBlockId, blocks]);
+
+  const floorsQuery = useFloors(selectedPgId, effectiveBlockId || undefined);
+  const floors = floorsQuery.data ?? [];
+
+  const effectiveFloorId = useMemo(() => {
+    if (hasSelectValue(selectedFloorId)) return idStr(selectedFloorId);
+    const first = floors[0];
+    return first ? idStr(first.id) : "";
+  }, [selectedFloorId, floors]);
+
+  const roomsQuery = useRoomsList(selectedPgId, effectiveBlockId || undefined, effectiveFloorId || undefined);
+  const rooms = roomsQuery.data ?? [];
+  const roomsInitialLoading =
+    Boolean(selectedPgId && effectiveBlockId && effectiveFloorId) &&
+    roomsQuery.isPending &&
+    rooms.length === 0;
 
   useEffect(() => {
-    if (open && selectedPgId) {
+    if (open && selectedPgId && effectiveBlockId && effectiveFloorId) {
       queryClient.invalidateQueries({ queryKey: ["property", selectedPgId, "rooms-list"] });
     }
-  }, [open, selectedPgId, queryClient]);
+  }, [open, selectedPgId, effectiveBlockId, effectiveFloorId, queryClient]);
 
-  const vacantRooms = rooms.filter(roomHasVacancyForAllocation);
-  const effectiveRoomId = selectedRoomId || vacantRooms[0]?.id || "";
+  useEffect(() => {
+    if (open) {
+      setSelectedBlockId("");
+      setSelectedFloorId("");
+      setSelectedRoomId("");
+    }
+  }, [open]);
+
+  const selectableRooms = useMemo(() => rooms.filter((r) => hasSelectValue(r.id)), [rooms]);
+
+  const effectiveRoomId = useMemo(() => {
+    if (selectableRooms.length === 0) return "";
+    const sel = idStr(selectedRoomId);
+    const matched = sel && selectableRooms.some((r) => idStr(r.id) === sel);
+    if (matched) return sel;
+    return idStr(selectableRooms[0].id);
+  }, [selectableRooms, selectedRoomId]);
 
   const update = (key: string, value: string) => setForm((p) => ({ ...p, [key]: value }));
 
-  const handleInviteTenant = async () => {
-    if (!selectedPgId) {
-      toast({ title: "Select a PG", variant: "destructive" });
-      return;
+  const getValidationError = (): string | null => {
+    if (!selectedPgId) return "Select a PG from the header.";
+    if (blocksQuery.isLoading && blocks.length === 0) return "Loading blocks…";
+    if (!hasSelectValue(effectiveBlockId)) return "Select a block.";
+    if (floorsQuery.isLoading && floors.length === 0) return "Loading floors…";
+    if (!hasSelectValue(effectiveFloorId)) return "Select a floor.";
+    if (roomsInitialLoading) return "Loading rooms…";
+    if (selectableRooms.length === 0) {
+      return "No rooms for this block and floor. Add rooms under My PGs → Structure.";
     }
-    const rent = parseInt(form.monthlyRent, 10) || 0;
-    const security = parseInt(form.securityDeposit, 10) || 0;
-    const bed = parseInt(form.bedNumber, 10) || 0;
-    const due = parseInt(form.rentDueDate, 10) || 5;
-    if (!form.name.trim() || !form.phone.trim() || !effectiveBlockId || !effectiveFloorId || !effectiveRoomId || bed <= 0) {
-      toast({ title: "Fill required fields", variant: "destructive" });
+    if (!hasSelectValue(effectiveRoomId)) return "Select a room.";
+    if (!form.name.trim()) return "Enter the tenant’s name.";
+    const phoneDigits = form.phone.replace(/\D/g, "");
+    if (phoneDigits.length < 10) return "Enter a valid 10-digit mobile number.";
+    const bed = parseInt(form.bedNumber, 10);
+    if (!Number.isFinite(bed) || bed < 1) return "Enter bed number (1 or more).";
+    return null;
+  };
+
+  const validationError = getValidationError();
+  const canSubmit = !submitting && validationError === null;
+
+  const handleInviteTenant = async () => {
+    const err = getValidationError();
+    if (err) {
+      toast({ title: "Can’t send invite", description: err, variant: "destructive" });
       return;
     }
 
+    const rent = parseInt(form.monthlyRent, 10) || 0;
+    const security = parseInt(form.securityDeposit, 10) || 0;
+    const bed = parseInt(form.bedNumber, 10) || 0;
+    const due = Math.min(28, Math.max(1, parseInt(form.rentDueDate, 10) || 5));
+
     try {
       setSubmitting(true);
-      const selectedRoom = vacantRooms.find((r) => r.id === effectiveRoomId);
-      const roomNumStr = selectedRoom ? String(selectedRoom.roomNumber).trim() : "";
-      const roomNumParsed = selectedRoom
-        ? parseInt(String(selectedRoom.roomNumber).replace(/\D/g, "").slice(0, 8), 10)
-        : NaN;
-      const blockName = blocks.find((b) => b.id === effectiveBlockId)?.name;
-      const floorName = floors.find((f) => f.id === effectiveFloorId)?.name;
-      const blockParam = selectedRoom?.block ?? blockName;
-      const floorParam = selectedRoom?.floor ?? floorName;
-      const availability = await checkRoomAvailability(selectedPgId, {
-        block: blockParam || undefined,
-        floorNumber: floorParam || undefined,
-        floorId: effectiveFloorId,
-        blockId: effectiveBlockId,
-        roomNumber: Number.isFinite(roomNumParsed) ? roomNumParsed : undefined,
-        roomNumberRaw: roomNumStr || undefined,
-        bedNumber: String(bed),
-      });
-      if (!availability.available) {
-        toast({
-          title: "Bed not available",
-          description: availability.message || "Room check failed.",
-          variant: "destructive",
-        });
-        return;
-      }
-      await addTenant(selectedPgId, {
+      const propertyId = selectedPgId!;
+      const electricityBill =
+        (parseInt(form.ac, 10) || 0) +
+        (parseInt(form.cooler, 10) || 0) +
+        (parseInt(form.geyser, 10) || 0);
+
+      // URL: …/add-tenant/:propertyId — body: floorId, blockId, roomId (UUIDs)
+      await addTenant(propertyId, {
         name: form.name.trim(),
-        email: form.email.trim() || undefined,
         phone: form.phone.startsWith("+") ? form.phone : `+91${form.phone.replace(/\D/g, "")}`,
-        floorId: effectiveFloorId,
-        blockId: effectiveBlockId,
-        roomId: effectiveRoomId,
+        floorId: idStr(effectiveFloorId),
+        blockId: idStr(effectiveBlockId),
+        roomId: idStr(effectiveRoomId),
         bedNumber: bed,
-        rentDueDate: due,
         monthlyRent: rent,
-        electricityBill: 0,
         securityDeposit: security,
+        rentDueDate: due,
         joiningDate: form.joiningDate || undefined,
+        electricityBill,
+        ...(form.email.trim() ? { email: form.email.trim() } : {}),
       });
       toast({ title: "Invite sent", description: "Tenant will receive an invite." });
       onOpenChange(false);
@@ -139,8 +184,9 @@ export function AddTenantDialog({ open, onOpenChange, onSuccess }: AddTenantDial
       setSelectedFloorId("");
       setSelectedRoomId("");
       onSuccess?.();
-    } catch (e: any) {
-      toast({ title: "Failed to invite tenant", description: e?.message, variant: "destructive" });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Something went wrong";
+      toast({ title: "Failed to invite tenant", description: message, variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
@@ -153,6 +199,9 @@ export function AddTenantDialog({ open, onOpenChange, onSuccess }: AddTenantDial
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add tenant {selectedPg ? `— ${selectedPg.name}` : ""}</DialogTitle>
+          <DialogDescription className="sr-only">
+            Enter tenant details and choose block, floor, room, and bed.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid grid-cols-2 gap-4">
@@ -161,59 +210,78 @@ export function AddTenantDialog({ open, onOpenChange, onSuccess }: AddTenantDial
               <Input placeholder="Full name" value={form.name} onChange={(e) => update("name", e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>Email (for receipt & agreement)</Label>
+              <Label>Email (optional)</Label>
               <Input type="email" placeholder="email@example.com" value={form.email} onChange={(e) => update("email", e.target.value)} />
             </div>
           </div>
           <div className="space-y-2">
-            <Label>NUMBER</Label>
+            <Label>NUMBER (10 digits)</Label>
             <Input placeholder="10-digit mobile" value={form.phone} onChange={(e) => update("phone", e.target.value.replace(/\D/g, "").slice(0, 10))} />
           </div>
           <div className="space-y-2">
-            <Label>JOINING DATE</Label>
+            <Label>JOINING DATE (optional)</Label>
             <Input type="date" value={form.joiningDate} onChange={(e) => update("joiningDate", e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>RENT (Monthly rent, AC, Cooler, Geyser)</Label>
             <div className="flex gap-2">
-              <Input type="number" placeholder="Rent" value={form.monthlyRent} onChange={(e) => update("monthlyRent", e.target.value)} />
-              <Input type="number" placeholder="AC" value={form.ac} onChange={(e) => update("ac", e.target.value)} className="w-20" />
-              <Input type="number" placeholder="Cooler" value={form.cooler} onChange={(e) => update("cooler", e.target.value)} className="w-20" />
-              <Input type="number" placeholder="Geyser" value={form.geyser} onChange={(e) => update("geyser", e.target.value)} className="w-20" />
+              <Input type="number" min={0} placeholder="Rent" value={form.monthlyRent} onChange={(e) => update("monthlyRent", e.target.value)} />
+              <Input type="number" min={0} placeholder="AC" value={form.ac} onChange={(e) => update("ac", e.target.value)} className="w-20" />
+              <Input type="number" min={0} placeholder="Cooler" value={form.cooler} onChange={(e) => update("cooler", e.target.value)} className="w-20" />
+              <Input type="number" min={0} placeholder="Geyser" value={form.geyser} onChange={(e) => update("geyser", e.target.value)} className="w-20" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>SECURITY</Label>
-              <Input type="number" placeholder="Security deposit" value={form.securityDeposit} onChange={(e) => update("securityDeposit", e.target.value)} />
+              <Label>SECURITY (optional)</Label>
+              <Input type="number" min={0} placeholder="Security deposit" value={form.securityDeposit} onChange={(e) => update("securityDeposit", e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>RENT DUE DATE (day of month)</Label>
+              <Label>RENT DUE DATE (day 1–28)</Label>
               <Input type="number" min={1} max={28} placeholder="5" value={form.rentDueDate} onChange={(e) => update("rentDueDate", e.target.value)} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>BLOCK</Label>
-              <Select value={effectiveBlockId || "none"} onValueChange={(v) => { setSelectedBlockId(v); setSelectedFloorId(""); setSelectedRoomId(""); }}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={hasSelectValue(effectiveBlockId) ? effectiveBlockId : "none"}
+                onValueChange={(v) => {
+                  if (v === "none") return;
+                  setSelectedBlockId(v);
+                  setSelectedFloorId("");
+                  setSelectedRoomId("");
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Block" /></SelectTrigger>
                 <SelectContent>
-                  {blocks.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                  {blocks.filter((b) => hasSelectValue(b.id)).map((b) => (
+                    <SelectItem key={idStr(b.id)} value={idStr(b.id)}>{b.name}</SelectItem>
                   ))}
-                  {blocks.length === 0 && <SelectItem value="none" disabled>No blocks</SelectItem>}
+                  {blocks.length === 0 && !blocksQuery.isLoading && (
+                    <SelectItem value="none" disabled>No blocks</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>FLOOR</Label>
-              <Select value={effectiveFloorId || "none"} onValueChange={(v) => { setSelectedFloorId(v); setSelectedRoomId(""); }}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={hasSelectValue(effectiveFloorId) ? effectiveFloorId : "none"}
+                onValueChange={(v) => {
+                  if (v === "none") return;
+                  setSelectedFloorId(v);
+                  setSelectedRoomId("");
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Floor" /></SelectTrigger>
                 <SelectContent>
-                  {floors.map((f) => (
-                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                  {floors.filter((f) => hasSelectValue(f.id)).map((f) => (
+                    <SelectItem key={idStr(f.id)} value={idStr(f.id)}>{f.name}</SelectItem>
                   ))}
-                  {floors.length === 0 && <SelectItem value="none" disabled>No floors</SelectItem>}
+                  {floors.length === 0 && !floorsQuery.isLoading && (
+                    <SelectItem value="none" disabled>No floors</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -221,21 +289,38 @@ export function AddTenantDialog({ open, onOpenChange, onSuccess }: AddTenantDial
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>ROOM</Label>
-              <Select value={effectiveRoomId || "none"} onValueChange={setSelectedRoomId}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={hasSelectValue(effectiveRoomId) ? effectiveRoomId : "none"}
+                onValueChange={(v) => {
+                  if (v === "none") return;
+                  setSelectedRoomId(v);
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder={roomsInitialLoading ? "Loading…" : "Room"} /></SelectTrigger>
                 <SelectContent>
-                  {vacantRooms.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {String(r.roomNumber)} ({r.availableBeds} available)
+                  {selectableRooms.map((r, idx) => (
+                    <SelectItem key={`${idStr(r.id)}-${idx}`} value={idStr(r.id)}>
+                      {String(r.roomNumber)}
+                      {typeof r.availableBeds === "number" ? ` (${r.availableBeds} available)` : ""}
                     </SelectItem>
                   ))}
-                  {vacantRooms.length === 0 && <SelectItem value="none" disabled>No vacant rooms</SelectItem>}
+                  {selectableRooms.length === 0 && (
+                    <SelectItem value="none" disabled>
+                      {roomsInitialLoading ? "Loading rooms…" : rooms.length === 0 ? "No rooms for this block/floor" : "No rooms with valid id"}
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>BED NO.</Label>
-              <Input placeholder="Bed no" value={form.bedNumber} onChange={(e) => update("bedNumber", e.target.value)} />
+              <Input
+                type="number"
+                min={1}
+                placeholder="e.g. 1"
+                value={form.bedNumber}
+                onChange={(e) => update("bedNumber", e.target.value)}
+              />
             </div>
           </div>
           <div className="space-y-2">
@@ -251,7 +336,7 @@ export function AddTenantDialog({ open, onOpenChange, onSuccess }: AddTenantDial
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={handleInviteTenant} disabled={submitting}>
+            <Button onClick={handleInviteTenant} disabled={!canSubmit}>
               {submitting ? "Sending..." : "Invite tenant"}
             </Button>
           </div>
