@@ -455,7 +455,7 @@ const Onboarding = () => {
                     <p className="text-xs text-white/50 max-w-xs mx-auto">{T.successSub}</p>
                   </div>
                   <Button
-                    onClick={() => navigate("/dashboard", { replace: true })}
+                    onClick={() => navigate("/dashboard", { replace: true, state: { justOnboarded: true, pgName: pgName.trim() } })}
                     className="mt-2 h-12 w-full rounded-2xl bg-primary text-sm font-semibold text-white shadow-lg hover:bg-primary/90"
                   >
                     {T.goToDashboard}
