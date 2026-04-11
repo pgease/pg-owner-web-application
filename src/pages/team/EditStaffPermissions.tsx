@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { usePermissions } from "@/context/PermissionContext";
 import { NoAccessPage } from "@/components/PermissionGuard";
 import { ROLE_PRESETS } from "@/constants/rolePresets";
+import type { PresetCell } from "@/constants/rolePresets";
 import { PermissionEditor } from "@/components/team/PermissionEditor";
 import { getStaff, patchStaffPermissions } from "@/api/staff";
 import { toast } from "@/components/ui/use-toast";

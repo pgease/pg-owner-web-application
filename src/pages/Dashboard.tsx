@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Users,
@@ -16,6 +16,9 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
+  Layers,
+  BedDouble as BedIcon,
+  DoorOpen,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,11 +28,14 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { useApp } from "@/context/AppContext";
 import {
   useAllRoomsAndCounts,
+  useBlocks,
   useComplaints,
   useDashboardDetails,
   useDashboardKpis,
+  usePropertyTenants,
   useStaffList,
 } from "@/hooks/usePropertyOwnerQueries";
+import { CelebrationDialog } from "@/components/CelebrationDialog";
 
 const manageItems = [
   { title: "Staff Management", desc: "Manage your team", icon: Users, path: "/staff" },
@@ -42,17 +48,35 @@ const Dashboard = () => {
   const location = useLocation();
   const { properties, selectedPgId } = useApp();
   const [addTenantOpen, setAddTenantOpen] = useState(false);
+  const [celebrationOpen, setCelebrationOpen] = useState(false);
+  const [celebrationPgName, setCelebrationPgName] = useState("");
 
   const isKpiPage = location.pathname === "/kpis";
+
+  // Celebration dialog after onboarding
+  useEffect(() => {
+    const state = location.state as { justOnboarded?: boolean; pgName?: string } | null;
+    if (state?.justOnboarded) {
+      setCelebrationPgName(state.pgName || "");
+      setCelebrationOpen(true);
+      // Clear navigation state so refresh won't re-trigger
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const roomsQuery = useAllRoomsAndCounts(selectedPgId);
   const complaintsQuery = useComplaints(selectedPgId);
   const staffQuery = useStaffList(selectedPgId);
   const dashboardDetailsQuery = useDashboardDetails(selectedPgId);
   const dashboardKpisQuery = useDashboardKpis();
+  const tenantsQuery = usePropertyTenants(selectedPgId);
+  const blocksQuery = useBlocks(selectedPgId);
 
   const isLoading = roomsQuery.isLoading || complaintsQuery.isLoading || staffQuery.isLoading;
   const isError = roomsQuery.isError || complaintsQuery.isError || staffQuery.isError;
+  
+  const tenantCount = (tenantsQuery.data as unknown[] | undefined)?.length ?? 0;
+  const blocksCount = (blocksQuery.data ?? []).length;
 
   const bedStats = useMemo(() => {
     const rooms = roomsQuery.data ?? [];
@@ -190,7 +214,53 @@ const Dashboard = () => {
             </div>
           </section>
 
-          {/* Backend dashboard-details + dashboard/kpis (Postman) */}
+          {/* Getting started prompts */}
+          {!isKpiPage && (blocksCount === 0 || tenantCount === 0) && (
+            <section>
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                Getting started
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {blocksCount === 0 && (
+                  <Card className="border-primary/30 bg-primary/[0.03] hover:border-primary/50 transition-colors cursor-pointer"
+                    onClick={() => navigate("/structure")}
+                  >
+                    <CardContent className="flex items-center gap-4 p-5">
+                      <div className="rounded-xl bg-primary/15 p-3 shrink-0">
+                        <Layers className="h-6 w-6 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm">Set up your PG structure</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Add blocks, floors, rooms & beds so you can start adding tenants easily.
+                        </p>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-primary shrink-0" />
+                    </CardContent>
+                  </Card>
+                )}
+                {tenantCount === 0 && (
+                  <Card className="border-primary/30 bg-primary/[0.03] hover:border-primary/50 transition-colors cursor-pointer"
+                    onClick={() => setAddTenantOpen(true)}
+                  >
+                    <CardContent className="flex items-center gap-4 p-5">
+                      <div className="rounded-xl bg-primary/15 p-3 shrink-0">
+                        <UserPlus className="h-6 w-6 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm">Add your first tenant</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          No tenants yet. Add a tenant manually, send an invite, or import via Excel.
+                        </p>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-primary shrink-0" />
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </section>
+          )}
+
           <section>
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
               API dashboard
@@ -362,6 +432,11 @@ const Dashboard = () => {
       )}
 
       <AddTenantDialog open={addTenantOpen} onOpenChange={setAddTenantOpen} />
+      <CelebrationDialog
+        open={celebrationOpen}
+        onClose={() => setCelebrationOpen(false)}
+        pgName={celebrationPgName}
+      />
     </div>
     </CanAccessPage>
   );
