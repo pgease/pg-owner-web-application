@@ -57,6 +57,15 @@ import {
   type UpdatePropertyPayload,
   type UpdateStaffPermissionsPayload,
   type StaffPermissionsAssignPayload,
+  type BlockItem,
+  type FloorItem,
+  type Complaint,
+  type RoomAndCount,
+  type StaffWithPermissions,
+  type Designation,
+  type PermissionItem,
+  type PropertyAmenity,
+  type PropertyRestriction,
 } from "@/api/propertyOwner";
 
 /**
