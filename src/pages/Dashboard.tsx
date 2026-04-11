@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Users,
@@ -16,6 +16,9 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
+  Layers,
+  BedDouble as BedIcon,
+  DoorOpen,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
