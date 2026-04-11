@@ -230,7 +230,7 @@ export const queryKeys = {
 export function useBlocks(propertyId?: string | null) {
   return useQuery({
     queryKey: queryKeys.blocks(propertyId),
-    queryFn: async () => (propertyId ? toArray(await getBlocks(propertyId)) : []),
+    queryFn: async () => (propertyId ? toArray<BlockItem>(await getBlocks(propertyId)) : []),
     enabled: Boolean(propertyId),
   });
 }
@@ -238,7 +238,7 @@ export function useBlocks(propertyId?: string | null) {
 export function useFloors(propertyId?: string | null, blockId?: string | null) {
   return useQuery({
     queryKey: queryKeys.floors(propertyId, blockId),
-    queryFn: async () => (propertyId && blockId ? toArray(await getFloors(propertyId, blockId)) : []),
+    queryFn: async () => (propertyId && blockId ? toArray<FloorItem>(await getFloors(propertyId, blockId)) : []),
     enabled: Boolean(propertyId && blockId),
   });
 }
@@ -384,7 +384,7 @@ export function useComplaints(propertyId?: string | null, priority?: string) {
     queryFn: async () => {
       if (!propertyId) return [];
       const params = priority && priority !== "all" ? { priority } : undefined;
-      return toArray(await getComplaintsByProperty(propertyId, params));
+      return toArray<Complaint>(await getComplaintsByProperty(propertyId, params));
     },
     enabled: Boolean(propertyId),
   });
@@ -404,7 +404,7 @@ export function useUpdateComplaintStatus(propertyId?: string | null, priority?: 
 export function useAmenities(propertyId?: string | null) {
   return useQuery({
     queryKey: queryKeys.amenities(propertyId),
-    queryFn: async () => (propertyId ? toArray(await getPropertyAmenities(propertyId)) : []),
+    queryFn: async () => (propertyId ? toArray<PropertyAmenity>(await getPropertyAmenities(propertyId)) : []),
     enabled: Boolean(propertyId),
   });
 }
@@ -412,7 +412,7 @@ export function useAmenities(propertyId?: string | null) {
 export function useRestrictions(propertyId?: string | null) {
   return useQuery({
     queryKey: queryKeys.restrictions(propertyId),
-    queryFn: async () => (propertyId ? toArray(await getPropertyRestrictions(propertyId)) : []),
+    queryFn: async () => (propertyId ? toArray<PropertyRestriction>(await getPropertyRestrictions(propertyId)) : []),
     enabled: Boolean(propertyId),
   });
 }
@@ -489,7 +489,7 @@ export function useUpdateDiningSchedule(propertyId?: string | null) {
 export function useAllRoomsAndCounts(propertyId?: string | null) {
   return useQuery({
     queryKey: queryKeys.allRoomsAndCounts(propertyId),
-    queryFn: async () => (propertyId ? toArray(await getAllRoomsAndCounts(propertyId)) : []),
+    queryFn: async () => (propertyId ? toArray<RoomAndCount>(await getAllRoomsAndCounts(propertyId)) : []),
     enabled: Boolean(propertyId),
   });
 }
@@ -506,7 +506,7 @@ export function useMyFeaturesQuery() {
 export function useStaffList(propertyId?: string | null) {
   return useQuery({
     queryKey: queryKeys.staff(propertyId),
-    queryFn: async () => (propertyId ? toArray(await getAllStaffWithPermissions(propertyId)) : []),
+    queryFn: async () => (propertyId ? toArray<StaffWithPermissions>(await getAllStaffWithPermissions(propertyId)) : []),
     enabled: Boolean(propertyId),
   });
 }
@@ -514,14 +514,14 @@ export function useStaffList(propertyId?: string | null) {
 export function useDesignationsQuery() {
   return useQuery({
     queryKey: queryKeys.designations(),
-    queryFn: async () => toArray(await getDesignations()),
+    queryFn: async () => toArray<Designation>(await getDesignations()),
   });
 }
 
 export function useStaffPermissionsQuery() {
   return useQuery({
     queryKey: queryKeys.staffPermissions(),
-    queryFn: async () => toArray(await getStaffPermissions()),
+    queryFn: async () => toArray<PermissionItem>(await getStaffPermissions()),
   });
 }
 
