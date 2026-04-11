@@ -48,8 +48,21 @@ const Dashboard = () => {
   const location = useLocation();
   const { properties, selectedPgId } = useApp();
   const [addTenantOpen, setAddTenantOpen] = useState(false);
+  const [celebrationOpen, setCelebrationOpen] = useState(false);
+  const [celebrationPgName, setCelebrationPgName] = useState("");
 
   const isKpiPage = location.pathname === "/kpis";
+
+  // Celebration dialog after onboarding
+  useEffect(() => {
+    const state = location.state as { justOnboarded?: boolean; pgName?: string } | null;
+    if (state?.justOnboarded) {
+      setCelebrationPgName(state.pgName || "");
+      setCelebrationOpen(true);
+      // Clear navigation state so refresh won't re-trigger
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const roomsQuery = useAllRoomsAndCounts(selectedPgId);
   const complaintsQuery = useComplaints(selectedPgId);
