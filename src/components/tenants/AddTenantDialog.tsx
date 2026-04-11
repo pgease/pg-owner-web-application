@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useApp } from "@/context/AppContext";
-import { addTenant } from "@/api/propertyOwner";
+import { addTenant, type BlockItem, type FloorItem } from "@/api/propertyOwner";
 import { toast } from "@/components/ui/use-toast";
 import { useBlocks, useFloors, useRoomsList } from "@/hooks/usePropertyOwnerQueries";
 
@@ -66,7 +66,7 @@ export function AddTenantDialog({ open, onOpenChange, onSuccess }: AddTenantDial
   });
 
   const blocksQuery = useBlocks(selectedPgId);
-  const blocks = blocksQuery.data ?? [];
+  const blocks: BlockItem[] = Array.isArray(blocksQuery.data) ? (blocksQuery.data as BlockItem[]) : [];
 
   const effectiveBlockId = useMemo(() => {
     if (hasSelectValue(selectedBlockId)) return idStr(selectedBlockId);
@@ -75,7 +75,7 @@ export function AddTenantDialog({ open, onOpenChange, onSuccess }: AddTenantDial
   }, [selectedBlockId, blocks]);
 
   const floorsQuery = useFloors(selectedPgId, effectiveBlockId || undefined);
-  const floors = floorsQuery.data ?? [];
+  const floors: FloorItem[] = Array.isArray(floorsQuery.data) ? (floorsQuery.data as FloorItem[]) : [];
 
   const effectiveFloorId = useMemo(() => {
     if (hasSelectValue(selectedFloorId)) return idStr(selectedFloorId);

@@ -21,6 +21,7 @@ import {
   UserMinus,
   Wallet,
   LifeBuoy,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -180,6 +181,11 @@ const navItems: NavItem[] = [
     title: "Support",
     url: "/support",
     icon: LifeBuoy,
+  },
+  {
+    title: "API catalog",
+    url: "/reference/apis",
+    icon: BookOpen,
   },
 ];
 

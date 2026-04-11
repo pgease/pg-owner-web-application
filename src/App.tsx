@@ -27,6 +27,7 @@ import TeamIndex from "./pages/team/TeamIndex";
 import AddStaff from "./pages/team/AddStaff";
 import EditStaffPermissions from "./pages/team/EditStaffPermissions";
 import { FeaturePlaceholder } from "./pages/FeaturePlaceholder";
+import ApiCatalogPage from "./pages/reference/ApiCatalogPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -90,6 +91,7 @@ const App = () => (
                         <Route path="/settings" element={<SettingsPage />} />
                         <Route path="/settings/notifications" element={<SettingsPage />} />
                         <Route path="/support" element={<Support />} />
+                        <Route path="/reference/apis" element={<ApiCatalogPage />} />
                         <Route path="/team" element={<TeamIndex />} />
                         <Route path="/team/add-staff" element={<AddStaff />} />
                         <Route path="/team/:staffId/permissions" element={<EditStaffPermissions />} />
