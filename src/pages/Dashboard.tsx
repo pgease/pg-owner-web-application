@@ -214,7 +214,53 @@ const Dashboard = () => {
             </div>
           </section>
 
-          {/* Backend dashboard-details + dashboard/kpis (Postman) */}
+          {/* Getting started prompts */}
+          {!isKpiPage && (blocksCount === 0 || tenantCount === 0) && (
+            <section>
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                Getting started
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {blocksCount === 0 && (
+                  <Card className="border-primary/30 bg-primary/[0.03] hover:border-primary/50 transition-colors cursor-pointer"
+                    onClick={() => navigate("/structure")}
+                  >
+                    <CardContent className="flex items-center gap-4 p-5">
+                      <div className="rounded-xl bg-primary/15 p-3 shrink-0">
+                        <Layers className="h-6 w-6 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm">Set up your PG structure</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Add blocks, floors, rooms & beds so you can start adding tenants easily.
+                        </p>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-primary shrink-0" />
+                    </CardContent>
+                  </Card>
+                )}
+                {tenantCount === 0 && (
+                  <Card className="border-primary/30 bg-primary/[0.03] hover:border-primary/50 transition-colors cursor-pointer"
+                    onClick={() => setAddTenantOpen(true)}
+                  >
+                    <CardContent className="flex items-center gap-4 p-5">
+                      <div className="rounded-xl bg-primary/15 p-3 shrink-0">
+                        <UserPlus className="h-6 w-6 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm">Add your first tenant</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          No tenants yet. Add a tenant manually, send an invite, or import via Excel.
+                        </p>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-primary shrink-0" />
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </section>
+          )}
+
           <section>
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
               API dashboard
