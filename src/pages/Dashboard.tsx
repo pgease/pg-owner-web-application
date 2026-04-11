@@ -28,11 +28,14 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { useApp } from "@/context/AppContext";
 import {
   useAllRoomsAndCounts,
+  useBlocks,
   useComplaints,
   useDashboardDetails,
   useDashboardKpis,
+  usePropertyTenants,
   useStaffList,
 } from "@/hooks/usePropertyOwnerQueries";
+import { CelebrationDialog } from "@/components/CelebrationDialog";
 
 const manageItems = [
   { title: "Staff Management", desc: "Manage your team", icon: Users, path: "/staff" },
