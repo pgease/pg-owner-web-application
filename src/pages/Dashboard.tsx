@@ -432,6 +432,11 @@ const Dashboard = () => {
       )}
 
       <AddTenantDialog open={addTenantOpen} onOpenChange={setAddTenantOpen} />
+      <CelebrationDialog
+        open={celebrationOpen}
+        onClose={() => setCelebrationOpen(false)}
+        pgName={celebrationPgName}
+      />
     </div>
     </CanAccessPage>
   );
