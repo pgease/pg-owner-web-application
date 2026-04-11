@@ -69,9 +69,14 @@ const Dashboard = () => {
   const staffQuery = useStaffList(selectedPgId);
   const dashboardDetailsQuery = useDashboardDetails(selectedPgId);
   const dashboardKpisQuery = useDashboardKpis();
+  const tenantsQuery = usePropertyTenants(selectedPgId);
+  const blocksQuery = useBlocks(selectedPgId);
 
   const isLoading = roomsQuery.isLoading || complaintsQuery.isLoading || staffQuery.isLoading;
   const isError = roomsQuery.isError || complaintsQuery.isError || staffQuery.isError;
+  
+  const tenantCount = (tenantsQuery.data as unknown[] | undefined)?.length ?? 0;
+  const blocksCount = (blocksQuery.data ?? []).length;
 
   const bedStats = useMemo(() => {
     const rooms = roomsQuery.data ?? [];
