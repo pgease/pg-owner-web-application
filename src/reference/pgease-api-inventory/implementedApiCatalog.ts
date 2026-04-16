@@ -422,10 +422,10 @@ export const IMPLEMENTED_API_CATALOG: ImplementedApiRow[] = [
     auth: true,
     useCase: "Allocate a tenant to a bed.",
     flowPhase: "Tenants",
-    appRoute: "/tenants",
+    appRoute: "/tenants/add",
     steps: [
-      "On `/tenants`, click add tenant (or open the add dialog from dashboard quick action).",
-      "Pick block, floor, room, bed, rent fields, then submit.",
+      "Open **`/tenants/add`** (sidebar Tenants → Add tenant, or **Add tenant** on the list / dashboard).",
+      "Pick block, floor, room, bed, and rent fields, then submit.",
     ],
   },
   {
@@ -437,8 +437,8 @@ export const IMPLEMENTED_API_CATALOG: ImplementedApiRow[] = [
     flowPhase: "Tenants",
     appRoute: "/tenants",
     steps: [
-      "On `/tenants`, open a tenant’s detail dialog.",
-      "Edit profile fields and save.",
+      "On `/tenants`, click a row or name to open **`/tenants/<tenantId>`**.",
+      "Use **Edit** on the profile tab, change fields, and save.",
     ],
   },
   {

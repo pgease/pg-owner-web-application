@@ -7,6 +7,8 @@ import AppLayout from "@/components/layout/AppLayout";
 import RequireAuth from "@/components/auth/RequireAuth";
 import Dashboard from "./pages/Dashboard";
 import Tenants from "./pages/Tenants";
+import AddTenantPage from "./pages/tenants/AddTenantPage";
+import TenantDetailPage from "./pages/tenants/TenantDetailPage";
 import MyPGs from "./pages/MyPGs";
 import RentPayments from "./pages/RentPayments";
 import Complaints from "./pages/Complaints";
@@ -66,11 +68,13 @@ const App = () => (
                         <Route path="/" element={<Dashboard />} />
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/kpis" element={<Dashboard />} />
-                        <Route path="/tenants" element={<Tenants />} />
+                        <Route path="/tenants/add" element={<AddTenantPage />} />
                         <Route path="/tenants/vacant-rooms" element={<Tenants />} />
                         <Route path="/tenants/onboarding" element={<Tenants />} />
                         <Route path="/tenants/guests" element={<Tenants />} />
                         <Route path="/tenants/kyc" element={<Kyc />} />
+                        <Route path="/tenants/:tenantId" element={<TenantDetailPage />} />
+                        <Route path="/tenants" element={<Tenants />} />
                         <Route path="/my-pgs" element={<MyPGs />} />
                         <Route path="/my-pgs/structure" element={<Structure />} />
                         <Route path="/my-pgs/rooms" element={<MyPGs />} />

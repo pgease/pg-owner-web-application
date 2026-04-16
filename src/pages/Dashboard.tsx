@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AddTenantDialog } from "@/components/tenants/AddTenantDialog";
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
 import { PageHeader } from "@/components/common/PageHeader";
 import { useApp } from "@/context/AppContext";
@@ -47,7 +46,6 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { properties, selectedPgId } = useApp();
-  const [addTenantOpen, setAddTenantOpen] = useState(false);
   const [celebrationOpen, setCelebrationOpen] = useState(false);
   const [celebrationPgName, setCelebrationPgName] = useState("");
 
@@ -157,7 +155,7 @@ const Dashboard = () => {
               <span className="hidden sm:inline">Send</span> Invite
             </Button>
             <CanAccess permission="tenant_add">
-              <Button size="sm" className="gap-2" onClick={() => setAddTenantOpen(true)}>
+              <Button size="sm" className="gap-2" onClick={() => navigate("/tenants/add")}>
                 <UserPlus className="h-4 w-4" /> Add Tenant
               </Button>
             </CanAccess>
@@ -241,7 +239,7 @@ const Dashboard = () => {
                 )}
                 {tenantCount === 0 && (
                   <Card className="border-primary/30 bg-primary/[0.03] hover:border-primary/50 transition-colors cursor-pointer"
-                    onClick={() => setAddTenantOpen(true)}
+                    onClick={() => navigate("/tenants/add")}
                   >
                     <CardContent className="flex items-center gap-4 p-5">
                       <div className="rounded-xl bg-primary/15 p-3 shrink-0">
@@ -431,7 +429,6 @@ const Dashboard = () => {
         </>
       )}
 
-      <AddTenantDialog open={addTenantOpen} onOpenChange={setAddTenantOpen} />
       <CelebrationDialog
         open={celebrationOpen}
         onClose={() => setCelebrationOpen(false)}

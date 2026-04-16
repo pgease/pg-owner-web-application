@@ -27,7 +27,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
         )}
       >
         <AppHeader onMenuToggle={() => setMobileOpen(!mobileOpen)} />
-        <main className="flex-1 p-4 md:p-6">{children}</main>
+        <main className="flex-1 bg-muted/20 p-4 md:p-6">{children}</main>
       </div>
     </div>
   );
