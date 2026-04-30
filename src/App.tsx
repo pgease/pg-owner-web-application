@@ -18,6 +18,9 @@ import Plans from "./pages/Plans";
 import SettingsPage from "./pages/SettingsPage";
 import Expenses from "./pages/Expenses";
 import Support from "./pages/Support";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import TermsConditionsPage from "./pages/TermsConditionsPage";
+import ContactUsPage from "./pages/ContactUsPage";
 import Login from "./pages/Login";
 import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
@@ -95,6 +98,9 @@ const App = () => (
                         <Route path="/settings" element={<SettingsPage />} />
                         <Route path="/settings/notifications" element={<SettingsPage />} />
                         <Route path="/support" element={<Support />} />
+                        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                        <Route path="/terms-and-conditions" element={<TermsConditionsPage />} />
+                        <Route path="/contact-us" element={<ContactUsPage />} />
                         <Route path="/reference/apis" element={<ApiCatalogPage />} />
                         <Route path="/team" element={<TeamIndex />} />
                         <Route path="/team/add-staff" element={<AddStaff />} />

@@ -182,6 +182,12 @@ const navItems: NavItem[] = [
     title: "Support",
     url: "/support",
     icon: LifeBuoy,
+    children: [
+      { title: "Support Home", url: "/support" },
+      { title: "Privacy Policy", url: "/privacy-policy" },
+      { title: "Terms & Conditions", url: "/terms-and-conditions" },
+      { title: "Contact Us", url: "/contact-us" },
+    ],
   },
   {
     title: "API catalog",
