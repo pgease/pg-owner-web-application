@@ -65,6 +65,7 @@ const navItems: NavItem[] = [
     permissionKey: "tenant_view",
     children: [
       { title: "Tenant List", url: "/tenants", permissionKey: "tenant_view" },
+      { title: "Leads & Visits", url: "/leads", permissionKey: "tenant_view", featureKey: "LEAD_CRM" },
       { title: "Add tenant", url: "/tenants/add", permissionKey: "tenant_add" },
       { title: "Vacant Rooms", url: "/tenants/vacant-rooms", permissionKey: "tenant_view" },
       { title: "Onboarding", url: "/tenants/onboarding", permissionKey: "tenant_view" },

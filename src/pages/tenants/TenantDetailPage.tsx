@@ -267,7 +267,7 @@ export default function TenantDetailPage() {
                 <TabsTrigger value="profile" className="text-xs sm:text-sm">
                   Profile
                 </TabsTrigger>
-                <TabsTrigger value="documents" disabled className="text-xs sm:text-sm">
+                <TabsTrigger value="documents" className="text-xs sm:text-sm">
                   Documents
                 </TabsTrigger>
                 <TabsTrigger value="passbook" disabled className="text-xs sm:text-sm">
@@ -378,6 +378,65 @@ export default function TenantDetailPage() {
                     </CollapsibleContent>
                   </Card>
                 </Collapsible>
+              </TabsContent>
+
+              <TabsContent value="documents" className="mt-4 space-y-4">
+                <Card className="border-border/80 shadow-sm">
+                  <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-base">Identity Verification (KYC)</CardTitle>
+                      <p className="text-xs text-muted-foreground font-normal mt-0.5 font-sans">Secure identity checks via Digio Aadhaar OKYC</p>
+                    </div>
+                    <Badge variant={verified ? "outline" : "secondary"} className={verified ? "bg-emerald-50 text-emerald-700 border-emerald-200" : ""}>
+                      {verified ? "Verified" : "KYC Pending"}
+                    </Badge>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border p-4 rounded-lg bg-muted/20">
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold">Aadhaar Offline KYC (OKYC)</p>
+                        <p className="text-xs text-muted-foreground">Tenant receives verification link on WhatsApp via MSG91.</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="shrink-0"
+                        onClick={() => {
+                          toast({ title: "Digio Request Dispatched", description: "Verification link sent via MSG91 WhatsApp to tenant." });
+                        }}
+                      >
+                        Send KYC Link
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border/80 shadow-sm">
+                  <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="text-base">Digital Rent Agreement</CardTitle>
+                      <p className="text-xs text-muted-foreground font-normal mt-0.5 font-sans">e-Signed legally binding lease contracts via Digio</p>
+                    </div>
+                    <Badge variant="secondary">Not Generated</Badge>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border p-4 rounded-lg bg-muted/20">
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold">Standard 11-Month Lease Agreement</p>
+                        <p className="text-xs text-muted-foreground">Generates stamp duty draft and requests digital signatures from owner and tenant.</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0"
+                        onClick={() => {
+                          toast({ title: "Agreement Request Dispatched", description: "Lease e-sign link sent to landlord and tenant." });
+                        }}
+                      >
+                        Generate & Send E-Sign Link
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           </div>

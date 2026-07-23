@@ -1,14 +1,15 @@
 import type { PlanFeature } from "@/api/propertyOwner";
 
-export type PlanTierKey = "FREE" | "PREMIUM" | "PRO";
+export type PlanTierKey = "FREE" | "LITE" | "PRO";
 
 export interface StaticPlanFeatureRow {
   name: string;
   /** If set, "Your plan" column uses GET /property-owners/my-features when the API returns features. */
   featureKey?: string;
   free: boolean;
-  premium: boolean;
+  lite: boolean;
   pro: boolean;
+  details?: string;
 }
 
 export function buildFeatureKeySet(features: PlanFeature[] | undefined): Set<string> {
@@ -26,6 +27,7 @@ export function userHasFeatureForRow(
     return apiKeys.has(row.featureKey);
   }
   if (planKey === "FREE") return row.free;
-  if (planKey === "PREMIUM") return row.premium;
+  if (planKey === "LITE") return row.lite;
   return row.pro;
 }
+

@@ -33,6 +33,7 @@ import AddStaff from "./pages/team/AddStaff";
 import EditStaffPermissions from "./pages/team/EditStaffPermissions";
 import { FeaturePlaceholder } from "./pages/FeaturePlaceholder";
 import ApiCatalogPage from "./pages/reference/ApiCatalogPage";
+import LeadsPage from "./pages/tenants/LeadsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -78,6 +79,7 @@ const App = () => (
                         <Route path="/tenants/kyc" element={<Kyc />} />
                         <Route path="/tenants/:tenantId" element={<TenantDetailPage />} />
                         <Route path="/tenants" element={<Tenants />} />
+                        <Route path="/leads" element={<LeadsPage />} />
                         <Route path="/my-pgs" element={<MyPGs />} />
                         <Route path="/my-pgs/structure" element={<Structure />} />
                         <Route path="/my-pgs/rooms" element={<MyPGs />} />

@@ -30,9 +30,11 @@ import { amountFromRow, formatInr, parseRentTenantRow } from "@/lib/rentDashboar
 function TenantTable({
   rows,
   emptyLabel,
+  isUnpaid = false,
 }: {
   rows: RentDashboardTenantRow[];
   emptyLabel: string;
+  isUnpaid?: boolean;
 }) {
   if (rows.length === 0) {
     return (
@@ -47,6 +49,7 @@ function TenantTable({
             <TableHead>Tenant</TableHead>
             <TableHead>Room</TableHead>
             <TableHead className="text-right">Amount</TableHead>
+            {isUnpaid && <TableHead className="text-right">Action</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -63,6 +66,24 @@ function TenantTable({
                 <TableCell className="text-right tabular-nums">
                   {amt != null ? formatInr(amt) : "—"}
                 </TableCell>
+                {isUnpaid && (
+                  <TableCell className="text-right">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-[11px] px-2 py-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toast({
+                          title: "Razorpay Link Generated",
+                          description: "Rent payment link sent via MSG91 WhatsApp to tenant.",
+                        });
+                      }}
+                    >
+                      Send Pay Link
+                    </Button>
+                  </TableCell>
+                )}
               </TableRow>
             );
           })}
@@ -278,7 +299,7 @@ const RentPayments = () => {
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold mb-2">Pending payment</h3>
-                  <TenantTable rows={dashboard?.unpaidTenants ?? []} emptyLabel="No unpaid tenants for this period." />
+                  <TenantTable rows={dashboard?.unpaidTenants ?? []} emptyLabel="No unpaid tenants for this period." isUnpaid={true} />
                 </div>
               </div>
             </>

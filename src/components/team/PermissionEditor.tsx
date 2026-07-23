@@ -15,13 +15,13 @@ import { cn } from "@/lib/utils";
 
 const tierStyles: Record<Tier, string> = {
   free: "bg-[#EAF3DE] text-[#3B6D11]",
-  premium: "bg-[#FAEEDA] text-[#854F0B]",
+  lite: "bg-[#FAEEDA] text-[#854F0B]",
   pro: "bg-[#EEEDFE] text-[#534AB7]",
 };
 
 const tierLabel: Record<Tier, string> = {
   free: "FREE",
-  premium: "PREMIUM",
+  lite: "LITE",
   pro: "PRO",
 };
 
