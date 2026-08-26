@@ -1,4 +1,4 @@
-import { LifeBuoy, Mail } from "lucide-react";
+import { LifeBuoy, Mail, Linkedin } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/common/PageHeader";
 
@@ -19,17 +19,33 @@ const Support = () => (
           Create tickets, track issues, and get help — available in an upcoming
           update.
         </p>
-        <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground">
-          <Mail className="h-4 w-4" />
-          <span>
-            For immediate help, email{" "}
-            <a
-              href="mailto:support@pgease.in"
-              className="text-primary font-medium hover:underline"
-            >
-              support@pgease.in
-            </a>
-          </span>
+        <div className="flex flex-col sm:flex-row items-center gap-4 mt-6 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <Mail className="h-4 w-4" />
+            <span>
+              For immediate help, email{" "}
+              <a
+                href="mailto:support@pgease.in"
+                className="text-primary font-medium hover:underline"
+              >
+                support@pgease.in
+              </a>
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Linkedin className="h-4 w-4 text-primary" />
+            <span>
+              Follow our{" "}
+              <a
+                href="https://www.linkedin.com/company/pg-ease-solutions/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary font-medium hover:underline"
+              >
+                LinkedIn Page
+              </a>
+            </span>
+          </div>
         </div>
       </CardContent>
     </Card>

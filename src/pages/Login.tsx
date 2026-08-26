@@ -13,7 +13,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { requestOtp, verifyOtp } from "@/api/propertyOwner";
 import pgeaseLogo from "@/assets/pgease-logo.jpg";
 import loginLottie from "@/assets/lottie/login.json";
-import { Shield, Lock, Users, Pencil } from "lucide-react";
+import { Shield, Lock, Users, Pencil, Linkedin } from "lucide-react";
 
 type Step = "phone" | "otp";
 type Lang = "en" | "hi";
@@ -484,6 +484,20 @@ export default function Login() {
               )}
             </CardContent>
           </Card>
+
+          {/* Social Links / Footer under Card */}
+          <div className="mt-4 flex items-center justify-center gap-2 text-xs text-white/40">
+            <span>Connect with us:</span>
+            <a
+              href="https://www.linkedin.com/company/pg-ease-solutions/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-primary hover:text-primary/80 transition-colors font-medium hover:underline"
+            >
+              <Linkedin className="h-3.5 w-3.5 animate-pulse" />
+              LinkedIn
+            </a>
+          </div>
 
           {/* Mobile Lottie */}
           <div className="mt-6 lg:hidden">
