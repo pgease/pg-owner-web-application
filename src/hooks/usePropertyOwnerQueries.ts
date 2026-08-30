@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   assignStaffRole,
   approveKycApplication,
@@ -68,6 +68,24 @@ import {
   type PermissionItem,
   type PropertyAmenity,
   type PropertyRestriction,
+  getCreditBalance,
+  getCreditPacks,
+  createCreditTopupOrder,
+  verifyCreditPayment,
+  requestTenantKyc,
+  getPlans,
+  getCurrentPlan,
+  createPlanCheckoutOrder,
+  verifyPlanPayment,
+  getPropertyAgreements,
+  createRentalAgreement,
+  sendAgreementForEsign,
+  setTenantNotice,
+  clearTenantNotice,
+  getElectricityDues,
+  addElectricityDues,
+  updateElectricityDues,
+  deleteElectricityDues
 } from "@/api/propertyOwner";
 
 /**
@@ -727,6 +745,201 @@ export function useUploadPhotoMutation() {
     mutationFn: (file: File) => uploadPhoto(file),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["property-owner", "me"] });
+    },
+  });
+}
+
+// ==========================================================
+// VERIFICATION CREDITS & TOP-UPS HOOKS
+// ==========================================================
+
+export function useCreditBalance() {
+  return useQuery({
+    queryKey: ['creditBalance'],
+    queryFn: () => getCreditBalance(),
+    staleTime: 30_000,
+  });
+}
+
+export function useCreditPacks() {
+  return useQuery({
+    queryKey: ['creditPacks'],
+    queryFn: () => getCreditPacks(),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useCreateCreditTopupOrderMutation() {
+  return useMutation({
+    mutationFn: (creditPackId: string) => createCreditTopupOrder(creditPackId),
+  });
+}
+
+export function useVerifyCreditPaymentMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: verifyCreditPayment,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['creditBalance'] });
+    },
+  });
+}
+
+export function useRequestTenantKycMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (roomTenantId: string) => requestTenantKyc(roomTenantId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['creditBalance'] });
+      queryClient.invalidateQueries({ queryKey: ['kycApplications'] });
+      queryClient.invalidateQueries({ queryKey: ['propertyTenants'] });
+    },
+  });
+}
+
+// ==========================================================
+// PLANS & SUBSCRIPTIONS HOOKS
+// ==========================================================
+
+export function usePlansList() {
+  return useQuery({
+    queryKey: ['subscriptionPlans'],
+    queryFn: () => getPlans(),
+    staleTime: 10 * 60_000,
+  });
+}
+
+export function useCurrentPlan() {
+  return useQuery({
+    queryKey: ['currentPlan'],
+    queryFn: () => getCurrentPlan(),
+    staleTime: 30_000,
+  });
+}
+
+export function useCreatePlanCheckoutOrderMutation() {
+  return useMutation({
+    mutationFn: ({ planId, billingCycle }: { planId: string; billingCycle?: 'monthly' | 'annual' }) =>
+      createPlanCheckoutOrder(planId, billingCycle),
+  });
+}
+
+export function useVerifyPlanPaymentMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: verifyPlanPayment,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['currentPlan'] });
+      queryClient.invalidateQueries({ queryKey: ['myFeatures'] });
+    },
+  });
+}
+
+// ==========================================================
+// RENTAL AGREEMENTS HOOKS
+// ==========================================================
+
+export function usePropertyAgreements(propertyId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['agreements', propertyId],
+    queryFn: () => getPropertyAgreements(propertyId!),
+    enabled: Boolean(propertyId),
+    staleTime: 30_000,
+  });
+}
+
+export function useCreateAgreementMutation(propertyId: string | null | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Parameters<typeof createRentalAgreement>[1]) =>
+      createRentalAgreement(propertyId!, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agreements', propertyId] });
+    },
+  });
+}
+
+export function useSendAgreementEsignMutation(propertyId?: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (agreementId: string) => sendAgreementForEsign(agreementId),
+    onSuccess: () => {
+      if (propertyId) {
+        queryClient.invalidateQueries({ queryKey: ['agreements', propertyId] });
+      }
+    },
+  });
+}
+
+// ==========================================================
+// NOTICE PERIOD HOOKS
+// ==========================================================
+
+export function useSetTenantNoticeMutation(propertyId: string | null | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ roomTenantId, body }: { roomTenantId: string; body: Parameters<typeof setTenantNotice>[2] }) =>
+      setTenantNotice(propertyId!, roomTenantId, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['propertyTenants'] });
+    },
+  });
+}
+
+export function useClearTenantNoticeMutation(propertyId: string | null | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (roomTenantId: string) => clearTenantNotice(propertyId!, roomTenantId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['propertyTenants'] });
+    },
+  });
+}
+
+// ==========================================================
+// ELECTRICITY METER DUES HOOKS
+// ==========================================================
+
+export function useElectricityDues(propertyId: string | null | undefined, roomTenantId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['electricityDues', propertyId, roomTenantId],
+    queryFn: () => getElectricityDues(propertyId!, roomTenantId!),
+    enabled: Boolean(propertyId && roomTenantId),
+    staleTime: 30_000,
+  });
+}
+
+export function useAddElectricityDuesMutation(propertyId: string | null | undefined, roomTenantId: string | null | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Parameters<typeof addElectricityDues>[2]) =>
+      addElectricityDues(propertyId!, roomTenantId!, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['electricityDues', propertyId, roomTenantId] });
+      queryClient.invalidateQueries({ queryKey: ['rentCollectionDashboard'] });
+    },
+  });
+}
+
+export function useUpdateElectricityDuesMutation(propertyId: string | null | undefined, roomTenantId: string | null | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ duesId, body }: { duesId: string; body: Parameters<typeof updateElectricityDues>[3] }) =>
+      updateElectricityDues(propertyId!, roomTenantId!, duesId, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['electricityDues', propertyId, roomTenantId] });
+      queryClient.invalidateQueries({ queryKey: ['rentCollectionDashboard'] });
+    },
+  });
+}
+
+export function useDeleteElectricityDuesMutation(propertyId: string | null | undefined, roomTenantId: string | null | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (duesId: string) => deleteElectricityDues(propertyId!, roomTenantId!, duesId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['electricityDues', propertyId, roomTenantId] });
+      queryClient.invalidateQueries({ queryKey: ['rentCollectionDashboard'] });
     },
   });
 }
