@@ -1,4 +1,4 @@
-import { Bell, Search, Moon, Sun, Menu, LogOut, ChevronDown, Globe, Building2, LifeBuoy } from "lucide-react";
+import { Bell, Search, Moon, Sun, Menu, LogOut, ChevronDown, Globe, Building2, LifeBuoy, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
@@ -123,6 +123,11 @@ const AppHeader = ({ onMenuToggle }: AppHeaderProps) => {
                   </DropdownMenuItem>
                 ))
               )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate("/onboarding", { state: { forceShowForm: true } })} className="text-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground font-semibold cursor-pointer">
+                <Plus className="mr-2 h-4 w-4 shrink-0" />
+                <span>Add New Property</span>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 

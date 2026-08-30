@@ -58,7 +58,16 @@ const App = () => (
           {/* Auth routes (no layout) */}
           <Route path="/" element={<Login />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/onboarding" element={<Onboarding />} />
+          <Route
+            path="/onboarding"
+            element={
+              <RequireAuth>
+                <AppProvider>
+                  <Onboarding />
+                </AppProvider>
+              </RequireAuth>
+            }
+          />
 
           {/* App routes (with layout) */}
           <Route

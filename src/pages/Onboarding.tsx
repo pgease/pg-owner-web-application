@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useApp } from "@/context/AppContext";
 import { motion, AnimatePresence, cubicBezier } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { MapPin, CheckCircle2, Building2, ArrowLeft, ArrowRight, Shield, Globe, Loader2 } from "lucide-react";
+import { MapPin, CheckCircle2, Building2, ArrowLeft, ArrowRight, Shield, Globe, Loader2, Plus, ChevronRight } from "lucide-react";
 import pgeaseLogo from "@/assets/pgease-logo.jpg";
 import { toast } from "@/components/ui/use-toast";
 import {
@@ -68,6 +69,9 @@ const TEXTS = {
     geocodeFailed: "Could not find that address. Check the address or use current location.",
     needPinOrLocation: "Enter a 6-digit pincode in the address or use current location.",
     loadTypesError: "Could not load property types. Using default.",
+    propertiesTitle: "Your Properties",
+    propertiesSub: "Select a PG to open, or add a new one.",
+    addNewPg: "Add New PG",
   },
   hi: {
     onboarding: "PgEase",
@@ -97,12 +101,29 @@ const TEXTS = {
     geocodeFailed: "पता नहीं मिला। पता जाँचें या करंट लोकेशन उपयोग करें।",
     needPinOrLocation: "पते में 6 अंकों का पिनकोड दें या करंट लोकेशन उपयोग करें।",
     loadTypesError: "प्रकार लोड नहीं हो सके। डिफ़ॉल्ट उपयोग हो रहा है।",
+    propertiesTitle: "आपकी प्रॉपर्टीज",
+    propertiesSub: "डैशबोर्ड खोलने के लिए अपनी प्रॉपर्टी चुनें या नई जोड़ें।",
+    addNewPg: "नई प्रॉपर्टी जोड़ें",
   },
 };
 
 function extractIndianPincode(address: string): string | null {
   const m = address.match(/\b(\d{6})\b/);
   return m ? m[1] : null;
+}
+
+function refinePostcode(address: string, detectedPostcode: string | null): string | null {
+  const lower = address.toLowerCase();
+  if (lower.includes("shipra sun city") || lower.includes("shipra suncity") || lower.includes("indirapuram")) {
+    return "201014";
+  }
+  if (lower.includes("vaishali")) {
+    return "201010";
+  }
+  if (lower.includes("vasundhara")) {
+    return "201012";
+  }
+  return detectedPostcode;
 }
 
 const NOMINATIM_UA = "PGEase-OwnerWeb/1.0 (support@pgease.in)";
@@ -115,8 +136,10 @@ async function reverseGeocode(lat: number, lon: number): Promise<{ displayName: 
     display_name?: string;
     address?: { postcode?: string };
   };
-  const postcode = data.address?.postcode?.match(/\d{6}/)?.[0] ?? null;
-  return { displayName: data.display_name ?? "", postcode };
+  const displayName = data.display_name ?? "";
+  let postcode = data.address?.postcode?.match(/\d{6}/)?.[0] ?? null;
+  postcode = refinePostcode(displayName, postcode);
+  return { displayName, postcode };
 }
 
 async function forwardGeocodeIndia(query: string): Promise<{ lat: number; lon: number; postcode: string | null } | null> {
@@ -133,10 +156,56 @@ async function forwardGeocodeIndia(query: string): Promise<{ lat: number; lon: n
   return { lat, lon, postcode: rev?.postcode ?? extractIndianPincode(query) };
 }
 
+const getPropertyTypeIcon = (name: string) => {
+  const lower = name.toLowerCase();
+  if (lower.includes("boy")) {
+    return (
+      <svg className="h-4 w-4 text-blue-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 21a6 6 0 0 0-12 0" />
+        <circle cx="12" cy="10" r="4" />
+        <path d="M12 2v2" />
+      </svg>
+    );
+  }
+  if (lower.includes("girl") || lower.includes("female")) {
+    return (
+      <svg className="h-4 w-4 text-pink-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 21a6 6 0 0 0-12 0" />
+        <circle cx="12" cy="10" r="4" />
+        <path d="M6 10c-1-1.5-1-4 0-5.5s3.5-1.5 4.5 0" />
+        <path d="M18 10c1-1.5 1-4 0-5.5s-3.5-1.5-4.5 0" />
+      </svg>
+    );
+  }
+  return (
+    <svg className="h-4 w-4 text-purple-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+};
+
+const getBedIcon = (value: string) => {
+  return (
+    <svg className="h-4 w-4 text-emerald-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 4v16" />
+      <path d="M2 8h18a2 2 0 0 1 2 2v10" />
+      <path d="M2 17h20" />
+      <path d="M6 8v9" />
+    </svg>
+  );
+};
+
 const Onboarding = () => {
   const navigate = useNavigate();
-  const [lang, setLang] = useState<Lang>("en");
-  const [step, setStep] = useState<FlowStep>(1);
+  const location = useLocation();
+  const navState = location.state as { forceShowForm?: boolean } | null;
+  const { properties, setSelectedPgId, refreshProperties, language, setLanguage } = useApp();
+  const lang: Lang = language === "hi-IN" ? "hi" : "en";
+  const [step, setStep] = useState<FlowStep>(2);
+  const [showForm, setShowForm] = useState(navState?.forceShowForm ?? false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [locating, setLocating] = useState(false);
   const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>([]);
@@ -205,21 +274,11 @@ const Onboarding = () => {
     }
   }, [T.locationDenied, T.locationFailed, address, lang]);
 
-  const canContinueLanguage = true;
-
   const canSubmitStep2 = useMemo(() => {
     return Boolean(pgName.trim() && address.trim() && propertyTypeId && bedRange);
   }, [pgName, address, propertyTypeId, bedRange]);
 
-  const handleLanguageContinue = async () => {
-    try {
-      await updateLanguage(apiLanguage);
-      setStep(2);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to save language";
-      toast({ title: msg, variant: "destructive" });
-    }
-  };
+
 
   const handlePropertyContinue = async () => {
     if (!canSubmitStep2) return;
@@ -250,7 +309,7 @@ const Onboarding = () => {
         return;
       }
 
-      await createProperty({
+      const newPg = await createProperty({
         name: pgName.trim(),
         address: address.trim(),
         latitude: lat,
@@ -259,8 +318,10 @@ const Onboarding = () => {
         bedRange,
         propertyTypeId,
       });
+      await refreshProperties();
+      setSelectedPgId(newPg.id);
       toast({ title: lang === "en" ? "Onboarding complete" : "सेटअप पूरा", description: T.successSub });
-      setStep(3);
+      navigate("/dashboard", { replace: true, state: { justOnboarded: true, pgName: pgName.trim() } });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Please try again.";
       toast({ title: lang === "en" ? "Could not create PG" : "PG नहीं बन सका", description: msg, variant: "destructive" });
@@ -289,58 +350,85 @@ const Onboarding = () => {
             <div>
               <p className="text-sm font-semibold">{T.onboarding}</p>
               <p className="text-[11px] text-white/50">
-                {step < 3 ? `${lang === "en" ? "Step" : "चरण"} ${step} ${T.stepOf} 3` : ""}
+                {(!showForm && properties.length > 0) ? "" : lang === "en" ? "PG Setup" : "PG सेटअप"}
               </p>
+            </div>
+          </div>
+
+          {/* Floating Language Toggle */}
+          <div className="flex items-center gap-1.5">
+            <div className="rounded-full border border-white/10 bg-white/[0.04] p-0.5 flex">
+              {(["en", "hi"] as const).map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  onClick={() => setLanguage(l === "en" ? "en-US" : "hi-IN")}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                    lang === l ? "bg-white/[0.12] text-white shadow-sm" : "text-white/55 hover:text-white/80"
+                  }`}
+                >
+                  {l === "en" ? "English" : "हिन्दी"}
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
         <Card className="rounded-3xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-2xl shadow-2xl shadow-black/30">
           <CardContent className="p-6 sm:p-8">
-            <AnimatePresence mode="wait">
-              {step === 1 && (
-                <motion.div key="lang" {...stepMotion} className="space-y-6">
-                  <div className="flex justify-center">
-                    <div className="rounded-2xl bg-primary/15 p-4">
-                      <Globe className="h-10 w-10 text-primary" />
-                    </div>
-                  </div>
-                  <div className="text-center space-y-1">
-                    <h2 className="text-xl font-semibold tracking-tight">{T.chooseLanguage}</h2>
-                    <p className="text-xs text-white/50">{T.chooseLanguageSub}</p>
-                  </div>
-                  <div className="grid gap-2">
-                    {(["en", "hi"] as const).map((l) => (
+            {(!showForm && properties.length > 0) ? (
+              <div className="space-y-6">
+                <div className="text-center space-y-1">
+                  <h2 className="text-xl font-bold tracking-tight text-white">{T.propertiesTitle}</h2>
+                  <p className="text-xs text-white/50">{T.propertiesSub}</p>
+                </div>
+                
+                <div className="grid gap-2.5 max-h-[300px] overflow-y-auto pr-1">
+                  {properties.map((pg) => {
+                    const initials = pg.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+                    return (
                       <button
-                        key={l}
-                        type="button"
-                        onClick={() => setLang(l)}
-                        className={`rounded-2xl border px-4 py-3.5 text-left text-sm font-medium transition-all ${
-                          lang === l
-                            ? "border-primary bg-primary/15 text-primary"
-                            : "border-white/[0.08] bg-white/[0.03] text-white/80 hover:border-white/20"
-                        }`}
+                        key={pg.id}
+                        onClick={() => {
+                          setSelectedPgId(pg.id);
+                          navigate("/dashboard", { replace: true });
+                        }}
+                        className="w-full flex items-center justify-between p-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] text-left hover:bg-white/[0.08] hover:border-white/20 transition-all group"
                       >
-                        {l === "en" ? "English" : "हिन्दी"}
+                        <div className="flex items-center gap-3 min-w-0">
+                          {/* Circular initial avatar like Instagram profile image */}
+                          <div className="h-10 w-10 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-xs font-bold text-primary group-hover:scale-105 transition-transform">
+                            {initials || "PG"}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-white truncate">{pg.name}</p>
+                            <p className="text-[10px] text-white/50 truncate max-w-[200px]">{pg.address}</p>
+                          </div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-white/40 group-hover:text-white/80 group-hover:translate-x-0.5 transition-all" />
                       </button>
-                    ))}
-                  </div>
-                  <Button
-                    onClick={handleLanguageContinue}
-                    disabled={!canContinueLanguage}
-                    className="h-12 w-full rounded-2xl bg-primary text-sm font-semibold text-white shadow-lg hover:bg-primary/90"
-                  >
-                    {T.continueWith} {lang === "en" ? "English" : "हिन्दी"}
-                  </Button>
-                </motion.div>
-              )}
+                    );
+                  })}
+                </div>
 
-              {step === 2 && (
-                <motion.div key="pg" {...stepMotion} className="space-y-5">
-                  <div>
-                    <h2 className="text-lg font-semibold">{T.step2Title}</h2>
-                    <p className="text-xs text-white/50 mt-1">{T.step2Sub}</p>
-                  </div>
+                <button
+                  onClick={() => setShowForm(true)}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-dashed border-white/20 hover:border-white/40 hover:bg-white/[0.02] text-xs font-bold text-white/70 hover:text-white transition-all mt-4"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>{T.addNewPg}</span>
+                </button>
+              </div>
+            ) : (
+              <AnimatePresence mode="wait">
+                {step === 2 && (
+                  <motion.div key="pg" {...stepMotion} className="space-y-5">
+                    <div>
+                      <h2 className="text-lg font-semibold text-white">{T.step2Title}</h2>
+                      <p className="text-xs text-white/50 mt-1">
+                        {lang === "en" ? "We only need these details to create your property." : "प्रॉपर्टी बनाने के लिए इतनी जानकारी ही चाहिए।"}
+                      </p>
+                    </div>
 
                   <div className="space-y-1.5">
                     <Label className="text-xs text-white/60">{T.pgName}</Label>
@@ -353,12 +441,23 @@ const Onboarding = () => {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-white/60">{T.pgAddress}</Label>
+                    <div className="flex justify-between items-center">
+                      <Label className="text-xs text-white/60">{T.pgAddress}</Label>
+                      <button
+                        type="button"
+                        disabled={locating}
+                        onClick={() => void handleUseLocation()}
+                        className="text-[11px] font-semibold flex items-center gap-1.5 text-primary hover:text-primary/80 disabled:opacity-50 transition-colors"
+                      >
+                        {locating ? <Loader2 className="h-3 w-3 animate-spin" /> : <MapPin className="h-3.5 w-3.5" />}
+                        <span>{locating ? T.locating : T.useLocation}</span>
+                      </button>
+                    </div>
                     <Textarea
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
                       placeholder={lang === "en" ? "Door no, street, area, city, state, pincode" : "पूरा पता, पिनकोड सहित"}
-                      rows={4}
+                      rows={3}
                       className="rounded-2xl border-white/[0.08] bg-white/[0.04] text-white placeholder:text-white/25 focus-visible:ring-1 focus-visible:ring-primary/50 resize-none"
                     />
                   </div>
@@ -373,7 +472,10 @@ const Onboarding = () => {
                         {(propertyTypes.length ? propertyTypes : [{ id: DEFAULT_PROPERTY_TYPE_ID, name: "PG / Hostel", description: null, imageUrl: null }]).map(
                           (t) => (
                             <SelectItem key={t.id} value={t.id}>
-                              {t.name}
+                              <span className="flex items-center gap-2.5">
+                                {getPropertyTypeIcon(t.name)}
+                                <span>{t.name}</span>
+                              </span>
                             </SelectItem>
                           )
                         )}
@@ -390,32 +492,36 @@ const Onboarding = () => {
                       <SelectContent>
                         {bedOptions.map((o) => (
                           <SelectItem key={o.value} value={o.value}>
-                            {o.label}
+                            <span className="flex items-center gap-2.5">
+                              {getBedIcon(o.value)}
+                              <span>{o.label}</span>
+                            </span>
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={locating}
-                    onClick={() => void handleUseLocation()}
-                    className="w-full flex items-center justify-center gap-2 rounded-2xl border-white/10 bg-white/[0.04] text-xs text-white/70 hover:bg-white/[0.08] h-10"
-                  >
-                    {locating ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
-                    {locating ? T.locating : T.useLocation}
-                  </Button>
-
                   <div className="flex gap-3 pt-1">
-                    <Button
-                      variant="outline"
-                      onClick={() => setStep(1)}
-                      className="flex-1 rounded-2xl border-white/10 bg-white/[0.04] text-xs text-white/70 hover:bg-white/[0.08] h-11"
-                    >
-                      <ArrowLeft className="h-3.5 w-3.5 mr-1" /> {T.back}
-                    </Button>
+                    {properties.length > 0 ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setShowForm(false)}
+                        className="flex-1 rounded-2xl border-white/10 bg-white/[0.04] text-xs text-white/70 hover:bg-white/[0.08] h-11"
+                      >
+                        <ArrowLeft className="h-3.5 w-3.5 mr-1" /> {T.back}
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => navigate("/login", { replace: true })}
+                        className="flex-1 rounded-2xl border-white/10 bg-white/[0.04] text-xs text-white/70 hover:bg-white/[0.08] h-11"
+                      >
+                        <ArrowLeft className="h-3.5 w-3.5 mr-1" /> {T.back}
+                      </Button>
+                    )}
                     <Button
                       onClick={() => void handlePropertyContinue()}
                       disabled={!canSubmitStep2 || isSubmitting}
@@ -435,36 +541,10 @@ const Onboarding = () => {
                 </motion.div>
               )}
 
-              {step === 3 && (
-                <motion.div key="done" {...stepMotion} className="flex flex-col items-center gap-5 py-6 text-center">
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: "spring", stiffness: 180, damping: 14 }}
-                    className="flex h-20 w-20 items-center justify-center rounded-3xl bg-primary/15"
-                  >
-                    <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.06]">
-                      <Building2 className="h-8 w-8 text-primary" />
-                      <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
-                        ✓
-                      </span>
-                    </div>
-                  </motion.div>
-                  <div className="space-y-1.5">
-                    <p className="text-base font-semibold">{T.successTitle}</p>
-                    <p className="text-xs text-white/50 max-w-xs mx-auto">{T.successSub}</p>
-                  </div>
-                  <Button
-                    onClick={() => navigate("/dashboard", { replace: true, state: { justOnboarded: true, pgName: pgName.trim() } })}
-                    className="mt-2 h-12 w-full rounded-2xl bg-primary text-sm font-semibold text-white shadow-lg hover:bg-primary/90"
-                  >
-                    {T.goToDashboard}
-                  </Button>
-                </motion.div>
-              )}
             </AnimatePresence>
+            )}
 
-            {step === 2 && (
+            {(properties.length === 0 || showForm) && step === 2 && (
               <div className="flex items-center justify-center gap-1.5 mt-5">
                 <Shield className="h-3 w-3 text-white/25" />
                 <span className="text-[10px] text-white/25">{T.secureFooter}</span>

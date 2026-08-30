@@ -59,6 +59,15 @@ export function CelebrationDialog({ open, onClose, pgName }: CelebrationDialogPr
     }
   }, [open]);
 
+  useEffect(() => {
+    if (open) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [open, onClose]);
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-md border-primary/20 overflow-hidden">
