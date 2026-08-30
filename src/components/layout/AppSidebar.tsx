@@ -22,6 +22,7 @@ import {
   Wallet,
   LifeBuoy,
   BookOpen,
+  Home,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -49,9 +50,9 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   {
-    title: "Dashboard",
+    title: "Home",
     url: "/dashboard",
-    icon: LayoutDashboard,
+    icon: Home,
     permissionKey: "dashboard_access",
     children: [
       { title: "Overview", url: "/dashboard", permissionKey: "dashboard_access" },
@@ -59,34 +60,7 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    title: "Tenants",
-    url: "/tenants",
-    icon: Users,
-    permissionKey: "tenant_view",
-    children: [
-      { title: "Tenant List", url: "/tenants", permissionKey: "tenant_view" },
-      { title: "Leads & Visits", url: "/leads", permissionKey: "tenant_view", featureKey: "LEAD_CRM" },
-      { title: "Add tenant", url: "/tenants/add", permissionKey: "tenant_add" },
-      { title: "Vacant Rooms", url: "/tenants/vacant-rooms", permissionKey: "tenant_view" },
-      { title: "Onboarding", url: "/tenants/onboarding", permissionKey: "tenant_view" },
-      { title: "Guest & Visitor Log", url: "/tenants/guests", permissionKey: "guest_log" },
-      { title: "Tenant KYC", url: "/tenants/kyc", permissionKey: "kyc_view", featureKey: "AADHAAR_KYC" },
-    ],
-  },
-  {
-    title: "My PGs",
-    url: "/my-pgs",
-    icon: Building2,
-    permissionKey: "room_view",
-    children: [
-      { title: "PG Details", url: "/my-pgs", permissionKey: "room_view" },
-      { title: "Blocks, Floors & Rooms", url: "/my-pgs/structure", permissionKey: "room_view" },
-      { title: "Rooms & Beds", url: "/my-pgs/rooms", permissionKey: "room_view" },
-      { title: "Bank Account", url: "/my-pgs/bank", permissionKey: "room_view" },
-    ],
-  },
-  {
-    title: "Payments",
+    title: "Money",
     url: "/rent-payments",
     icon: IndianRupee,
     permissionKey: "account_view_dues",
@@ -94,106 +68,58 @@ const navItems: NavItem[] = [
       { title: "Rent Collection", url: "/rent-payments", permissionKey: "account_view_dues" },
       { title: "Payment History", url: "/rent-payments/history", permissionKey: "account_view_dues" },
       { title: "Dues & Pending", url: "/rent-payments/dues", permissionKey: "account_view_dues" },
+      { title: "Expenses Ledger", url: "/expenses", permissionKey: "expense_view" },
+      { title: "Refunds", url: "/refunds", permissionKey: "refund_add" },
     ],
   },
   {
-    title: "Team",
-    url: "/team",
-    icon: UserCog,
-    permissionKey: "team_view_members",
+    title: "People",
+    url: "/tenants",
+    icon: Users,
+    permissionKey: "tenant_view",
     children: [
-      { title: "Team list", url: "/team", permissionKey: "team_view_members" },
-      { title: "Legacy staff", url: "/staff", permissionKey: "team_view_members" },
-      { title: "Roles & Permissions", url: "/staff/roles", permissionKey: "team_property_access", featureKey: "STAFF_ROLES" },
+      { title: "Tenant List", url: "/tenants", permissionKey: "tenant_view" },
+      { title: "Leads & Visits", url: "/leads", permissionKey: "tenant_view", featureKey: "LEAD_CRM" },
+      { title: "Add tenant", url: "/tenants/add", permissionKey: "tenant_add" },
+      { title: "Tenant KYC", url: "/tenants/kyc", permissionKey: "kyc_view", featureKey: "AADHAAR_KYC" },
+      { title: "Guest Log", url: "/tenants/guests", permissionKey: "guest_log" },
+      { title: "Team List", url: "/team", permissionKey: "team_view_members" },
+      { title: "Attendance", url: "/attendance", permissionKey: "attend_view" },
     ],
   },
   {
-    title: "Complaints",
+    title: "Property",
+    url: "/my-pgs",
+    icon: Building2,
+    permissionKey: "room_view",
+    children: [
+      { title: "PG Details", url: "/my-pgs", permissionKey: "room_view" },
+      { title: "Structure & Rooms", url: "/my-pgs/structure", permissionKey: "room_view" },
+      { title: "Rooms & Beds", url: "/my-pgs/rooms", permissionKey: "room_view" },
+      { title: "Bank Account", url: "/my-pgs/bank", permissionKey: "room_view" },
+    ],
+  },
+  {
+    title: "Operations",
     url: "/complaints",
     icon: MessageSquareWarning,
-    permissionKey: "complaint_view_all",
-  },
-  {
-    title: "Food Menu",
-    url: "/food",
-    icon: UtensilsCrossed,
-    permissionKey: "food_view_edit",
-  },
-  {
-    title: "Expenses",
-    url: "/expenses",
-    icon: Receipt,
-    permissionKey: "expense_view",
     children: [
-      { title: "Add Expense", url: "/expenses", permissionKey: "expense_view" },
-      { title: "Categories", url: "/expenses/categories", permissionKey: "expense_view" },
-      { title: "Monthly View", url: "/expenses/monthly", permissionKey: "expense_view" },
+      { title: "Complaints", url: "/complaints", permissionKey: "complaint_view_all" },
+      { title: "Food Menu", url: "/food", permissionKey: "food_view_edit" },
+      { title: "Night Out", url: "/nightout", permissionKey: "nightout_view" },
+      { title: "Eviction", url: "/eviction", permissionKey: "eviction_approve" },
     ],
   },
   {
-    title: "Reports",
-    url: "/reports",
-    icon: BarChart3,
-    permissionKey: "report_people",
-    children: [
-      { title: "Tenant Due Rent", url: "/reports", permissionKey: "report_people" },
-      { title: "Payment Report", url: "/reports/payments", permissionKey: "report_people" },
-      { title: "Export", url: "/reports/export", permissionKey: "report_people" },
-    ],
-  },
-  {
-    title: "Night Out",
-    url: "/nightout",
-    icon: Moon,
-    permissionKey: "nightout_view",
-  },
-  {
-    title: "Attendance",
-    url: "/attendance",
-    icon: ClipboardCheck,
-    permissionKey: "attend_view",
-  },
-  {
-    title: "Eviction",
-    url: "/eviction",
-    icon: UserMinus,
-    permissionKey: "eviction_approve",
-  },
-  {
-    title: "Refunds",
-    url: "/refunds",
-    icon: Wallet,
-    permissionKey: "refund_add",
-  },
-  {
-    title: "Plans & Pricing",
-    url: "/plans",
-    icon: CreditCard,
-  },
-  {
-    title: "Settings",
+    title: "Management",
     url: "/settings",
     icon: Settings,
     children: [
-      { title: "Profile", url: "/settings" },
-      { title: "Notifications", url: "/settings/notifications" },
+      { title: "Plans & Pricing", url: "/plans" },
+      { title: "Profile Settings", url: "/settings" },
+      { title: "Support Help", url: "/support" },
+      { title: "API Catalog", url: "/reference/apis" },
     ],
-  },
-  {
-    title: "Support",
-    url: "/support",
-    icon: LifeBuoy,
-    children: [
-      { title: "Support Home", url: "/support" },
-      { title: "Privacy Policy", url: "/privacy-policy" },
-      { title: "Terms & Conditions", url: "/terms-and-conditions" },
-      { title: "Contact Us", url: "/contact-us" },
-    ],
-  },
-  {
-    title: "API catalog",
-    url: "/reference/apis",
-    icon: BookOpen,
   },
 ];
 
@@ -284,10 +210,10 @@ const AppSidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }: AppSideb
                       className={cn(
                         "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
                         "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                        active && "text-sidebar-primary"
+                        active && "text-sidebar-accent-foreground font-semibold"
                       )}
                     >
-                      <item.icon className={cn("h-[18px] w-[18px] shrink-0", active && "text-sidebar-primary")} />
+                      <item.icon className={cn("h-[18px] w-[18px] shrink-0", active && "text-sidebar-accent-foreground")} />
                       <span className="flex-1 text-left">{item.title}</span>
                       <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", open && "rotate-180")} />
                     </button>
@@ -324,7 +250,7 @@ const AppSidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }: AppSideb
                                 to={child.url}
                                 end
                                 className="block rounded-md px-3 py-1.5 text-[13px] font-medium text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                                activeClassName="bg-sidebar-accent text-sidebar-primary"
+                                activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-semibold shadow-sm animate-scale-in"
                                 onClick={onMobileClose}
                               >
                                 {child.title}
@@ -342,11 +268,11 @@ const AppSidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }: AppSideb
                       "flex items-center justify-center rounded-lg px-2 py-2.5 text-sm font-medium transition-all duration-200",
                       "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     )}
-                    activeClassName="bg-sidebar-accent text-sidebar-primary"
+                    activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-semibold shadow-sm animate-scale-in"
                     onClick={onMobileClose}
                     title={item.title}
                   >
-                    <item.icon className={cn("h-[18px] w-[18px] shrink-0", active && "text-sidebar-primary")} />
+                    <item.icon className={cn("h-[18px] w-[18px] shrink-0", active && "text-sidebar-primary-foreground")} />
                   </NavLink>
                 ) : topLocked ? (
                   <div className="px-1">{renderLocked(item.title, item.icon)}</div>
@@ -359,10 +285,10 @@ const AppSidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }: AppSideb
                       "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                       collapsed && "justify-center px-2"
                     )}
-                    activeClassName="bg-sidebar-accent text-sidebar-primary"
+                    activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-semibold shadow-sm animate-scale-in"
                     onClick={onMobileClose}
                   >
-                    <item.icon className={cn("h-[18px] w-[18px] shrink-0", active && "text-sidebar-primary")} />
+                    <item.icon className={cn("h-[18px] w-[18px] shrink-0", active && "text-sidebar-primary-foreground")} />
                     {!collapsed && <span>{item.title}</span>}
                   </NavLink>
                 )}

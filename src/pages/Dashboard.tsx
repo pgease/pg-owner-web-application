@@ -19,12 +19,15 @@ import {
   Layers,
   BedDouble as BedIcon,
   DoorOpen,
+  X,
+  MapPin,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
 import { PageHeader } from "@/components/common/PageHeader";
 import { useApp } from "@/context/AppContext";
+import { PieChart, Pie, Cell } from "recharts";
 import {
   useAllRoomsAndCounts,
   useBlocks,
@@ -46,6 +49,8 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { properties, selectedPgId } = useApp();
+  const list = Array.isArray(properties) ? properties : [];
+  const selectedPg = list.find((p) => p.id === selectedPgId);
   const [celebrationOpen, setCelebrationOpen] = useState(false);
   const [celebrationPgName, setCelebrationPgName] = useState("");
 
@@ -136,305 +141,314 @@ const Dashboard = () => {
 
   return (
     <CanAccessPage permission="dashboard_access">
-    <div className="space-y-6 animate-fade-in">
-      <PageHeader
-        title={isKpiPage ? "KPIs" : "Dashboard Overview"}
-        description={
-          isKpiPage
-            ? "Key performance indicators for your properties"
-            : "Welcome back. Here's your PG overview."
-        }
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" className="gap-2">
+      <div className="space-y-6 animate-fade-in pb-10">
+        
+        {/* Rentok-style Header with Integrated Property/City Filters */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-slate-100">
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-slate-800">Dashboard</h1>
+            <div className="flex items-center gap-4 mt-2">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Properties</span>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs font-semibold text-slate-700">
+                  <Building2 className="h-3.5 w-3.5 text-brand-600" />
+                  <span>{selectedPg ? selectedPg.name : "Saksham Pg"}</span>
+                  <button className="text-slate-400 hover:text-slate-600 ml-1">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">City</span>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs font-semibold text-slate-700">
+                  <MapPin className="h-3.5 w-3.5 text-brand-600" />
+                  <span>{selectedPg?.address ? (selectedPg.address.split(",").slice(-2, -1)[0]?.trim() || "Ghaziabad") : "Ghaziabad"}</span>
+                  <button className="text-slate-400 hover:text-slate-600 ml-1">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Action Buttons */}
+          <div className="flex flex-wrap gap-2 self-end">
+            <Button size="sm" variant="outline" className="gap-2 border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50">
               <FileSpreadsheet className="h-4 w-4" />
               <span className="hidden sm:inline">Import</span> Excel
             </Button>
-            <Button size="sm" variant="outline" className="gap-2">
+            <Button size="sm" variant="outline" className="gap-2 border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50">
               <Send className="h-4 w-4" />
               <span className="hidden sm:inline">Send</span> Invite
             </Button>
             <CanAccess permission="tenant_add">
-              <Button size="sm" className="gap-2" onClick={() => navigate("/tenants/add")}>
+              <Button size="sm" className="gap-2 bg-brand-600 text-white rounded-xl hover:bg-brand-700 shadow-sm shadow-brand-600/10" onClick={() => navigate("/tenants/add")}>
                 <UserPlus className="h-4 w-4" /> Add Tenant
               </Button>
             </CanAccess>
           </div>
-        }
-      />
-
-      {isLoading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          <span className="ml-2 text-sm text-muted-foreground">Loading dashboard data…</span>
         </div>
-      )}
 
-      {!isLoading && isError && (
-        <Card className="border-destructive/50">
-          <CardContent className="p-6 text-center space-y-3">
-            <AlertCircle className="h-8 w-8 text-destructive mx-auto" />
-            <p className="text-sm text-muted-foreground">
-              Failed to load some dashboard data. Please try again.
-            </p>
-            <Button size="sm" variant="outline" className="gap-2" onClick={handleRetry}>
-              <RefreshCw className="h-4 w-4" /> Retry
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+        {isLoading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-brand-600" />
+            <span className="ml-2 text-sm text-slate-500 font-medium">Loading dashboard data…</span>
+          </div>
+        )}
 
-      {!isLoading && !isError && (
-        <>
-          {/* Stats grid */}
-          <section>
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-              {isKpiPage ? "Key metrics" : "At a glance"}
-            </h2>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {(isKpiPage ? kpiStats : overviewStats).map((stat) => {
-                const Icon = stat.icon;
-                return (
-                  <Card key={stat.label} className="overflow-hidden border-border/80 hover:border-primary/30 transition-colors">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="rounded-lg bg-primary/10 p-2">
-                          <Icon className="h-4 w-4 text-primary" />
-                        </div>
-                      </div>
-                      <p className="mt-3 text-xl font-bold tracking-tight">{stat.value}</p>
-                      <p className="text-xs font-medium text-muted-foreground">{stat.label}</p>
-                      <p className="text-xs text-muted-foreground/80 mt-0.5">{stat.sub}</p>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </section>
+        {!isLoading && isError && (
+          <Card className="border-destructive/30 rounded-2xl bg-destructive/[0.02]">
+            <CardContent className="p-6 text-center space-y-3">
+              <AlertCircle className="h-8 w-8 text-destructive mx-auto" />
+              <p className="text-sm font-semibold text-slate-700">
+                Failed to load dashboard metrics. Please retry.
+              </p>
+              <Button size="sm" variant="outline" className="gap-2 rounded-xl" onClick={handleRetry}>
+                <RefreshCw className="h-4 w-4" /> Retry
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
-          {/* Getting started prompts */}
-          {!isKpiPage && (blocksCount === 0 || tenantCount === 0) && (
-            <section>
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                Getting started
-              </h2>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {blocksCount === 0 && (
-                  <Card className="border-primary/30 bg-primary/[0.03] hover:border-primary/50 transition-colors cursor-pointer"
-                    onClick={() => navigate("/structure")}
-                  >
-                    <CardContent className="flex items-center gap-4 p-5">
-                      <div className="rounded-xl bg-primary/15 p-3 shrink-0">
-                        <Layers className="h-6 w-6 text-primary" />
+        {!isLoading && !isError && (
+          <>
+            {/* Rentok-style Metrics Section */}
+            <section className="space-y-3">
+              <h2 className="text-[15px] font-bold text-slate-800 tracking-tight">User Dashboard</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-4">
+                
+                {/* Rooms Card */}
+                <Card className="md:col-span-2 bg-white border border-slate-100 shadow-sm rounded-2xl flex flex-col justify-center items-center py-6 hover:shadow-md transition-shadow">
+                  <p className="text-5xl font-extrabold text-slate-800 tracking-tight">
+                    {roomsQuery.data?.length || 0}
+                  </p>
+                  <p className="text-[13px] font-semibold text-slate-400 mt-2">
+                    Rooms
+                  </p>
+                </Card>
+
+                {/* Beds Card */}
+                <Card className="md:col-span-2 bg-white border border-slate-100 shadow-sm rounded-2xl flex flex-col justify-center items-center py-6 hover:shadow-md transition-shadow">
+                  <p className="text-5xl font-extrabold text-slate-800 tracking-tight">
+                    {bedStats.totalBeds}
+                  </p>
+                  <p className="text-[13px] font-semibold text-slate-400 mt-2">
+                    Beds
+                  </p>
+                </Card>
+
+                {/* Current Tenants Card */}
+                <Card className="md:col-span-2 bg-white border border-slate-100 shadow-sm rounded-2xl flex flex-col justify-center items-center py-6 hover:shadow-md transition-shadow">
+                  <p className="text-5xl font-extrabold text-slate-800 tracking-tight">
+                    {tenantCount}
+                  </p>
+                  <p className="text-[13px] font-semibold text-slate-400 mt-2">
+                    Current Tenants
+                  </p>
+                </Card>
+
+                {/* Bookings Card */}
+                <Card className="md:col-span-2 bg-white border border-slate-100 shadow-sm rounded-2xl flex flex-col justify-center items-center py-6 hover:shadow-md transition-shadow">
+                  <p className="text-5xl font-extrabold text-slate-800 tracking-tight">
+                    0
+                  </p>
+                  <p className="text-[13px] font-semibold text-slate-400 mt-2">
+                    Bookings
+                  </p>
+                </Card>
+
+                {/* Tenant Vs Booking Doughnut Chart */}
+                <Card className="md:col-span-4 bg-white border border-slate-100 shadow-sm rounded-2xl p-5 flex flex-col justify-between hover:shadow-md transition-shadow">
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    Tenant Vs Booking
+                  </h3>
+                  <div className="flex items-center justify-between flex-1 min-h-[90px]">
+                    <div className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full bg-brand-600 inline-block" />
+                      <span className="text-sm font-semibold text-slate-700">Tenant</span>
+                      <span className="text-sm font-bold text-slate-800 ml-1">100%</span>
+                    </div>
+                    
+                    {/* Recharts Pie (Doughnut Ring) */}
+                    <div className="w-[80px] h-[80px] relative flex items-center justify-center">
+                      <PieChart width={80} height={80}>
+                        <Pie
+                          data={[{ value: 100 }]}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={26}
+                          outerRadius={36}
+                          dataKey="value"
+                        >
+                          <Cell fill="#2563eb" />
+                        </Pie>
+                      </PieChart>
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <span className="text-[10px] font-bold text-slate-400">100%</span>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm">Set up your PG structure</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Add blocks, floors, rooms & beds so you can start adding tenants easily.
-                        </p>
-                      </div>
-                      <ChevronRight className="h-5 w-5 text-primary shrink-0" />
-                    </CardContent>
-                  </Card>
-                )}
-                {tenantCount === 0 && (
-                  <Card className="border-primary/30 bg-primary/[0.03] hover:border-primary/50 transition-colors cursor-pointer"
-                    onClick={() => navigate("/tenants/add")}
-                  >
-                    <CardContent className="flex items-center gap-4 p-5">
-                      <div className="rounded-xl bg-primary/15 p-3 shrink-0">
-                        <UserPlus className="h-6 w-6 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm">Add your first tenant</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          No tenants yet. Add a tenant manually, send an invite, or import via Excel.
-                        </p>
-                      </div>
-                      <ChevronRight className="h-5 w-5 text-primary shrink-0" />
-                    </CardContent>
-                  </Card>
-                )}
+                    </div>
+                  </div>
+                </Card>
+
               </div>
             </section>
-          )}
 
-          <section>
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-              API dashboard
-            </h2>
-            <div className="grid gap-3 md:grid-cols-2">
-              <Card className="border-border/80">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-medium text-muted-foreground">
-                    GET /dashboard-details/:propertyId
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {dashboardDetailsQuery.isLoading ? (
-                    <p className="text-xs text-muted-foreground">Loading…</p>
-                  ) : dashboardDetailsQuery.isError ? (
-                    <p className="text-xs text-destructive">Unavailable</p>
-                  ) : (
-                    <pre className="text-[11px] bg-muted/40 rounded-md p-3 max-h-40 overflow-auto whitespace-pre-wrap break-all">
-                      {JSON.stringify(dashboardDetailsQuery.data, null, 2)}
-                    </pre>
-                  )}
-                </CardContent>
+            {/* Current Month's All Issues */}
+            <section className="space-y-3">
+              <h2 className="text-[15px] font-bold text-slate-800 tracking-tight">Current Month's All Issues</h2>
+              
+              <Card className="bg-white border border-slate-100 shadow-sm rounded-2xl p-8 flex flex-col items-center justify-center min-h-[220px]">
+                {complaintCounts.total === 0 ? (
+                  <div className="text-center space-y-4 flex flex-col items-center justify-center">
+                    <svg
+                      width="120"
+                      height="80"
+                      viewBox="0 0 120 80"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="opacity-40"
+                    >
+                      <path
+                        d="M60 10V50"
+                        stroke="#94a3b8"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                      />
+                      <path
+                        d="M60 15L90 45H60V15Z"
+                        fill="#e2e8f0"
+                        stroke="#94a3b8"
+                        strokeWidth="2"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M60 22L38 45H60V22Z"
+                        fill="#f1f5f9"
+                        stroke="#94a3b8"
+                        strokeWidth="2"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M20 54C40 50 80 50 100 54L92 64H28L20 54Z"
+                        fill="#cbd5e1"
+                        stroke="#475569"
+                        strokeWidth="2.5"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M10 68C30 66 90 66 110 68"
+                        stroke="#94a3b8"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <p className="text-sm font-semibold text-slate-400">No results!</p>
+                  </div>
+                ) : (
+                  <div className="w-full space-y-3">
+                    {complaintsQuery.data?.slice(0, 3).map((complaint) => (
+                      <div key={complaint.id} className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-100">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm text-slate-800 truncate">{complaint.title}</p>
+                          <p className="text-xs text-slate-400 mt-0.5">Room {complaint.roomNumber} • Raised by {complaint.tenantName}</p>
+                        </div>
+                        <span className={cn(
+                          "text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider",
+                          complaint.status === "open" ? "bg-amber-100 text-amber-800" :
+                          complaint.status === "in_progress" ? "bg-blue-100 text-blue-800" :
+                          "bg-emerald-100 text-emerald-800"
+                        )}>
+                          {complaint.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </Card>
-              <Card className="border-border/80">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-medium text-muted-foreground">
-                    GET /dashboard/kpis
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {dashboardKpisQuery.isLoading ? (
-                    <p className="text-xs text-muted-foreground">Loading…</p>
-                  ) : dashboardKpisQuery.isError ? (
-                    <p className="text-xs text-destructive">Unavailable</p>
-                  ) : (
-                    <pre className="text-[11px] bg-muted/40 rounded-md p-3 max-h-40 overflow-auto whitespace-pre-wrap break-all">
-                      {JSON.stringify(dashboardKpisQuery.data, null, 2)}
-                    </pre>
+            </section>
+
+            {/* Quick Setup Promo for new PGs */}
+            {!isKpiPage && (blocksCount === 0 || tenantCount === 0) && (
+              <section className="space-y-3">
+                <h2 className="text-[15px] font-bold text-slate-800 tracking-tight">Getting started</h2>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {blocksCount === 0 && (
+                    <Card className="border border-brand-100 bg-brand-50/20 hover:border-brand-300 transition-colors cursor-pointer rounded-2xl"
+                      onClick={() => navigate("/my-pgs/structure")}
+                    >
+                      <CardContent className="flex items-center gap-4 p-5">
+                        <div className="rounded-xl bg-brand-500/10 p-3 shrink-0">
+                          <Layers className="h-6 w-6 text-brand-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-slate-800 text-sm">Set up your PG structure</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Add blocks, floors, rooms & beds so you can start adding tenants easily.
+                          </p>
+                        </div>
+                        <ChevronRight className="h-5 w-5 text-brand-600 shrink-0" />
+                      </CardContent>
+                    </Card>
                   )}
-                </CardContent>
-              </Card>
-            </div>
-          </section>
-
-          {/* Occupancy & Complaints — shown on overview only */}
-          {!isKpiPage && (
-            <>
-              <section>
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  Occupancy
-                </h2>
-                <Card className="border-border/80">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
-                      <div className="rounded-lg bg-primary/10 p-3">
-                        <BarChart3 className="h-6 w-6 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-3xl font-bold tracking-tight">{bedStats.occupancyRate}%</p>
-                        <p className="text-sm text-muted-foreground">
-                          {bedStats.occupiedBeds} occupied out of {bedStats.totalBeds} total beds
-                        </p>
-                      </div>
-                    </div>
-                    {bedStats.totalBeds > 0 && (
-                      <div className="mt-3 h-2 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-primary transition-all"
-                          style={{ width: `${bedStats.occupancyRate}%` }}
-                        />
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </section>
-
-              <section>
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  Complaints summary
-                </h2>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <Card className="border-border/80">
-                    <CardContent className="flex items-center gap-3 p-4">
-                      <div className="rounded-lg bg-amber-500/15 p-2.5">
-                        <AlertCircle className="h-5 w-5 text-amber-600" />
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold">{complaintCounts.open}</p>
-                        <p className="text-xs text-muted-foreground">Open</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card className="border-border/80">
-                    <CardContent className="flex items-center gap-3 p-4">
-                      <div className="rounded-lg bg-blue-500/15 p-2.5">
-                        <Clock className="h-5 w-5 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold">{complaintCounts.inProgress}</p>
-                        <p className="text-xs text-muted-foreground">In Progress</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card className="border-border/80">
-                    <CardContent className="flex items-center gap-3 p-4">
-                      <div className="rounded-lg bg-emerald-500/15 p-2.5">
-                        <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold">{complaintCounts.resolved}</p>
-                        <p className="text-xs text-muted-foreground">Resolved</p>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  {tenantCount === 0 && (
+                    <Card className="border border-brand-100 bg-brand-50/20 hover:border-brand-300 transition-colors cursor-pointer rounded-2xl"
+                      onClick={() => navigate("/tenants/add")}
+                    >
+                      <CardContent className="flex items-center gap-4 p-5">
+                        <div className="rounded-xl bg-brand-500/10 p-3 shrink-0">
+                          <UserPlus className="h-6 w-6 text-brand-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-slate-800 text-sm">Add your first tenant</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            No tenants yet. Add a tenant manually, send an invite, or import via Excel.
+                          </p>
+                        </div>
+                        <ChevronRight className="h-5 w-5 text-brand-600 shrink-0" />
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
               </section>
+            )}
 
-              <section>
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  Staff
-                </h2>
-                <Card className="border-border/80">
-                  <CardContent className="flex items-center gap-4 p-4">
-                    <div className="rounded-lg bg-primary/10 p-3">
-                      <Users className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-3xl font-bold tracking-tight">{staffCount}</p>
-                      <p className="text-sm text-muted-foreground">Active staff members</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </section>
-            </>
-          )}
+            {/* Quick Actions / Shortcuts Panel */}
+            <section className="space-y-3">
+              <h2 className="text-[15px] font-bold text-slate-800 tracking-tight">Quick Shortcuts</h2>
+              <div className="grid gap-4 sm:grid-cols-3">
+                {manageItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Card
+                      key={item.title}
+                      className="cursor-pointer hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm transition-all border border-slate-100 rounded-2xl"
+                      onClick={() => navigate(item.path)}
+                    >
+                      <CardContent className="flex items-center gap-4 p-4">
+                        <div className="rounded-xl bg-slate-50 border border-slate-200 p-2.5 shadow-sm">
+                          <Icon className="h-5 w-5 text-brand-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-slate-800 text-sm">{item.title}</p>
+                          <p className="text-xs text-slate-400 mt-0.5">{item.desc}</p>
+                        </div>
+                        <ChevronRight className="h-5 w-5 text-slate-400 shrink-0" />
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </section>
+          </>
+        )}
 
-          <div className="border-t border-border/80" />
-
-          {/* Manage */}
-          <section>
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-              Manage
-            </h2>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {manageItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Card
-                    key={item.title}
-                    className="cursor-pointer hover:bg-muted/50 hover:border-primary/20 transition-all border-border/80"
-                    onClick={() => navigate(item.path)}
-                  >
-                    <CardContent className="flex items-center gap-4 p-4">
-                      <div className="rounded-lg bg-background border border-border/80 p-2.5 shadow-sm">
-                        <Icon className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm">{item.title}</p>
-                        <p className="text-xs text-muted-foreground">{item.desc}</p>
-                      </div>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </section>
-        </>
-      )}
-
-      <CelebrationDialog
-        open={celebrationOpen}
-        onClose={() => setCelebrationOpen(false)}
-        pgName={celebrationPgName}
-      />
-    </div>
+        <CelebrationDialog
+          open={celebrationOpen}
+          onClose={() => setCelebrationOpen(false)}
+          pgName={celebrationPgName}
+        />
+      </div>
     </CanAccessPage>
   );
 };
