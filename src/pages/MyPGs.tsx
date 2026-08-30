@@ -31,6 +31,8 @@ import {
 import { DEFAULT_PROPERTY_TYPE_ID, type DiningDaySchedule } from "@/api/propertyOwner";
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
 
+const EMPTY_ARRAY: any[] = [];
+
 const MyPGs = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -38,9 +40,9 @@ const MyPGs = () => {
   const isBankPage = location.pathname === "/my-pgs/bank";
   const selectedPg = Array.isArray(properties) ? properties.find((p) => p.id === selectedPgId) : null;
 
-  const { data: amenities = [], isLoading: amenitiesLoading, isError: amenitiesError, refetch: refetchAmenities } = useAmenities(selectedPgId);
-  const { data: restrictions = [], isLoading: restrictionsLoading, isError: restrictionsError, refetch: refetchRestrictions } = useRestrictions(selectedPgId);
-  const { data: dining = [], isLoading: diningLoading, isError: diningError, refetch: refetchDining } = useDiningSchedule(selectedPgId);
+  const { data: amenities = EMPTY_ARRAY, isLoading: amenitiesLoading, isError: amenitiesError, refetch: refetchAmenities } = useAmenities(selectedPgId);
+  const { data: restrictions = EMPTY_ARRAY, isLoading: restrictionsLoading, isError: restrictionsError, refetch: refetchRestrictions } = useRestrictions(selectedPgId);
+  const { data: dining = EMPTY_ARRAY, isLoading: diningLoading, isError: diningError, refetch: refetchDining } = useDiningSchedule(selectedPgId);
 
   const createAmenity = useCreateCustomAmenity(selectedPgId);
   const linkAmenityMutation = useLinkAmenities(selectedPgId);

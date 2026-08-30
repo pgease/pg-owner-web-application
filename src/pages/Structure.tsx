@@ -53,7 +53,10 @@ import { createProperty } from "@/api/propertyOwner";
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
 
 export default function Structure() {
-  const { currentPropertyId, propertyList, refreshProperties, setCurrentPropertyId } = useApp();
+  const { selectedPgId, properties, refreshProperties, setSelectedPgId } = useApp();
+  const currentPropertyId = selectedPgId;
+  const propertyList = properties;
+  const setCurrentPropertyId = setSelectedPgId;
 
   // State for Navigation Hierarchy
   const [selectedBlockId, setSelectedBlockId] = useState<string>("");
@@ -83,8 +86,6 @@ export default function Structure() {
   const [roomForm, setRoomForm] = useState({
     roomNumber: "",
     numberOfBeds: 2,
-    monthlyRent: 8500,
-    securityDeposit: 10000,
   });
 
   // Queries
@@ -180,14 +181,12 @@ export default function Structure() {
         floorId: effectiveFloorId,
         roomNumber: roomForm.roomNumber.trim(),
         numberOfBeds: Number(roomForm.numberOfBeds),
-        monthlyRent: Number(roomForm.monthlyRent),
-        securityDeposit: Number(roomForm.securityDeposit),
       });
       toast({
         title: "Room & Beds Added! 🚪",
         description: `Room ${roomForm.roomNumber} with ${roomForm.numberOfBeds} beds generated.`,
       });
-      setRoomForm({ roomNumber: "", numberOfBeds: 2, monthlyRent: 8500, securityDeposit: 10000 });
+      setRoomForm({ roomNumber: "", numberOfBeds: 2 });
       setAddRoomOpen(false);
     } catch (e: any) {
       toast({ title: "Failed to create room", description: e?.message, variant: "destructive" });
@@ -638,66 +637,56 @@ export default function Structure() {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-3 py-2">
-              <div className="space-y-1">
-                <Label>Room Number / Code</Label>
-                <Input
-                  placeholder="e.g. 101, 102, G-01"
-                  value={roomForm.roomNumber}
-                  onChange={(e) => setRoomForm({ ...roomForm, roomNumber: e.target.value })}
-                />
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleCreateRoom();
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-3 py-2">
+                <div className="space-y-1">
+                  <Label>Room Number / Code</Label>
+                  <Input
+                    placeholder="e.g. 101, 102, G-01"
+                    value={roomForm.roomNumber}
+                    onChange={(e) => setRoomForm({ ...roomForm, roomNumber: e.target.value })}
+                    autoFocus
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Number of Beds (Sharing Type)</Label>
+                  <Select
+                    value={String(roomForm.numberOfBeds)}
+                    onValueChange={(val) => setRoomForm({ ...roomForm, numberOfBeds: Number(val) })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Sharing" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 Bed (Single Private)</SelectItem>
+                      <SelectItem value="2">2 Beds (Double Sharing)</SelectItem>
+                      <SelectItem value="3">3 Beds (Triple Sharing)</SelectItem>
+                      <SelectItem value="4">4 Beds (Four Sharing)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <Label>Number of Beds (Sharing Type)</Label>
-                <Select
-                  value={String(roomForm.numberOfBeds)}
-                  onValueChange={(val) => setRoomForm({ ...roomForm, numberOfBeds: Number(val) })}
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setAddRoomOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-teal-600 hover:bg-teal-700 text-white"
+                  disabled={createRoomMut.isPending}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Sharing" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1 Bed (Single Private)</SelectItem>
-                    <SelectItem value="2">2 Beds (Double Sharing)</SelectItem>
-                    <SelectItem value="3">3 Beds (Triple Sharing)</SelectItem>
-                    <SelectItem value="4">4 Beds (Four Sharing)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>Monthly Rent / Bed (₹)</Label>
-                  <Input
-                    type="number"
-                    value={roomForm.monthlyRent}
-                    onChange={(e) => setRoomForm({ ...roomForm, monthlyRent: Number(e.target.value) })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Security Deposit (₹)</Label>
-                  <Input
-                    type="number"
-                    value={roomForm.securityDeposit}
-                    onChange={(e) => setRoomForm({ ...roomForm, securityDeposit: Number(e.target.value) })}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setAddRoomOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                className="bg-teal-600 hover:bg-teal-700 text-white"
-                disabled={createRoomMut.isPending}
-                onClick={handleCreateRoom}
-              >
-                {createRoomMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Room & Beds"}
-              </Button>
-            </DialogFooter>
+                  {createRoomMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Room & Beds"}
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
       </div>
