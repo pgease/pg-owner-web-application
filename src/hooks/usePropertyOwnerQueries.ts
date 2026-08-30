@@ -22,6 +22,7 @@ import {
   getPropertyAmenities,
   getPropertyRestrictions,
   getRentCollectionDashboard,
+  getPropertyTenantById,
   getPropertyTenants,
   getRooms,
   getRoomsList,
@@ -59,8 +60,6 @@ import {
   type UpdatePropertyPayload,
   type UpdateStaffPermissionsPayload,
   type StaffPermissionsAssignPayload,
-  type BlockItem,
-  type FloorItem,
   type Complaint,
   type RoomAndCount,
   type StaffWithPermissions,
@@ -131,19 +130,42 @@ function coerceFloorBlockLabel(v: unknown): string | undefined {
 /** Map API room objects to the shape the UI expects (numberOfBeds, roomNumber, availableBeds). */
 function normalizeRoomItem(item: unknown): RoomItem {
   const r = item as Record<string, unknown>;
-  const bedsArr = Array.isArray(r.beds) ? (r.beds as Record<string, unknown>[]) : null;
+  const innerRoom = (r.room && typeof r.room === "object") ? (r.room as Record<string, unknown>) : null;
+
+  const readProp = (key: string): any => {
+    return r[key] !== undefined ? r[key] : (innerRoom ? innerRoom[key] : undefined);
+  };
+
+  const rawBeds = r.beds ?? (innerRoom ? innerRoom.beds : undefined);
+  const bedsArr = Array.isArray(rawBeds) ? (rawBeds as Record<string, unknown>[]) : null;
 
   const hasExplicitTotal =
-    r.numberOfBeds !== undefined && r.numberOfBeds !== null && String(r.numberOfBeds).trim() !== "";
+    readProp("numberOfBeds") !== undefined && readProp("numberOfBeds") !== null && String(readProp("numberOfBeds")).trim() !== "";
   const hasExplicitCapacity =
-    r.capacity !== undefined && r.capacity !== null && String(r.capacity).trim() !== "";
+    readProp("capacity") !== undefined && readProp("capacity") !== null && String(readProp("capacity")).trim() !== "";
+  const hasExplicitSharing =
+    readProp("sharing") !== undefined && readProp("sharing") !== null && String(readProp("sharing")).trim() !== "";
+  const hasExplicitSharingCount =
+    readProp("sharingCount") !== undefined && readProp("sharingCount") !== null && String(readProp("sharingCount")).trim() !== "";
+
+  let pricingMaxSharing = 0;
+  const rawPricing = readProp("sharingWisePricing");
+  if (Array.isArray(rawPricing)) {
+    const counts = rawPricing.map((p: any) => coerceNum(p?.sharingCount)).filter(Boolean);
+    if (counts.length > 0) {
+      pricingMaxSharing = Math.max(...counts);
+    }
+  }
 
   let numberOfBeds =
-    coerceNum(r.numberOfBeds) ||
-    coerceNum(r.capacity) ||
+    coerceNum(readProp("numberOfBeds")) ||
+    coerceNum(readProp("capacity")) ||
+    coerceNum(readProp("sharing")) ||
+    coerceNum(readProp("sharingCount")) ||
+    pricingMaxSharing ||
     (bedsArr ? bedsArr.length : 0);
 
-  let occupiedBeds = coerceNum(r.occupiedBeds);
+  let occupiedBeds = coerceNum(readProp("occupiedBeds"));
   if (bedsArr && bedsArr.length > 0) {
     const fromBeds = bedsArr.filter((b) => b && b.isOccupied === true).length;
     if (fromBeds > 0 || bedsArr.some((b) => b && Object.prototype.hasOwnProperty.call(b, "isOccupied"))) {
@@ -152,10 +174,10 @@ function normalizeRoomItem(item: unknown): RoomItem {
   }
 
   const hasExplicitAvailable =
-    r.availableBeds !== undefined && r.availableBeds !== null && String(r.availableBeds).trim() !== "";
+    readProp("availableBeds") !== undefined && readProp("availableBeds") !== null && String(readProp("availableBeds")).trim() !== "";
   let availableBeds: number;
   if (hasExplicitAvailable) {
-    const av = coerceNum(r.availableBeds);
+    const av = coerceNum(readProp("availableBeds"));
     availableBeds = Math.max(0, av);
   } else if (bedsArr && bedsArr.length > 0) {
     availableBeds = bedsArr.filter((b) => b && b.isOccupied !== true).length;
@@ -164,9 +186,9 @@ function normalizeRoomItem(item: unknown): RoomItem {
   }
 
   const isVacantFlag =
-    typeof r.isVacant === "boolean"
-      ? r.isVacant
-      : r.status === "vacant" || String(r.status ?? "").toLowerCase() === "vacant";
+    typeof readProp("isVacant") === "boolean"
+      ? readProp("isVacant")
+      : readProp("status") === "vacant" || String(readProp("status") ?? "").toLowerCase() === "vacant";
 
   const missingInventory =
     numberOfBeds === 0 &&
@@ -174,6 +196,9 @@ function normalizeRoomItem(item: unknown): RoomItem {
     !hasExplicitAvailable &&
     !hasExplicitTotal &&
     !hasExplicitCapacity &&
+    !hasExplicitSharing &&
+    !hasExplicitSharingCount &&
+    pricingMaxSharing === 0 &&
     (!bedsArr || bedsArr.length === 0);
 
   if (missingInventory) {
@@ -182,26 +207,27 @@ function normalizeRoomItem(item: unknown): RoomItem {
     availableBeds = 1;
   }
 
-  const rawRoomId = r.id ?? (r as Record<string, unknown>).roomId;
+  const rawRoomId = readProp("id") ?? readProp("roomId");
   const idStr = rawRoomId != null && String(rawRoomId).trim() !== "" ? String(rawRoomId) : "";
 
   return {
     id: idStr,
-    propertyId: String(r.propertyId ?? ""),
-    floorId: String(r.floorId ?? ""),
-    blockId: r.blockId != null ? String(r.blockId) : undefined,
-    name: r.name != null ? String(r.name) : undefined,
-    roomNumber: String(r.roomNumber ?? r.name ?? ""),
+    propertyId: String(readProp("propertyId") ?? ""),
+    floorId: String(readProp("floorId") ?? ""),
+    blockId: readProp("blockId") != null ? String(readProp("blockId")) : undefined,
+    name: readProp("name") != null ? String(readProp("name")) : undefined,
+    roomNumber: String(readProp("roomNumber") ?? readProp("name") ?? ""),
     numberOfBeds,
-    capacity: coerceNum(r.capacity) > 0 ? coerceNum(r.capacity) : undefined,
-    sharingWisePricing: r.sharingWisePricing as RoomItem["sharingWisePricing"],
+    capacity: coerceNum(readProp("capacity")) > 0 ? coerceNum(readProp("capacity")) : undefined,
+    sharingWisePricing: rawPricing as RoomItem["sharingWisePricing"],
     occupiedBeds,
     availableBeds,
     isVacant: isVacantFlag,
-    status: r.status != null ? String(r.status) : undefined,
-    floor: coerceFloorBlockLabel(r.floor),
-    block: coerceFloorBlockLabel(r.block),
-    createdAt: r.createdAt != null ? String(r.createdAt) : undefined,
+    status: readProp("status") != null ? String(readProp("status")) : undefined,
+    floor: coerceFloorBlockLabel(readProp("floor")),
+    block: coerceFloorBlockLabel(readProp("block")),
+    createdAt: readProp("createdAt") != null ? String(readProp("createdAt")) : undefined,
+    beds: bedsArr || undefined,
   };
 }
 
@@ -234,6 +260,8 @@ export const queryKeys = {
   roomsList: (propertyId?: string | null, blockId?: string | null, floorId?: string | null) =>
     ["property", propertyId, "rooms-list", { blockId, floorId }] as const,
   tenants: (propertyId?: string | null) => ["property", propertyId, "tenants"] as const,
+  tenantDetail: (propertyId?: string | null, tenantId?: string | null) =>
+    ["property", propertyId, "tenants", tenantId] as const,
   allRoomsAndCounts: (propertyId?: string | null) =>
     ["property", propertyId, "all-rooms-and-counts"] as const,
   complaints: (propertyId?: string | null, priority?: string) =>
@@ -304,16 +332,26 @@ export function useRoomsList(
       const fid = floorId?.trim();
 
       if (bid && fid) {
-        const raw = await getRoomsList(propertyId, { blockId: bid, floorId: fid });
-        let rooms = roomsFromListResponse(raw);
+        let rooms: RoomItem[] = [];
+        try {
+          const raw = await getRoomsList(propertyId, { blockId: bid, floorId: fid });
+          rooms = roomsFromListResponse(raw);
+        } catch (err) {
+          console.warn("Failed to fetch rooms via getRoomsList, falling back to getRooms:", err);
+        }
+
         if (rooms.length === 0) {
-          const rawAlt = await getRooms(propertyId, {
-            page: 1,
-            limit: 200,
-            blockId: bid,
-            floorId: fid,
-          });
-          rooms = roomsFromListResponse(rawAlt);
+          try {
+            const rawAlt = await getRooms(propertyId, {
+              page: 1,
+              limit: 200,
+              blockId: bid,
+              floorId: fid,
+            });
+            rooms = roomsFromListResponse(rawAlt);
+          } catch (err) {
+            console.error("Failed to fetch rooms via getRooms:", err);
+          }
         }
         return rooms;
       }
@@ -344,6 +382,30 @@ export function usePropertyTenants(propertyId?: string | null) {
   });
 }
 
+export function usePropertyTenantDetail(propertyId?: string | null, tenantId?: string | null) {
+  return useQuery({
+    queryKey: queryKeys.tenantDetail(propertyId, tenantId),
+    queryFn: async () => {
+      if (!propertyId || !tenantId) return null;
+      try {
+        const direct = await getPropertyTenantById(propertyId, tenantId);
+        if (direct && typeof direct === "object") {
+          return direct;
+        }
+      } catch (err) {
+        console.warn("Failed to fetch tenant detail directly, trying list fallback:", err);
+      }
+      const list = await getPropertyTenants(propertyId);
+      const found = list.find((t) => (t.roomTenant?.id ?? t.id) === tenantId || t.id === tenantId);
+      if (!found) {
+        throw new Error("Tenant not found");
+      }
+      return found;
+    },
+    enabled: Boolean(propertyId && tenantId),
+  });
+}
+
 export function useCreateBlock(propertyId?: string | null) {
   const qc = useQueryClient();
   return useMutation({
@@ -360,7 +422,7 @@ export function useCreateBlock(propertyId?: string | null) {
 export function useCreateFloor(propertyId?: string | null, blockId?: string | null) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { name: string }) => {
+    mutationFn: (payload: { name: string; displayOrder?: number }) => {
       if (!propertyId || !blockId) throw new Error("Select PG and block first");
       return createFloor(propertyId, blockId, payload);
     },

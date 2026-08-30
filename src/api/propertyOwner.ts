@@ -389,24 +389,70 @@ export interface PropertyTenant {
   /** KYC / Aadhaar — set when API sends it */
   kycVerified?: boolean;
   aadhaarVerified?: boolean;
+  mobileNumber?: string;
+  emergencyContact?: string;
+  workAddress?: string;
+  monthlyRent?: number | string;
+  securityDeposit?: number | string;
+  moveInDate?: string;
+  createdAt?: string;
+  noticeGivenAt?: string;
+  expectedMoveOutDate?: string;
+  isKycVerified?: boolean;
+  kycInfo?: any;
+  kycStatus?: string;
 }
 
 /** @deprecated use PropertyTenant */
 export type PropertyTenantListItem = PropertyTenant;
 
+export function normalizeSingleTenant(t: any): PropertyTenant {
+  if (!t) return t;
+
+  const monthlyRent = t.monthlyRent ?? t.roomTenant?.rentAmount ?? t.roomTenant?.monthlyRent ?? 0;
+  const securityDeposit = t.securityDeposit ?? t.roomTenant?.securityDeposit ?? 0;
+  const moveInDate = t.moveInDate ?? t.roomTenant?.startDate ?? t.roomTenant?.moveInDate ?? t.createdAt ?? "";
+
+  const noticeGivenAt = t.noticeGivenAt ?? t.notice?.noticeStartedAt ?? null;
+  const expectedMoveOutDate = t.expectedMoveOutDate ?? t.notice?.vacateOn ?? null;
+
+  const phone = t.phone ?? t.mobileNumber ?? "";
+  const mobileNumber = t.mobileNumber ?? t.phone ?? "";
+
+  const roomNo = t.roomNo ?? t.room?.roomNumber ?? "";
+  const roomNumber = t.roomNumber ?? t.room?.roomNumber ?? "";
+  const bedNo = t.bedNo ?? t.bed?.bedNumber ?? "";
+
+  return {
+    ...t,
+    phone,
+    mobileNumber,
+    monthlyRent,
+    securityDeposit,
+    moveInDate,
+    noticeGivenAt,
+    expectedMoveOutDate,
+    roomNo,
+    roomNumber,
+    bedNo,
+  };
+}
+
 export function normalizePropertyTenantsList(raw: unknown): PropertyTenant[] {
-  if (Array.isArray(raw)) return raw as PropertyTenant[];
-  if (raw && typeof raw === "object") {
+  let list: any[] = [];
+  if (Array.isArray(raw)) {
+    list = raw;
+  } else if (raw && typeof raw === "object") {
     const o = raw as Record<string, unknown>;
-    if (Array.isArray(o.data)) return o.data as PropertyTenant[];
-    if (Array.isArray(o.tenants)) return o.tenants as PropertyTenant[];
-    if (Array.isArray(o.items)) return o.items as PropertyTenant[];
-    if (o.data && typeof o.data === "object") {
+    if (Array.isArray(o.data)) list = o.data;
+    else if (Array.isArray(o.tenants)) list = o.tenants;
+    else if (Array.isArray(o.items)) list = o.items;
+    else if (o.data && typeof o.data === "object") {
       const inner = o.data as Record<string, unknown>;
-      if (Array.isArray(inner.tenants)) return inner.tenants as PropertyTenant[];
+      if (Array.isArray(inner.tenants)) list = inner.tenants;
     }
   }
-  return [];
+  return list.map(normalizeSingleTenant);
 }
 
 /** PATCH body — basic profile only (matches owner “edit tenant basic”). */
@@ -429,6 +475,17 @@ export async function updatePropertyTenant(
       body: payload,
     },
   );
+}
+
+export async function getPropertyTenantById(propertyId: string, tenantId: string) {
+  const raw = await httpRequest<unknown>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/tenants/${tenantId}`,
+    {
+      method: "GET",
+      auth: true,
+    }
+  );
+  return normalizeSingleTenant(raw);
 }
 
 /** GET `/api/property-owners/properties/:propertyId/tenants` */
@@ -652,6 +709,7 @@ export interface RoomItem {
   floor?: string;
   block?: string;
   createdAt?: string;
+  beds?: any[];
 }
 
 /** POST /properties/:id/rooms often returns `{ room, beds }` instead of a bare room. */
@@ -1105,16 +1163,21 @@ export interface RazorpayOrderResponse {
 }
 
 export async function getCreditBalance() {
-  return httpRequest<CreditBalanceResponse>(`${PROPERTY_OWNER_BASE}/credits/balance`);
+  return httpRequest<CreditBalanceResponse>(`${PROPERTY_OWNER_BASE}/credits/balance`, {
+    auth: true,
+  });
 }
 
 export async function getCreditPacks() {
-  return httpRequest<{ creditPacks: CreditPack[] }>(`${PROPERTY_OWNER_BASE}/credit-packs`);
+  return httpRequest<{ creditPacks: CreditPack[] }>(`${PROPERTY_OWNER_BASE}/credit-packs`, {
+    auth: true,
+  });
 }
 
 export async function createCreditTopupOrder(creditPackId: string) {
   return httpRequest<RazorpayOrderResponse>(`${PROPERTY_OWNER_BASE}/credits/${creditPackId}/checkout-order`, {
     method: 'POST',
+    auth: true,
   });
 }
 
@@ -1127,6 +1190,7 @@ export async function verifyCreditPayment(body: {
   return httpRequest<{ success: boolean; message: string; newBalance: number }>(`${PROPERTY_OWNER_BASE}/credits/verify-payment`, {
     method: 'POST',
     body,
+    auth: true,
   });
 }
 
@@ -1140,6 +1204,7 @@ export async function requestTenantKyc(roomTenantId: string) {
     remainingCredits: number;
   }>(`${PROPERTY_OWNER_BASE}/tenants/${roomTenantId}/request-kyc`, {
     method: 'POST',
+    auth: true,
   });
 }
 
@@ -1169,17 +1234,22 @@ export interface CurrentPlanResponse {
 }
 
 export async function getPlans() {
-  return httpRequest<{ plans: SubscriptionPlan[] }>(`${PROPERTY_OWNER_BASE}/plans`);
+  return httpRequest<{ plans: SubscriptionPlan[] }>(`${PROPERTY_OWNER_BASE}/plans`, {
+    auth: true,
+  });
 }
 
 export async function getCurrentPlan() {
-  return httpRequest<CurrentPlanResponse>(`${PROPERTY_OWNER_BASE}/plans/current`);
+  return httpRequest<CurrentPlanResponse>(`${PROPERTY_OWNER_BASE}/plans/current`, {
+    auth: true,
+  });
 }
 
 export async function createPlanCheckoutOrder(planId: string, billingCycle: 'monthly' | 'annual' = 'monthly') {
   return httpRequest<RazorpayOrderResponse>(`${PROPERTY_OWNER_BASE}/plans/${planId}/checkout-order`, {
     method: 'POST',
     body: { billingCycle },
+    auth: true,
   });
 }
 
@@ -1193,6 +1263,7 @@ export async function verifyPlanPayment(body: {
   return httpRequest<{ success: boolean; message: string; plan: SubscriptionPlan }>(`${PROPERTY_OWNER_BASE}/plans/verify-payment`, {
     method: 'POST',
     body,
+    auth: true,
   });
 }
 
@@ -1222,7 +1293,9 @@ export interface RentalAgreement {
 }
 
 export async function getPropertyAgreements(propertyId: string) {
-  return httpRequest<{ agreements: RentalAgreement[] }>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/agreements`);
+  return httpRequest<{ agreements: RentalAgreement[] }>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/agreements`, {
+    auth: true,
+  });
 }
 
 export async function createRentalAgreement(
@@ -1246,6 +1319,7 @@ export async function createRentalAgreement(
   }>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/agreements/create`, {
     method: 'POST',
     body,
+    auth: true,
   });
 }
 
@@ -1256,6 +1330,7 @@ export async function sendAgreementForEsign(agreementId: string) {
     signingUrl?: string;
   }>(`${PROPERTY_OWNER_BASE}/agreements/${agreementId}/send-esign`, {
     method: 'POST',
+    auth: true,
   });
 }
 
@@ -1317,7 +1392,10 @@ export interface ElectricityMeterDue {
 
 export async function getElectricityDues(propertyId: string, roomTenantId: string) {
   return httpRequest<{ dues: ElectricityMeterDue[] }>(
-    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${roomTenantId}/electricity-meter-dues`
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${roomTenantId}/electricity-meter-dues`,
+    {
+      auth: true,
+    }
   );
 }
 
@@ -1339,6 +1417,7 @@ export async function addElectricityDues(
     {
       method: 'POST',
       body,
+      auth: true,
     }
   );
 }
@@ -1361,6 +1440,7 @@ export async function updateElectricityDues(
     {
       method: 'PATCH',
       body,
+      auth: true,
     }
   );
 }
@@ -1370,6 +1450,7 @@ export async function deleteElectricityDues(propertyId: string, roomTenantId: st
     `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${roomTenantId}/electricity-meter-dues/${duesId}`,
     {
       method: 'DELETE',
+      auth: true,
     }
   );
 }

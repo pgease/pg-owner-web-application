@@ -20,7 +20,7 @@ import { useApp } from "@/context/AppContext";
 import { ROLE_PRESETS, ROLE_LABELS, type PresetCell } from "@/constants/rolePresets";
 import { getPermissionDisplayName } from "@/constants/permissions";
 import { PermissionEditor } from "@/components/team/PermissionEditor";
-import { createStaff } from "@/api/staff";
+import { createStaff as createOwnerStaff, updateStaffPermissions } from "@/api/propertyOwner";
 import { toast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -89,13 +89,17 @@ export default function AddStaff() {
       .map(([k]) => k);
     try {
       setSaving(true);
-      await createStaff({
+      const res = await createOwnerStaff({
+        propertyId: pgId,
         name: name.trim(),
-        phone: digits,
-        role,
-        pgId,
-        permissions,
+        email: `${name.trim().toLowerCase().replace(/\s+/g, "")}_${digits}@pgease.local`,
+        mobileContactNumber: digits,
+        designation: role,
+        countryCode: "+91",
       });
+      if (res?.id && permissions.length > 0) {
+        await updateStaffPermissions(res.id, { permissions });
+      }
       toast({ title: "Staff added successfully" });
       navigate("/team", { replace: true });
     } catch (e: unknown) {

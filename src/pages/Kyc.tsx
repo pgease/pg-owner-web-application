@@ -73,7 +73,7 @@ declare global {
 }
 
 export default function Kyc() {
-  const { currentPropertyId, propertyList } = useApp();
+  const { selectedPgId: currentPropertyId, properties: propertyList } = useApp();
   const [activeTab, setActiveTab] = useState("kyc");
 
   // KYC Queries & Mutations
@@ -85,6 +85,7 @@ export default function Kyc() {
   const [rejectReason, setRejectReason] = useState("");
   const [detailId, setDetailId] = useState<string | null>(null);
   const detailQuery = useKycDetail(detailId);
+  const kycDetail = detailQuery.data as any;
 
   // Credit Balance & Topup
   const { data: balanceData, isLoading: isBalanceLoading } = useCreditBalance();
@@ -108,8 +109,8 @@ export default function Kyc() {
   const [createAgreementOpen, setCreateAgreementOpen] = useState(false);
   const [agreementForm, setAgreementForm] = useState({
     roomTenantId: "",
-    monthlyRent: 8500,
-    securityDeposit: 10000,
+    monthlyRent: 12000,
+    securityDeposit: 15000,
     noticePeriodDays: 30,
     lockInPeriodMonths: 3,
     agreementStartDate: new Date().toISOString().split("T")[0],
@@ -119,12 +120,7 @@ export default function Kyc() {
 
   const kycList = Array.isArray(kycRows) ? (kycRows as Record<string, any>[]) : [];
   const agreementsList = agreementsData?.agreements || [];
-  const creditPacks = packsData?.creditPacks || [
-    { id: "pack_10", name: "Starter Pack", credits: 10, price: 499, popular: false },
-    { id: "pack_25", name: "Growth Pack", credits: 25, price: 999, popular: true },
-    { id: "pack_50", name: "Pro Pack", credits: 50, price: 1799, popular: false },
-    { id: "pack_100", name: "Enterprise Pack", credits: 100, price: 2999, popular: false },
-  ];
+  const creditPacks = (Array.isArray(packsData) ? packsData : packsData?.creditPacks) || [];
 
   // Top-up Razorpay Checkout
   const handleTopupCheckout = async (packId: string) => {
@@ -374,10 +370,10 @@ export default function Kyc() {
                         <TableRow key={id || String(i)}>
                           <TableCell>
                             <div className="font-medium text-foreground">
-                              {row.tenantName || row.name || "Tenant"}
+                              {row.tenantName || row.name || row.tenant?.name || row.roomTenant?.tenant?.name || row.roomTenant?.name || "Tenant"}
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              {row.mobileNumber || row.phone || "—"}
+                              {row.mobileNumber || row.phone || row.tenant?.phone || row.roomTenant?.tenant?.phone || row.roomTenant?.phone || "—"}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -812,15 +808,15 @@ export default function Kyc() {
                 <div className="grid grid-cols-2 gap-2 bg-muted/40 p-3 rounded-lg">
                   <div>
                     <span className="text-xs text-muted-foreground">Full Name:</span>
-                    <p className="font-semibold">{detailQuery.data.name || "—"}</p>
+                    <p className="font-semibold">{kycDetail.name || "—"}</p>
                   </div>
                   <div>
                     <span className="text-xs text-muted-foreground">Gender / DOB:</span>
-                    <p className="font-semibold">{detailQuery.data.gender || "—"} • {detailQuery.data.dob || "—"}</p>
+                    <p className="font-semibold">{kycDetail.gender || "—"} • {kycDetail.dob || "—"}</p>
                   </div>
                   <div className="col-span-2">
                     <span className="text-xs text-muted-foreground">Address:</span>
-                    <p className="text-xs font-medium mt-0.5">{detailQuery.data.address || "—"}</p>
+                    <p className="text-xs font-medium mt-0.5">{kycDetail.address || "—"}</p>
                   </div>
                 </div>
 

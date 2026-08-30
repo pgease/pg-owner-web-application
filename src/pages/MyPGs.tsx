@@ -193,13 +193,38 @@ const MyPGs = () => {
     }
   };
 
+  const formatTimeTo24h = (timeStr: string, fallback: string): string => {
+    if (!timeStr) return fallback;
+    const parts = timeStr.split(":");
+    if (parts.length >= 2) {
+      const hh = parts[0].padStart(2, "0");
+      const mm = parts[1].padStart(2, "0");
+      if (/^\d{2}$/.test(hh) && /^\d{2}$/.test(mm)) {
+        return `${hh}:${mm}`;
+      }
+    }
+    return fallback;
+  };
+
   const saveDining = async () => {
     const payload: DiningDaySchedule[] = [
       {
         dayOfWeek: 1,
-        breakfast: { menu: breakfastMenu, startTime: breakfastStart, endTime: breakfastEnd },
-        lunch: { menu: lunchMenu, startTime: lunchStart, endTime: lunchEnd },
-        dinner: { menu: dinnerMenu, startTime: dinnerStart, endTime: dinnerEnd },
+        breakfast: {
+          menu: breakfastMenu,
+          startTime: formatTimeTo24h(breakfastStart, "09:00"),
+          endTime: formatTimeTo24h(breakfastEnd, "10:00"),
+        },
+        lunch: {
+          menu: lunchMenu,
+          startTime: formatTimeTo24h(lunchStart, "13:00"),
+          endTime: formatTimeTo24h(lunchEnd, "14:00"),
+        },
+        dinner: {
+          menu: dinnerMenu,
+          startTime: formatTimeTo24h(dinnerStart, "20:00"),
+          endTime: formatTimeTo24h(dinnerEnd, "21:00"),
+        },
       },
     ];
     try {

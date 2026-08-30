@@ -59,7 +59,7 @@ import {
 import { useApp } from "@/context/AppContext";
 import {
   queryKeys,
-  usePropertyTenants,
+  usePropertyTenantDetail,
   useRequestTenantKycMutation,
   usePropertyAgreements,
   useCreateAgreementMutation,
@@ -94,18 +94,12 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 export default function TenantDetailPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
-  const { currentPropertyId } = useApp();
+  const { selectedPgId: currentPropertyId } = useApp();
   const queryClient = useQueryClient();
 
-  const { data: rawTenants = [], isLoading } = usePropertyTenants(currentPropertyId);
-  const tenants = Array.isArray(rawTenants) ? (rawTenants as PropertyTenant[]) : [];
+  const { data: tenant, isLoading } = usePropertyTenantDetail(currentPropertyId, tenantId);
 
-  const tenant = useMemo(() => {
-    if (!tenantId) return undefined;
-    return tenants.find((t) => (t.roomTenantId ?? t.id) === tenantId || t.id === tenantId);
-  }, [tenants, tenantId]);
-
-  const roomTenantId = tenant?.roomTenantId ?? tenant?.id ?? "";
+  const roomTenantId = tenant?.roomTenant?.id ?? tenant?.id ?? "";
 
   // React Query Mutations & Sub-resource hooks
   const requestKycMut = useRequestTenantKycMutation();
@@ -144,8 +138,8 @@ export default function TenantDetailPage() {
 
   const [agreementOpen, setAgreementOpen] = useState(false);
   const [agreementForm, setAgreementForm] = useState({
-    monthlyRent: 8500,
-    securityDeposit: 10000,
+    monthlyRent: 12000,
+    securityDeposit: 15000,
     noticePeriodDays: 30,
     lockInPeriodMonths: 3,
     agreementStartDate: new Date().toISOString().split("T")[0],
@@ -171,8 +165,8 @@ export default function TenantDetailPage() {
       if (tenant.monthlyRent) {
         setAgreementForm((prev) => ({
           ...prev,
-          monthlyRent: tenant.monthlyRent,
-          securityDeposit: tenant.securityDeposit || 10000,
+          monthlyRent: Number(tenant.monthlyRent),
+          securityDeposit: Number(tenant.securityDeposit || 10000),
         }));
       }
     }
@@ -219,7 +213,7 @@ export default function TenantDetailPage() {
     if (!currentPropertyId || !tenantId) return;
     try {
       await updatePropertyTenant(currentPropertyId, tenantId, form);
-      queryClient.invalidateQueries({ queryKey: queryKeys.propertyTenants(currentPropertyId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenants(currentPropertyId) });
       toast({ title: "Profile updated successfully" });
       setEditing(false);
     } catch (e: any) {
@@ -409,37 +403,138 @@ export default function TenantDetailPage() {
 
           {/* TAB 1: OVERVIEW */}
           <TabsContent value="overview" className="mt-6 space-y-6">
-            <div className="grid gap-6 sm:grid-cols-2">
+            <div className="grid gap-6 grid-cols-1">
+              {/* 1. Renting Details */}
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-semibold">Residency & Financials</CardTitle>
+                <CardHeader className="pb-3 border-b">
+                  <CardTitle className="text-sm font-semibold">Renting Details</CardTitle>
                 </CardHeader>
-                <CardContent className="p-4 pt-0">
-                  <DetailRow label="Room Number" value={`Room ${roomNo}`} />
-                  <DetailRow label="Bed Assigned" value={bedNo || "Standard"} />
-                  <DetailRow label="Floor" value={floor || "Ground Floor"} />
-                  <DetailRow label="Monthly Rent" value={`₹${rent.toLocaleString("en-IN")}/mo`} />
-                  <DetailRow
-                    label="Security Deposit"
-                    value={`₹${(tenant.securityDeposit || 10000).toLocaleString("en-IN")}`}
-                  />
-                  <DetailRow label="Dues Status" value={duesLabel} />
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-0.5">
+                    <div>
+                      <DetailRow label="Full Name" value={name} />
+                      <DetailRow label="Fixed Rent" value={tenant.monthlyRent ? `₹${Number(tenant.monthlyRent).toLocaleString("en-IN")}` : "—"} />
+                      <DetailRow label="Add Rent On" value={(tenant.roomTenant as any)?.rentDueDate ? `${(tenant.roomTenant as any).rentDueDate} of every cycle` : "—"} />
+                      <DetailRow label="Rental Frequency" value={(tenant.roomTenant as any)?.rentalFrequency || "—"} />
+                      <DetailRow label="Stay Type" value={(tenant.roomTenant as any)?.stayType || "—"} />
+                      <DetailRow label="Lockin Period (Months)" value={(tenant.roomTenant as any)?.lockInPeriodMonths ? `${(tenant.roomTenant as any).lockInPeriodMonths}` : "0"} />
+                      <DetailRow label="Security Deposit" value={tenant.securityDeposit ? `₹${Number(tenant.securityDeposit).toLocaleString("en-IN")}` : "—"} />
+                      <DetailRow label="Room" value={roomNo ? `${roomNo} - Bed ${bedNo}` : "—"} />
+                      <DetailRow label="Date Of Joining" value={tenant.moveInDate ? new Date(tenant.moveInDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"} />
+                      <DetailRow label="Move Out Date" value={tenant.expectedMoveOutDate ? new Date(tenant.expectedMoveOutDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"} />
+                      <DetailRow label="Notice Period (Days)" value={(tenant.roomTenant as any)?.noticePeriodDays ? `${(tenant.roomTenant as any).noticePeriodDays}` : "—"} />
+                    </div>
+                    <div>
+                      <DetailRow label="Agreement Period (Months)" value={(tenant.roomTenant as any)?.lockInPeriodMonths ? `${(tenant.roomTenant as any).lockInPeriodMonths}` : "—"} />
+                      <DetailRow label="Referred By" value="—" />
+                      <DetailRow label="Booked By" value="—" />
+                      <DetailRow label="Checkin Time" value="—" />
+                      <DetailRow label="Checkout Time" value="—" />
+                      <DetailRow label="Last Meter Reading" value="—" />
+                      <DetailRow label="Last Reading Date" value="—" />
+                      <DetailRow label="Renting Type" value="—" />
+                      <DetailRow label="Collect Online Payments" value={(tenant as any).collectOnlinePayments ? "Yes" : "—"} />
+                      <DetailRow label="GST Applicable" value={(tenant as any).gstApplicable ? "Yes" : "—"} />
+                      <DetailRow label="Tenant Added On" value={tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"} />
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 
+              {/* 2. Tenant Personal Details */}
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-semibold">Contact & Work Details</CardTitle>
+                <CardHeader className="pb-3 border-b">
+                  <CardTitle className="text-sm font-semibold">Tenant Personal Details</CardTitle>
                 </CardHeader>
-                <CardContent className="p-4 pt-0">
-                  <DetailRow label="Mobile Contact" value={phone} />
-                  <DetailRow label="Emergency Contact" value={tenant.emergencyContact || "—"} />
-                  <DetailRow label="Work / College Address" value={tenant.workAddress || "—"} />
-                  <DetailRow label="Check-in Date" value={tenant.moveInDate || tenant.createdAt || "—"} />
-                  <DetailRow
-                    label="KYC Status"
-                    value={isKycDone ? "DigiLocker Verified ✓" : "Pending Aadhaar Verification"}
-                  />
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-0.5">
+                    <div>
+                      <DetailRow label="Remarks" value="—" />
+                      <DetailRow label="Contact Number" value={phone} />
+                      <DetailRow label="Alternate Number" value="—" />
+                      <DetailRow label="Email" value={tenant.email || "—"} />
+                      <DetailRow label="Date Of Birth" value="—" />
+                      <DetailRow label="Gender" value="—" />
+                      <DetailRow label="Tenant Type" value="—" />
+                      <DetailRow label="Blood Group" value="—" />
+                      <DetailRow label="Course Year" value="—" />
+                      <DetailRow label="Office / College Name" value={tenant.workAddress || "—"} />
+                    </div>
+                    <div>
+                      <DetailRow label="Permanent Address" value="—" />
+                      <DetailRow label="Current Address" value="—" />
+                      <DetailRow label="Nationality" value="—" />
+                      <DetailRow label="Mother Tongue" value="—" />
+                      <DetailRow label="Office / Institute ID" value="—" />
+                      <DetailRow label="Govt. ID" value={isKycDone ? "Aadhaar Verified ✓" : "—"} />
+                      <DetailRow label="Course Name" value="—" />
+                      <DetailRow label="Biometric ID" value="—" />
+                      <DetailRow label="Vehicle Number" value="—" />
+                      <DetailRow label="Food Preferences" value="—" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 3. Guardian & Parent Details */}
+              <Card>
+                <CardHeader className="pb-3 border-b">
+                  <CardTitle className="text-sm font-semibold">Guardian & Parent Details</CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-0.5">
+                    <div>
+                      <DetailRow label="Father Name" value="—" />
+                      <DetailRow label="Father Contact" value="—" />
+                      <DetailRow label="Father Occupation" value="—" />
+                      <DetailRow label="Mother Name" value="—" />
+                    </div>
+                    <div>
+                      <DetailRow label="Mother Contact" value="—" />
+                      <DetailRow label="Local Guardian Name" value="—" />
+                      <DetailRow label="Local Guardian Phone" value="—" />
+                      <DetailRow label="Local Guardian Address" value="—" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 4. GST Details */}
+              <Card>
+                <CardHeader className="pb-3 border-b">
+                  <CardTitle className="text-sm font-semibold">GST Details</CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-0.5">
+                    <div>
+                      <DetailRow label="GST Number" value="—" />
+                      <DetailRow label="PAN Number" value="—" />
+                      <DetailRow label="Company Name" value="—" />
+                    </div>
+                    <div>
+                      <DetailRow label="Business Owner Name" value="—" />
+                      <DetailRow label="Company Address" value="—" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 5. Bank Details */}
+              <Card>
+                <CardHeader className="pb-3 border-b">
+                  <CardTitle className="text-sm font-semibold">Bank Details</CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-0.5">
+                    <div>
+                      <DetailRow label="Account Number" value="—" />
+                      <DetailRow label="UPI ID" value="—" />
+                    </div>
+                    <div>
+                      <DetailRow label="IFSC Code" value="—" />
+                      <DetailRow label="Bank Holder Name" value="—" />
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </div>

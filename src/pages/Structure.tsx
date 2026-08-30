@@ -53,7 +53,10 @@ import { createProperty } from "@/api/propertyOwner";
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
 
 export default function Structure() {
-  const { currentPropertyId, propertyList, refreshProperties, setCurrentPropertyId } = useApp();
+  const { selectedPgId, properties, refreshProperties, setSelectedPgId } = useApp();
+  const currentPropertyId = selectedPgId;
+  const propertyList = properties;
+  const setCurrentPropertyId = setSelectedPgId;
 
   // State for Navigation Hierarchy
   const [selectedBlockId, setSelectedBlockId] = useState<string>("");
@@ -69,13 +72,13 @@ export default function Structure() {
   const [propertyForm, setPropertyForm] = useState({
     name: "",
     address: "",
-    city: "Bengaluru",
-    state: "Karnataka",
-    pincode: "560001",
-    contactNumber: "918920215953",
-    totalFloors: 3,
-    totalRooms: 10,
-    totalBeds: 25,
+    city: "",
+    state: "",
+    pincode: "",
+    contactNumber: "",
+    totalFloors: 0,
+    totalRooms: 0,
+    totalBeds: 0,
   });
 
   const [blockName, setBlockName] = useState("");
@@ -83,8 +86,6 @@ export default function Structure() {
   const [roomForm, setRoomForm] = useState({
     roomNumber: "",
     numberOfBeds: 2,
-    monthlyRent: 8500,
-    securityDeposit: 10000,
   });
 
   // Queries
@@ -117,14 +118,12 @@ export default function Structure() {
     try {
       const res = await createProperty({
         name: propertyForm.name.trim(),
-        address: propertyForm.address.trim(),
-        city: propertyForm.city.trim(),
-        state: propertyForm.state.trim(),
-        pincode: propertyForm.pincode.trim(),
-        contactNumber: propertyForm.contactNumber.trim(),
-        totalFloors: Number(propertyForm.totalFloors),
-        totalRooms: Number(propertyForm.totalRooms),
-        totalBeds: Number(propertyForm.totalBeds),
+        address: `${propertyForm.address.trim()}, ${propertyForm.city.trim()}, ${propertyForm.state.trim()}`,
+        latitude: 28.63876539,
+        longitude: 77.37794469,
+        locationPin: propertyForm.pincode.trim() || "201014",
+        bedRange: `${Number(propertyForm.totalBeds || 10)}-${Number(propertyForm.totalBeds || 10) + 20}`,
+        propertyTypeId: "770b22ea-688a-481a-9ee3-006e6891600f",
       });
       toast({ title: "Property Created! 🏢", description: `${propertyForm.name} added successfully.` });
       setAddPropertyOpen(false);
@@ -180,14 +179,12 @@ export default function Structure() {
         floorId: effectiveFloorId,
         roomNumber: roomForm.roomNumber.trim(),
         numberOfBeds: Number(roomForm.numberOfBeds),
-        monthlyRent: Number(roomForm.monthlyRent),
-        securityDeposit: Number(roomForm.securityDeposit),
       });
       toast({
         title: "Room & Beds Added! 🚪",
         description: `Room ${roomForm.roomNumber} with ${roomForm.numberOfBeds} beds generated.`,
       });
-      setRoomForm({ roomNumber: "", numberOfBeds: 2, monthlyRent: 8500, securityDeposit: 10000 });
+      setRoomForm({ roomNumber: "", numberOfBeds: 2, });
       setAddRoomOpen(false);
     } catch (e: any) {
       toast({ title: "Failed to create room", description: e?.message, variant: "destructive" });
@@ -228,7 +225,7 @@ export default function Structure() {
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {activeProperty?.address || "Configure your room structure below"} • {activeProperty?.city || "India"}
+                    {activeProperty?.address || "Configure your room structure below"} • {(activeProperty as any)?.city || "India"}
                   </p>
                 </div>
               </div>
@@ -374,7 +371,11 @@ export default function Structure() {
               </Button>
             </div>
 
-            {rooms.length === 0 ? (
+            {roomsQuery.isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+              </div>
+            ) : rooms.length === 0 ? (
               <Card className="border-dashed">
                 <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                   <DoorOpen className="h-10 w-10 text-teal-600 mb-2 opacity-60" />
@@ -394,9 +395,7 @@ export default function Structure() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {rooms.map((r: any) => {
-                  const bedCount = r.numberOfBeds || r.beds?.length || 1;
-                  const rent = r.monthlyRent || 8500;
-                  const deposit = r.securityDeposit || 10000;
+                  const bedCount = r.capacity || r.numberOfBeds || r.beds?.length || 1;
 
                   // Find assigned tenants for this room
                   const roomTenants = tenantsData.filter(
@@ -418,10 +417,6 @@ export default function Structure() {
                         </Badge>
                       </CardHeader>
                       <CardContent className="p-4 pt-2 space-y-3">
-                        <div className="text-xs text-muted-foreground flex justify-between">
-                          <span>Rent: ₹{rent.toLocaleString("en-IN")}/mo</span>
-                          <span>Deposit: ₹{deposit.toLocaleString("en-IN")}</span>
-                        </div>
 
                         {/* Bed Slots Grid */}
                         <div className="space-y-1.5 border-t pt-2.5">
@@ -454,7 +449,7 @@ export default function Structure() {
                                   </div>
                                   <div className="text-[11px] truncate mt-1">
                                     {isOccupied ? (
-                                      assignedTenant.name || assignedTenant.tenantName
+                                      assignedTenant.name || (assignedTenant as any).tenantName
                                     ) : (
                                       <span className="opacity-60 italic">Vacant</span>
                                     )}
@@ -508,6 +503,7 @@ export default function Structure() {
                 <div className="space-y-1">
                   <Label>City</Label>
                   <Input
+                    placeholder="e.g. Noida"
                     value={propertyForm.city}
                     onChange={(e) => setPropertyForm({ ...propertyForm, city: e.target.value })}
                   />
@@ -515,6 +511,7 @@ export default function Structure() {
                 <div className="space-y-1">
                   <Label>State</Label>
                   <Input
+                    placeholder="e.g. Uttar Pradesh"
                     value={propertyForm.state}
                     onChange={(e) => setPropertyForm({ ...propertyForm, state: e.target.value })}
                   />
@@ -525,6 +522,7 @@ export default function Structure() {
                 <div className="space-y-1">
                   <Label>Pincode</Label>
                   <Input
+                    placeholder="e.g. 201014"
                     value={propertyForm.pincode}
                     onChange={(e) => setPropertyForm({ ...propertyForm, pincode: e.target.value })}
                   />
@@ -532,6 +530,7 @@ export default function Structure() {
                 <div className="space-y-1">
                   <Label>Contact Number</Label>
                   <Input
+                    placeholder="e.g. 917701953356"
                     value={propertyForm.contactNumber}
                     onChange={(e) => setPropertyForm({ ...propertyForm, contactNumber: e.target.value })}
                   />
@@ -664,25 +663,6 @@ export default function Structure() {
                     <SelectItem value="4">4 Beds (Four Sharing)</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>Monthly Rent / Bed (₹)</Label>
-                  <Input
-                    type="number"
-                    value={roomForm.monthlyRent}
-                    onChange={(e) => setRoomForm({ ...roomForm, monthlyRent: Number(e.target.value) })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Security Deposit (₹)</Label>
-                  <Input
-                    type="number"
-                    value={roomForm.securityDeposit}
-                    onChange={(e) => setRoomForm({ ...roomForm, securityDeposit: Number(e.target.value) })}
-                  />
-                </div>
               </div>
             </div>
 

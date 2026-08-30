@@ -6,8 +6,7 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { usePermissions } from "@/context/PermissionContext";
 import { CanAccessPage } from "@/components/PermissionGuard";
 import { useApp } from "@/context/AppContext";
-import { listStaff } from "@/api/staff";
-import { useQuery } from "@tanstack/react-query";
+import { useStaffList } from "@/hooks/usePropertyOwnerQueries";
 import { useMemo } from "react";
 
 function TeamIndexInner() {
@@ -15,13 +14,18 @@ function TeamIndexInner() {
   const { selectedPgId } = useApp();
   const pgId = selectedPgId ?? undefined;
 
-  const q = useQuery({
-    queryKey: ["staff-list", pgId],
-    queryFn: () => listStaff(pgId),
-    enabled: Boolean(pgId),
-  });
+  const q = useStaffList(pgId);
 
-  const rows = useMemo(() => (Array.isArray(q.data) ? q.data : []), [q.data]);
+  const rows = useMemo(() => {
+    const list = Array.isArray(q.data) ? q.data : [];
+    return list.map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      role: s.permissionTierName || s.designation || "Staff",
+      phone: s.mobileContactNumber || s.phone || "",
+      permissions: s.permissions || [],
+    }));
+  }, [q.data]);
 
   return (
     <div className="space-y-6 animate-fade-in">
