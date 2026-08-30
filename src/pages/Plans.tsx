@@ -1,235 +1,332 @@
-import { Check, X, Crown, Zap, Sparkles, Loader2, Lock } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import {
+  Check,
+  X,
+  Crown,
+  Zap,
+  Sparkles,
+  Loader2,
+  Lock,
+  CreditCard,
+  CheckCircle2,
+  Building,
+  Users,
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/common/PageHeader";
-import { useMyFeaturesQuery } from "@/hooks/usePropertyOwnerQueries";
+import {
+  useMyFeaturesQuery,
+  usePlansList,
+  useCurrentPlan,
+  useCreatePlanCheckoutOrderMutation,
+  useVerifyPlanPaymentMutation,
+} from "@/hooks/usePropertyOwnerQueries";
 import { buildFeatureKeySet, userHasFeatureForRow, type PlanTierKey } from "@/lib/planFeatures";
+import { toast } from "@/components/ui/use-toast";
 
-/** `featureKey` must match `featureKey` from GET /property-owners/my-features so “Your plan” can show locked/unlocked. */
+declare global {
+  interface Window {
+    Razorpay?: any;
+  }
+}
+
 const features = [
   { name: "Properties/tenants scale limit", featureKey: "SCALE_LIMIT_BYPASS", free: false, lite: true, pro: true },
   { name: "Add tenants (Excel/Invite/Manual)", featureKey: "TENANT_ADD", free: true, lite: true, pro: true },
   { name: "Multi-PG / Multi-building", featureKey: "MULTI_PG", free: false, lite: true, pro: true },
-  { name: "Notice period tracker", featureKey: "NOTICE_TRACKER", free: true, lite: true, pro: true },
-  { name: "Vacancy & tenant dashboard", featureKey: "VACANCY_DASHBOARD", free: true, lite: true, pro: true },
-  { name: "Manual rent add", featureKey: "MANUAL_LEDGER", free: true, lite: true, pro: true },
-  { name: "Manual receipts upload", featureKey: "MANUAL_RECEIPTS", free: true, lite: true, pro: true },
-  { name: "Complaint logging", featureKey: "COMPLAINTS", free: true, lite: true, pro: true },
-  { name: "Rent collection via UPI intent (Direct Owner)", featureKey: "UPI_INTENT_DIRECT", free: false, lite: true, pro: true },
-  { name: "Automated collection (Payment Gateway)", featureKey: "PAYMENT_GATEWAY_AUTO", free: false, lite: false, pro: true },
-  { name: "WhatsApp rent reminders", featureKey: "WHATSAPP_REMINDERS", free: true, lite: true, pro: true },
-  { name: "Aadhaar verification", featureKey: "AADHAAR_KYC_ADDON", free: true, lite: true, pro: true, details: "Add-on (paid)" },
-  { name: "Digital rent agreement (e-Sign)", featureKey: "DIGITAL_AGREEMENT_ADDON", free: true, lite: true, pro: true, details: "Add-on (paid)" },
-  { name: "Auto rent receipts", featureKey: "AUTO_RECEIPTS", free: false, lite: false, pro: true },
-  { name: "Automated late fees", featureKey: "LATE_FEES", free: false, lite: false, pro: true },
-  { name: "PG website (pgname.pgease.in)", featureKey: "PG_WEBSITE", free: false, lite: false, pro: true },
-  { name: "Lead generation / CRM visit requests", featureKey: "LEAD_CRM", free: false, lite: false, pro: true },
-  { name: "Guest tracking (automatic)", featureKey: "GUEST_TRACKING", free: false, lite: false, pro: true },
-  { name: "Group notifications/broadcast", featureKey: "BROADCAST", free: false, lite: false, pro: true },
-  { name: "Priority support", featureKey: "PRIORITY_SUPPORT", free: false, lite: false, pro: true },
+  { name: "Room structure & floor manager", featureKey: "ROOM_STRUCTURE", free: true, lite: true, pro: true },
+  { name: "DigiLocker Aadhaar KYC", featureKey: "KYC_VERIFICATION", free: true, lite: true, pro: true },
+  { name: "Digital Rental Agreement eSign", featureKey: "RENTAL_AGREEMENT", free: false, lite: true, pro: true },
+  { name: "Online Rent Collection Gateway", featureKey: "ONLINE_PAYMENTS", free: true, lite: true, pro: true },
+  { name: "Electricity Meter Billing", featureKey: "ELECTRICITY_DUES", free: true, lite: true, pro: true },
+  { name: "Notice Period Management", featureKey: "NOTICE_MANAGEMENT", free: true, lite: true, pro: true },
+  { name: "Staff Management & Granular Roles", featureKey: "STAFF_ROLES", free: false, lite: true, pro: true },
+  { name: "WhatsApp Automation & Reminders", featureKey: "WHATSAPP_AUTOMATION", free: false, lite: true, pro: true },
+  { name: "Complaints & Maintenance Desk", featureKey: "COMPLAINTS_DESK", free: true, lite: true, pro: true },
+  { name: "Revenue & Occupancy Analytics", featureKey: "ADVANCED_ANALYTICS", free: false, lite: false, pro: true },
 ];
 
-function normalizePlanKey(planName?: string, planDisplayName?: string): PlanTierKey {
-  const raw = (planDisplayName || planName || "").toUpperCase();
-  if (raw.includes("PRO") || raw.includes("STANDARD") || raw.includes("49")) return "PRO";
-  if (raw.includes("LITE") || raw.includes("PREMIUM") || raw.includes("29")) return "LITE";
-  return "FREE";
-}
+export default function Plans() {
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
+  const { data: featuresData, isLoading: isFeaturesLoading } = useMyFeaturesQuery();
+  const { data: plansData, isLoading: isPlansLoading } = usePlansList();
+  const { data: currentPlanData, isLoading: isCurrentPlanLoading, refetch: refetchCurrentPlan } = useCurrentPlan();
 
-const plans = [
-  {
-    key: "FREE",
-    icon: Zap,
-    price: "₹0",
-    period: "",
-    tagline: "Get started for free",
-    featureCount: features.filter((f) => f.free).length,
-  },
-  {
-    key: "LITE",
-    icon: Sparkles,
-    price: "₹29",
-    period: "/bed/mo",
-    tagline: "Best for growing PGs",
-    popular: true,
-    featureCount: features.filter((f) => f.lite).length,
-  },
-  {
-    key: "PRO",
-    icon: Crown,
-    price: "₹49",
-    period: "/bed/mo",
-    tagline: "For professional operators",
-    featureCount: features.filter((f) => f.pro).length,
-  },
-];
+  const createOrderMut = useCreatePlanCheckoutOrderMutation();
+  const verifyPaymentMut = useVerifyPlanPaymentMutation();
 
-const Plans = () => {
-  const { data: featuresData, isLoading, isError, refetch } = useMyFeaturesQuery();
-  const currentPlanKey = featuresData
-    ? normalizePlanKey(featuresData.planName, featuresData.planDisplayName)
-    : "FREE";
+  const rawPlanName = featuresData?.planName || currentPlanData?.currentPlan?.name || "Free";
+  const currentPlanKey: PlanTierKey = rawPlanName.toLowerCase().includes("pro")
+    ? "Pro"
+    : rawPlanName.toLowerCase().includes("lite")
+    ? "Lite"
+    : "Free";
 
   const apiFeatureKeys = buildFeatureKeySet(featuresData?.features);
-  const hasExplicitApiList = (featuresData?.features?.length ?? 0) > 0;
+  const hasExplicitApiList = Boolean(featuresData?.features && featuresData.features.length > 0);
 
-  const totalFeatures = features.length;
+  const fallbackPlans = [
+    {
+      id: "plan_free",
+      name: "Free",
+      code: "FREE",
+      priceMonthly: 0,
+      priceAnnual: 0,
+      maxProperties: 1,
+      maxTenants: 15,
+      features: ["Up to 15 Tenants", "1 Property", "Manual Rent Tracking", "5 Free KYC Credits"],
+      popular: false,
+    },
+    {
+      id: "plan_pro",
+      name: "Pro",
+      code: "PRO",
+      priceMonthly: 999,
+      priceAnnual: 9990,
+      maxProperties: 5,
+      maxTenants: 100,
+      features: [
+        "Up to 100 Tenants",
+        "5 Properties",
+        "WhatsApp Automation",
+        "Digital Rental Agreements",
+        "Granular Staff Permissions",
+      ],
+      popular: true,
+    },
+    {
+      id: "plan_enterprise",
+      name: "Enterprise",
+      code: "ENTERPRISE",
+      priceMonthly: 2499,
+      priceAnnual: 24990,
+      maxProperties: 50,
+      maxTenants: 1000,
+      features: [
+        "Unlimited Properties",
+        "Unlimited Tenants",
+        "Priority 24/7 Support",
+        "Advanced Revenue Analytics",
+        "Custom Branding",
+      ],
+      popular: false,
+    },
+  ];
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  const planCards = plansData?.plans && plansData.plans.length > 0 ? plansData.plans : fallbackPlans;
 
-  if (isError) {
-    return (
-      <div className="flex flex-col items-center justify-center py-24 space-y-4">
-        <p className="text-sm text-muted-foreground">Failed to load plan information.</p>
-        <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button>
-      </div>
-    );
-  }
+  const handleUpgradeCheckout = async (planId: string) => {
+    try {
+      const order = await createOrderMut.mutateAsync({ planId, billingCycle });
+      if (!window.Razorpay) {
+        const script = document.createElement("script");
+        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        document.body.appendChild(script);
+        await new Promise((resolve) => (script.onload = resolve));
+      }
+
+      const options = {
+        key: order.keyId || "rzp_test_TUV3u84h3zOyxB",
+        amount: order.amount,
+        currency: order.currency || "INR",
+        name: "PG Ease",
+        description: `Upgrade to ${planId} Plan (${billingCycle})`,
+        order_id: order.orderId,
+        handler: async (response: any) => {
+          try {
+            await verifyPaymentMut.mutateAsync({
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+              planId,
+              billingCycle,
+            });
+            toast({
+              title: "Subscription Activated! 👑",
+              description: "Your account has been upgraded successfully.",
+            });
+            refetchCurrentPlan();
+          } catch (err: any) {
+            toast({
+              title: "Payment Verification Failed",
+              description: err?.message || "Please contact support if amount was debited.",
+              variant: "destructive",
+            });
+          }
+        },
+        theme: { color: "#008080" },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch (err: any) {
+      toast({
+        title: "Failed to initiate plan checkout",
+        description: err?.message || "Please try again later.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
-    <div className="space-y-8 animate-fade-in max-w-5xl mx-auto pb-12">
-      <div className="text-center">
-        <PageHeader
-          title="Plans & Pricing"
-          description="Simple, transparent pricing. Upgrade anytime as your PG grows."
-        />
-      </div>
+    <div className="space-y-6 animate-fade-in pb-12">
+      <PageHeader
+        title="Plans & Billing"
+        description="Choose the ideal plan to scale your PG living management and operations."
+      />
 
-      {/* Current Plan Banner */}
-      <Card className="border-primary/30 bg-primary/5">
-        <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 py-4 px-5">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-              {currentPlanKey === "FREE" && <Zap className="h-5 w-5 text-primary" />}
-              {currentPlanKey === "LITE" && <Sparkles className="h-5 w-5 text-primary" />}
-              {currentPlanKey === "PRO" && <Crown className="h-5 w-5 text-primary" />}
-            </div>
-            <div>
-              <p className="text-sm font-semibold">
-                You're on the <span className="text-primary">{currentPlanKey}</span> plan
-              </p>
+      {/* CURRENT SUBSCRIPTION BANNER */}
+      <Card className="border-teal-200 dark:border-teal-900 bg-gradient-to-br from-teal-500/5 via-emerald-500/5 to-transparent">
+        <CardContent className="p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
+                  Active Subscription
+                </span>
+                <Badge className="bg-teal-600 text-white gap-1 text-xs">
+                  <Crown className="h-3 w-3" /> {currentPlanKey} Plan
+                </Badge>
+                <Badge variant="outline" className="text-xs text-emerald-600 border-emerald-300">
+                  Active ✓
+                </Badge>
+              </div>
+              <h3 className="text-xl font-bold text-foreground">
+                {currentPlanKey === "Pro"
+                  ? "PG Ease Professional Suite"
+                  : currentPlanKey === "Lite"
+                  ? "PG Ease Growth Suite"
+                  : "PG Ease Starter Edition"}
+              </h3>
               <p className="text-xs text-muted-foreground">
-                {currentPlanKey === "FREE"
-                  ? "Upgrade to unlock automation & advanced features"
-                  : currentPlanKey === "LITE"
-                    ? "You have access to automation features"
-                    : "You have full access to all features"}
+                {currentPlanData?.expiresAt
+                  ? `Renewal Date: ${new Date(currentPlanData.expiresAt).toLocaleDateString("en-IN")}`
+                  : "Free perpetual license for single property management"}
               </p>
+            </div>
+
+            <div className="flex items-center gap-6">
+              <div className="text-left sm:text-right">
+                <div className="text-xs text-muted-foreground font-medium flex items-center gap-1 sm:justify-end">
+                  <Building className="h-3.5 w-3.5" /> Properties Limit
+                </div>
+                <div className="text-sm font-bold text-foreground">
+                  {currentPlanData?.propertiesUsage?.used ?? 1} / {currentPlanData?.propertiesUsage?.max ?? (currentPlanKey === "Free" ? 1 : 5)}
+                </div>
+              </div>
+              <div className="text-left sm:text-right">
+                <div className="text-xs text-muted-foreground font-medium flex items-center gap-1 sm:justify-end">
+                  <Users className="h-3.5 w-3.5" /> Tenants Limit
+                </div>
+                <div className="text-sm font-bold text-foreground">
+                  {currentPlanData?.tenantsUsage?.used ?? 2} / {currentPlanData?.tenantsUsage?.max ?? (currentPlanKey === "Free" ? 15 : 100)}
+                </div>
+              </div>
             </div>
           </div>
-          {currentPlanKey !== "PRO" && (
-            <Button size="sm" className="shrink-0" disabled>
-              Contact sales
-            </Button>
-          )}
         </CardContent>
       </Card>
 
-      {/* Live features from API: GET /property-owners/my-features */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Features in your plan</CardTitle>
-          <p className="text-xs text-muted-foreground font-normal">
-            Loaded from <code className="rounded bg-muted px-1 py-0.5 text-[11px]">GET /property-owners/my-features</code>
-            . Keys here should match the <span className="font-medium">featureKey</span> column in the comparison table
-            below.
-          </p>
-        </CardHeader>
-        <CardContent>
-          {!hasExplicitApiList ? (
-            <div className="rounded-lg border border-dashed bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
-              No feature rows returned yet. When the backend sends a non-empty <code className="text-[11px]">features</code>{" "}
-              array, each item appears here. Until then, &quot;Your plan&quot; in the table uses your plan name (Free /
-              Lite / Pro) only.
-            </div>
-          ) : (
-            <ul className="grid gap-3 sm:grid-cols-2">
-              {featuresData!.features.map((f) => (
-                <li
-                  key={f.id}
-                  className="rounded-lg border bg-card px-3 py-2.5 text-left shadow-sm"
-                >
-                  <p className="text-sm font-medium leading-snug">{f.featureName}</p>
-                  {f.featureDescription ? (
-                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{f.featureDescription}</p>
-                  ) : null}
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                    <Badge variant="secondary" className="font-mono text-[10px]">
-                      {f.featureKey}
-                    </Badge>
-                    {f.category ? (
-                      <span className="rounded bg-muted px-1.5 py-0.5">{f.category}</span>
-                    ) : null}
-                    {f.limit != null ? <span>Limit: {f.limit}</span> : null}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      {/* BILLING TOGGLE */}
+      <div className="flex justify-center pt-2">
+        <Tabs value={billingCycle} onValueChange={(v) => setBillingCycle(v as any)} className="w-[300px]">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="monthly">Monthly</TabsTrigger>
+            <TabsTrigger value="annual">
+              Annual <Badge className="ml-1.5 bg-emerald-600 text-white text-[9px] px-1 py-0">20% OFF</Badge>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
 
-      {/* Plan Cards */}
-      <div className="grid gap-5 sm:grid-cols-3">
-        {plans.map((plan) => {
-          const isCurrent = plan.key === currentPlanKey;
-          const Icon = plan.icon;
+      {/* PRICING CARDS */}
+      <div className="grid gap-6 sm:grid-cols-3">
+        {planCards.map((plan: any) => {
+          const isCurrent = plan.name.toLowerCase() === currentPlanKey.toLowerCase();
+          const price =
+            billingCycle === "annual" ? plan.priceAnnual || plan.priceMonthly * 10 : plan.priceMonthly;
+
           return (
             <Card
-              key={plan.key}
-              className={`relative transition-all ${plan.popular
-                  ? "border-primary shadow-lg shadow-primary/10 ring-1 ring-primary/20"
-                  : ""
-                } ${isCurrent ? "bg-primary/[0.03]" : ""}`}
+              key={plan.id || plan.name}
+              className={`relative flex flex-col justify-between transition-all ${
+                plan.popular
+                  ? "border-teal-600 shadow-xl shadow-teal-500/10 ring-2 ring-teal-600/20"
+                  : "hover:border-teal-200 dark:hover:border-teal-800"
+              } ${isCurrent ? "bg-teal-500/[0.02]" : ""}`}
             >
               {plan.popular && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge className="bg-primary text-[10px] px-2">Most Popular</Badge>
+                  <Badge className="bg-teal-600 text-white text-[10px] px-2.5 shadow-sm">MOST POPULAR</Badge>
                 </div>
               )}
               {isCurrent && (
                 <div className="absolute -top-3 right-4">
-                  <Badge variant="outline" className="text-[10px] px-2 border-primary text-primary bg-background">
-                    Current Plan
+                  <Badge variant="outline" className="text-[10px] px-2 border-teal-600 text-teal-600 bg-background font-semibold">
+                    CURRENT PLAN
                   </Badge>
                 </div>
               )}
-              <CardHeader className="text-center pt-7 pb-3">
-                <div className="mx-auto h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
-                  <Icon className="h-5 w-5 text-primary" />
+
+              <CardHeader className="text-center pt-8 pb-4">
+                <div className="mx-auto h-12 w-12 rounded-2xl bg-teal-50 dark:bg-teal-950/60 flex items-center justify-center mb-3">
+                  {plan.name.toLowerCase().includes("pro") ? (
+                    <Crown className="h-6 w-6 text-teal-600" />
+                  ) : plan.name.toLowerCase().includes("enterprise") ? (
+                    <Sparkles className="h-6 w-6 text-teal-600" />
+                  ) : (
+                    <Zap className="h-6 w-6 text-teal-600" />
+                  )}
                 </div>
-                <CardTitle className="text-lg">{plan.key}</CardTitle>
+                <CardTitle className="text-xl font-bold">{plan.name}</CardTitle>
                 <div className="mt-2">
-                  <span className="text-3xl font-bold">{plan.price}</span>
-                  <span className="text-xs text-muted-foreground ml-1">{plan.period}</span>
+                  <span className="text-3xl font-black text-foreground">
+                    ₹{price.toLocaleString("en-IN")}
+                  </span>
+                  <span className="text-xs text-muted-foreground ml-1">
+                    /{billingCycle === "annual" ? "year" : "month"}
+                  </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">{plan.tagline}</p>
+                <CardDescription className="text-xs mt-1">
+                  {plan.name.toLowerCase() === "free"
+                    ? "Essential features for single property"
+                    : plan.name.toLowerCase() === "pro"
+                    ? "Full automation & agreements for growing PGs"
+                    : "Tailored for large multi-property chains"}
+                </CardDescription>
               </CardHeader>
+
               <CardContent className="space-y-4 pb-6">
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-[11px] text-muted-foreground">
-                    <span>Features included</span>
-                    <span className="font-medium text-foreground">
-                      {plan.featureCount}/{totalFeatures}
-                    </span>
-                  </div>
-                  <Progress value={(plan.featureCount / totalFeatures) * 100} className="h-1.5" />
+                <div className="space-y-2 border-t pt-4">
+                  {(plan.features || []).map((feat: string, idx: number) => (
+                    <div key={idx} className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Check className="h-4 w-4 text-teal-600 shrink-0" />
+                      <span>{feat}</span>
+                    </div>
+                  ))}
                 </div>
 
                 <Button
-                  className="w-full"
-                  variant={isCurrent ? "outline" : plan.popular ? "default" : "outline"}
-                  disabled
+                  className={`w-full font-semibold ${
+                    isCurrent
+                      ? "border-teal-600 text-teal-600"
+                      : "bg-teal-600 hover:bg-teal-700 text-white shadow-sm"
+                  }`}
+                  variant={isCurrent ? "outline" : "default"}
+                  disabled={isCurrent || createOrderMut.isPending}
+                  onClick={() => handleUpgradeCheckout(plan.id || plan.name.toLowerCase())}
                 >
-                  {isCurrent ? "Current Plan" : "Contact sales"}
+                  {createOrderMut.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : isCurrent ? (
+                    "Active Plan"
+                  ) : (
+                    "Upgrade to " + plan.name
+                  )}
                 </Button>
               </CardContent>
             </Card>
@@ -237,29 +334,25 @@ const Plans = () => {
         })}
       </div>
 
-      {/* Feature Comparison */}
+      {/* FEATURE COMPARISON TABLE */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Feature Comparison</CardTitle>
-          <p className="text-xs text-muted-foreground font-normal">
-            The <span className="font-medium">Your plan</span> column uses your enabled{" "}
-            <span className="font-medium">featureKey</span>s when the API returns them; otherwise it follows Free /
-            Lite / Pro tiers.
+          <CardTitle className="text-base font-bold">Feature Comparison Matrix</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Complete functional breakdown across all subscription tiers.
           </p>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/40">
-                  <th className="text-left font-medium px-4 py-3 min-w-[200px]">Feature</th>
-                  {plans.map((p) => (
-                    <th key={p.key} className="text-center font-medium px-3 py-3 min-w-[100px]">
-                      <span className={p.key === currentPlanKey ? "text-primary" : ""}>{p.key}</span>
-                    </th>
-                  ))}
-                  <th className="text-center font-medium px-3 py-3 min-w-[88px] bg-primary/5">
-                    <span className="text-primary">Your plan</span>
+                <tr className="border-b bg-muted/40 text-xs">
+                  <th className="text-left font-semibold px-4 py-3 min-w-[200px]">Feature</th>
+                  <th className="text-center font-semibold px-3 py-3">Free</th>
+                  <th className="text-center font-semibold px-3 py-3">Lite</th>
+                  <th className="text-center font-semibold px-3 py-3 text-teal-600">Pro</th>
+                  <th className="text-center font-semibold px-3 py-3 bg-teal-50/50 dark:bg-teal-950/20 text-teal-700 dark:text-teal-300">
+                    Your Plan
                   </th>
                 </tr>
               </thead>
@@ -272,29 +365,24 @@ const Plans = () => {
                     currentPlanKey
                   );
                   return (
-                    <tr key={i} className={`border-b last:border-0 ${i % 2 === 0 ? "bg-muted/20" : ""}`}>
-                      <td className="px-4 py-2.5 text-sm">
-                        <span>{f.name}</span>
-                        {f.featureKey ? (
-                          <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground">{f.featureKey}</span>
-                        ) : null}
+                    <tr key={i} className={`border-b last:border-0 ${i % 2 === 0 ? "bg-muted/10" : ""}`}>
+                      <td className="px-4 py-2.5 text-xs">
+                        <span className="font-medium text-foreground">{f.name}</span>
                       </td>
                       {(["free", "lite", "pro"] as const).map((tier) => (
                         <td key={tier} className="text-center px-3 py-2.5">
                           {f[tier] ? (
                             <Check className="h-4 w-4 text-emerald-500 mx-auto" />
                           ) : (
-                            <X className="h-4 w-4 text-muted-foreground mx-auto opacity-40" />
+                            <X className="h-4 w-4 text-muted-foreground mx-auto opacity-30" />
                           )}
                         </td>
                       ))}
-                      <td className="text-center px-3 py-2.5 bg-primary/[0.03]">
+                      <td className="text-center px-3 py-2.5 bg-teal-50/30 dark:bg-teal-950/10">
                         {youHave ? (
-                          <Check className="h-4 w-4 text-emerald-600 mx-auto" aria-label="Included" />
+                          <Check className="h-4 w-4 text-emerald-600 mx-auto" />
                         ) : (
-                          <span className="inline-flex items-center justify-center" title="Not included in your plan">
-                            <Lock className="h-4 w-4 text-amber-600/90 mx-auto" aria-label="Locked" />
-                          </span>
+                          <Lock className="h-4 w-4 text-amber-600/80 mx-auto" />
                         )}
                       </td>
                     </tr>
@@ -307,6 +395,4 @@ const Plans = () => {
       </Card>
     </div>
   );
-};
-
-export default Plans;
+}

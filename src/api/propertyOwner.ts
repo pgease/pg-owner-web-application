@@ -1073,3 +1073,303 @@ export async function createStaffPermissionDefinition(payload: CreateStaffPermis
   });
 }
 
+// ==========================================================
+// VERIFICATION CREDITS & TOP-UPS (RAZORPAY)
+// ==========================================================
+
+export interface CreditBalanceResponse {
+  totalCredits: number;
+  freeCreditsAllocated: number;
+  freeCreditsUsed: number;
+  freeCreditsRemaining: number;
+  topupCreditsRemaining: number;
+  remainingCredits: number;
+  isBlocked: boolean;
+}
+
+export interface CreditPack {
+  id: string;
+  name: string;
+  credits: number;
+  price: number;
+  discountPercentage?: number;
+  popular?: boolean;
+}
+
+export interface RazorpayOrderResponse {
+  orderId: string;
+  amount: number;
+  currency: string;
+  keyId: string;
+  notes?: Record<string, any>;
+}
+
+export async function getCreditBalance() {
+  return httpRequest<CreditBalanceResponse>(`${PROPERTY_OWNER_BASE}/credits/balance`);
+}
+
+export async function getCreditPacks() {
+  return httpRequest<{ creditPacks: CreditPack[] }>(`${PROPERTY_OWNER_BASE}/credit-packs`);
+}
+
+export async function createCreditTopupOrder(creditPackId: string) {
+  return httpRequest<RazorpayOrderResponse>(`${PROPERTY_OWNER_BASE}/credits/${creditPackId}/checkout-order`, {
+    method: 'POST',
+  });
+}
+
+export async function verifyCreditPayment(body: {
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  razorpaySignature: string;
+  creditPackId: string;
+}) {
+  return httpRequest<{ success: boolean; message: string; newBalance: number }>(`${PROPERTY_OWNER_BASE}/credits/verify-payment`, {
+    method: 'POST',
+    body,
+  });
+}
+
+export async function requestTenantKyc(roomTenantId: string) {
+  return httpRequest<{
+    success: boolean;
+    message: string;
+    kycApplicationId: string;
+    digioKycId?: string;
+    kycDirectUrl?: string;
+    remainingCredits: number;
+  }>(`${PROPERTY_OWNER_BASE}/tenants/${roomTenantId}/request-kyc`, {
+    method: 'POST',
+  });
+}
+
+// ==========================================================
+// PLANS & SUBSCRIPTION UPGRADES (RAZORPAY)
+// ==========================================================
+
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  code: string;
+  priceMonthly: number;
+  priceAnnual: number;
+  features: string[];
+  maxProperties: number;
+  maxTenants: number;
+  isPopular?: boolean;
+}
+
+export interface CurrentPlanResponse {
+  currentPlan: SubscriptionPlan | null;
+  subscriptionStatus: 'active' | 'trial' | 'expired' | 'free';
+  expiresAt: string | null;
+  daysRemaining: number | null;
+  propertiesUsage: { used: number; max: number };
+  tenantsUsage: { used: number; max: number };
+}
+
+export async function getPlans() {
+  return httpRequest<{ plans: SubscriptionPlan[] }>(`${PROPERTY_OWNER_BASE}/plans`);
+}
+
+export async function getCurrentPlan() {
+  return httpRequest<CurrentPlanResponse>(`${PROPERTY_OWNER_BASE}/plans/current`);
+}
+
+export async function createPlanCheckoutOrder(planId: string, billingCycle: 'monthly' | 'annual' = 'monthly') {
+  return httpRequest<RazorpayOrderResponse>(`${PROPERTY_OWNER_BASE}/plans/${planId}/checkout-order`, {
+    method: 'POST',
+    body: { billingCycle },
+  });
+}
+
+export async function verifyPlanPayment(body: {
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  razorpaySignature: string;
+  planId: string;
+  billingCycle: 'monthly' | 'annual';
+}) {
+  return httpRequest<{ success: boolean; message: string; plan: SubscriptionPlan }>(`${PROPERTY_OWNER_BASE}/plans/verify-payment`, {
+    method: 'POST',
+    body,
+  });
+}
+
+// ==========================================================
+// RENTAL AGREEMENTS (DIGIO eSIGN)
+// ==========================================================
+
+export interface RentalAgreement {
+  id: string;
+  propertyId: string;
+  roomTenantId: string;
+  tenantName: string;
+  tenantPhone: string;
+  roomNumber: string;
+  monthlyRent: number;
+  securityDeposit: number;
+  noticePeriodDays: number;
+  lockInPeriodMonths: number;
+  agreementStartDate: string;
+  agreementEndDate: string;
+  status: 'draft' | 'sent_for_esign' | 'partially_signed' | 'signed' | 'rejected' | 'expired';
+  agreementPdfUrl?: string;
+  signedPdfUrl?: string;
+  digioDocumentId?: string;
+  signingDirectUrl?: string;
+  createdAt: string;
+}
+
+export async function getPropertyAgreements(propertyId: string) {
+  return httpRequest<{ agreements: RentalAgreement[] }>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/agreements`);
+}
+
+export async function createRentalAgreement(
+  propertyId: string,
+  body: {
+    roomTenantId: string;
+    monthlyRent: number;
+    securityDeposit: number;
+    noticePeriodDays: number;
+    lockInPeriodMonths?: number;
+    agreementStartDate: string;
+    agreementEndDate?: string;
+    houseRules?: string[];
+  }
+) {
+  return httpRequest<{
+    success: boolean;
+    message: string;
+    agreement: RentalAgreement;
+    signingUrl?: string;
+  }>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/agreements/create`, {
+    method: 'POST',
+    body,
+  });
+}
+
+export async function sendAgreementForEsign(agreementId: string) {
+  return httpRequest<{
+    success: boolean;
+    message: string;
+    signingUrl?: string;
+  }>(`${PROPERTY_OWNER_BASE}/agreements/${agreementId}/send-esign`, {
+    method: 'POST',
+  });
+}
+
+// ==========================================================
+// NOTICE PERIOD MANAGEMENT
+// ==========================================================
+
+export interface NoticePeriodResponse {
+  success: boolean;
+  message: string;
+  noticeGivenAt: string;
+  expectedMoveOutDate: string;
+}
+
+export async function setTenantNotice(
+  propertyId: string,
+  roomTenantId: string,
+  body: { noticeGivenAt: string; expectedMoveOutDate: string; reason?: string }
+) {
+  return httpRequest<NoticePeriodResponse>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${roomTenantId}/notice`,
+    {
+      method: 'POST',
+      body,
+    }
+  );
+}
+
+export async function clearTenantNotice(propertyId: string, roomTenantId: string) {
+  return httpRequest<{ success: boolean; message: string }>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${roomTenantId}/notice`,
+    {
+      method: 'DELETE',
+    }
+  );
+}
+
+// ==========================================================
+// ELECTRICITY METER DUES MANAGEMENT
+// ==========================================================
+
+export interface ElectricityMeterDue {
+  id: string;
+  propertyId: string;
+  roomTenantId: string;
+  previousReading: number;
+  currentReading: number;
+  unitsConsumed: number;
+  ratePerUnit: number;
+  totalAmount: number;
+  billingMonth: number;
+  billingYear: number;
+  readingDate: string;
+  dueDate: string;
+  isPaid: boolean;
+  notes?: string;
+  createdAt: string;
+}
+
+export async function getElectricityDues(propertyId: string, roomTenantId: string) {
+  return httpRequest<{ dues: ElectricityMeterDue[] }>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${roomTenantId}/electricity-meter-dues`
+  );
+}
+
+export async function addElectricityDues(
+  propertyId: string,
+  roomTenantId: string,
+  body: {
+    previousReading: number;
+    currentReading: number;
+    ratePerUnit: number;
+    billingMonth: number;
+    billingYear: number;
+    dueDate?: string;
+    notes?: string;
+  }
+) {
+  return httpRequest<{ success: boolean; message: string; due: ElectricityMeterDue }>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${roomTenantId}/electricity-meter-dues`,
+    {
+      method: 'POST',
+      body,
+    }
+  );
+}
+
+export async function updateElectricityDues(
+  propertyId: string,
+  roomTenantId: string,
+  duesId: string,
+  body: Partial<{
+    previousReading: number;
+    currentReading: number;
+    ratePerUnit: number;
+    isPaid: boolean;
+    dueDate: string;
+    notes: string;
+  }>
+) {
+  return httpRequest<{ success: boolean; message: string; due: ElectricityMeterDue }>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${roomTenantId}/electricity-meter-dues/${duesId}`,
+    {
+      method: 'PATCH',
+      body,
+    }
+  );
+}
+
+export async function deleteElectricityDues(propertyId: string, roomTenantId: string, duesId: string) {
+  return httpRequest<{ success: boolean; message: string }>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${roomTenantId}/electricity-meter-dues/${duesId}`,
+    {
+      method: 'DELETE',
+    }
+  );
+}
