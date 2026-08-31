@@ -19,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useApp } from "@/context/AppContext";
@@ -181,12 +182,12 @@ const Complaints = () => {
         </>
       )}
 
-      <Dialog open={updateOpen} onOpenChange={setUpdateOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Update complaint status</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-2">
+      <Sheet open={updateOpen} onOpenChange={setUpdateOpen}>
+        <SheetContent side="right" className="w-[400px] max-w-full space-y-6">
+          <SheetHeader>
+            <SheetTitle>Update Complaint Status</SheetTitle>
+          </SheetHeader>
+          <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <Label>Status</Label>
               <Select value={updateForm.status} onValueChange={(v) => setUpdateForm((p) => ({ ...p, status: v }))}>
@@ -208,13 +209,13 @@ const Complaints = () => {
               />
             </div>
             <CanAccess permission="complaint_edit_assign">
-              <Button onClick={handleUpdateStatus} disabled={updateMutation.isPending}>
+              <Button onClick={handleUpdateStatus} disabled={updateMutation.isPending} className="bg-teal-600 hover:bg-teal-700 text-white font-bold w-full">
                 {updateMutation.isPending ? "Saving..." : "Save"}
               </Button>
             </CanAccess>
           </div>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
     </CanAccessPage>
   );

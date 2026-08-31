@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Check,
   X,
@@ -68,6 +68,18 @@ export default function Plans() {
 
   const apiFeatureKeys = buildFeatureKeySet(featuresData?.features);
   const hasExplicitApiList = Boolean(featuresData?.features && featuresData.features.length > 0);
+
+  const activeFeaturesToShow = useMemo(() => {
+    if (featuresData?.features && featuresData.features.length > 0) {
+      return featuresData.features;
+    }
+    const key = currentPlanKey.toLowerCase() as "free" | "lite" | "pro";
+    return features.filter(f => f[key]).map(f => ({
+      featureKey: f.featureKey,
+      name: f.name,
+      description: "Included in your " + currentPlanKey + " plan"
+    }));
+  }, [featuresData, currentPlanKey]);
 
   const fallbackPlans = [
     {
@@ -230,6 +242,40 @@ export default function Plans() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ACTIVE FEATURES GRID */}
+      {activeFeaturesToShow.length > 0 && (
+        <Card className="border-teal-200 dark:border-teal-900 bg-gradient-to-br from-teal-500/[0.01] via-emerald-500/[0.01] to-transparent shadow-sm">
+          <CardHeader className="pb-3 border-b bg-muted/5">
+            <CardTitle className="text-sm font-bold flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-teal-600 animate-pulse" />
+              Active Features Unlocked ({activeFeaturesToShow.length})
+            </CardTitle>
+            <CardDescription className="text-xs">
+              These features are fully activated and configured on your current plan tier.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {activeFeaturesToShow.map((feat: any, idx: number) => (
+                <div key={idx} className="flex items-center gap-2.5 p-3 rounded-xl border bg-card hover:bg-muted/10 transition-colors">
+                  <div className="h-6 w-6 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-bold text-foreground block">
+                      {feat.name || feat.featureKey}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground block line-clamp-1">
+                      {feat.description || "Active feature module"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* BILLING TOGGLE */}
       <div className="flex justify-center pt-2">

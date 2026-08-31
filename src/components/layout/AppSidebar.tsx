@@ -54,10 +54,6 @@ const navItems: NavItem[] = [
     url: "/dashboard",
     icon: Home,
     permissionKey: "dashboard_access",
-    children: [
-      { title: "Overview", url: "/dashboard", permissionKey: "dashboard_access" },
-      { title: "KPIs", url: "/kpis", permissionKey: "dashboard_access" },
-    ],
   },
   {
     title: "Money",

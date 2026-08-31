@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useApp } from "@/context/AppContext";
 import { toast } from "@/components/ui/use-toast";
 import {
@@ -58,6 +59,10 @@ const MyPGs = () => {
   const [pgPin, setPgPin] = useState("");
   const [pgBedRange, setPgBedRange] = useState("");
   const [pgTypeId, setPgTypeId] = useState(DEFAULT_PROPERTY_TYPE_ID);
+
+  const [amenitiesOpen, setAmenitiesOpen] = useState(false);
+  const [restrictionsOpen, setRestrictionsOpen] = useState(false);
+  const [diningOpen, setDiningOpen] = useState(false);
 
   const [newAmenity, setNewAmenity] = useState("");
   const [newRestriction, setNewRestriction] = useState("");
@@ -332,146 +337,273 @@ const MyPGs = () => {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <UtensilsCrossed className="h-5 w-5" /> Amenities
-            </h2>
-            <Card>
-              <CardContent className="p-4 space-y-4">
-                {amenitiesLoading ? (
-                  <div className="flex items-center justify-center py-6">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  </div>
-                ) : amenitiesError ? (
-                  <div className="text-center space-y-3">
-                    <p className="text-sm text-muted-foreground">Failed to load amenities.</p>
-                    <Button size="sm" variant="outline" onClick={() => refetchAmenities()}>Retry</Button>
-                  </div>
-                ) : amenities.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No amenities linked to this PG yet.</p>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <UtensilsCrossed className="h-5 w-5 text-teal-600" /> Amenities
+              </h2>
+              <Button size="sm" variant="outline" onClick={() => setAmenitiesOpen(true)} className="rounded-xl border-slate-200">
+                Configure Amenities
+              </Button>
+            </div>
+            <Card className="mb-8 rounded-2xl shadow-sm border-slate-100">
+              <CardContent className="p-5">
+                {selectedAmenityIds.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No amenities selected. Click "Configure Amenities" to select.</p>
                 ) : (
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {amenities.map((a) => (
-                      <label key={a.id} className="flex items-center gap-2 text-sm">
-                        <Checkbox checked={selectedAmenityIds.includes(a.id)} onCheckedChange={() => toggleAmenity(a.id)} />
-                        <span>{a.name}</span>
-                      </label>
-                    ))}
+                  <div className="flex flex-wrap gap-2 animate-fade-in">
+                    {amenities
+                      .filter((a) => selectedAmenityIds.includes(a.id))
+                      .map((a) => (
+                        <Badge key={a.id} variant="secondary" className="px-2.5 py-1 text-xs bg-teal-50 text-teal-800 border-teal-100 hover:bg-teal-50">
+                          {a.name}
+                        </Badge>
+                      ))}
                   </div>
                 )}
-                <div className="flex gap-2">
-                  <Input placeholder="Add custom amenity" value={newAmenity} onChange={(e) => setNewAmenity(e.target.value)} />
-                  <Button variant="outline" onClick={addAmenity} disabled={createAmenity.isPending}>
-                    {createAmenity.isPending ? "Adding..." : "Add"}
-                  </Button>
-                </div>
-                <Button onClick={saveAmenities} disabled={linkAmenityMutation.isPending}>
-                  {linkAmenityMutation.isPending ? "Saving..." : "Save Amenities"}
-                </Button>
               </CardContent>
             </Card>
+
+            {/* AMENITIES SIDEBAR SHEET */}
+            <Sheet open={amenitiesOpen} onOpenChange={setAmenitiesOpen}>
+              <SheetContent side="right" className="w-[400px] max-w-full overflow-y-auto space-y-6">
+                <SheetHeader>
+                  <SheetTitle>Configure Amenities</SheetTitle>
+                </SheetHeader>
+                <div className="space-y-6 py-4">
+                  {amenitiesLoading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : amenitiesError ? (
+                    <div className="text-center space-y-3">
+                      <p className="text-sm text-muted-foreground">Failed to load amenities.</p>
+                      <Button size="sm" variant="outline" onClick={() => refetchAmenities()}>Retry</Button>
+                    </div>
+                  ) : amenities.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No amenities linked to this PG yet.</p>
+                  ) : (
+                    <div className="grid gap-3 border rounded-xl p-4 bg-muted/10">
+                      {amenities.map((a) => (
+                        <label key={a.id} className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                          <Checkbox checked={selectedAmenityIds.includes(a.id)} onCheckedChange={() => toggleAmenity(a.id)} />
+                          <span className="font-medium text-foreground">{a.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="space-y-2 border-t pt-4">
+                    <Label className="text-xs text-muted-foreground">Create Custom Amenity</Label>
+                    <div className="flex gap-2">
+                      <Input placeholder="e.g. Power Backup" value={newAmenity} onChange={(e) => setNewAmenity(e.target.value)} />
+                      <Button variant="outline" onClick={async () => {
+                        await addAmenity();
+                        setNewAmenity("");
+                      }} disabled={createAmenity.isPending}>
+                        {createAmenity.isPending ? "Adding..." : "Add"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <Button onClick={async () => {
+                    await saveAmenities();
+                    setAmenitiesOpen(false);
+                  }} disabled={linkAmenityMutation.isPending} className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl">
+                    {linkAmenityMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Ban className="h-5 w-5" /> Restrictions
-            </h2>
-            <Card>
-              <CardContent className="p-4 space-y-4">
-                {restrictionsLoading ? (
-                  <div className="flex items-center justify-center py-6">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  </div>
-                ) : restrictionsError ? (
-                  <div className="text-center space-y-3">
-                    <p className="text-sm text-muted-foreground">Failed to load restrictions.</p>
-                    <Button size="sm" variant="outline" onClick={() => refetchRestrictions()}>Retry</Button>
-                  </div>
-                ) : restrictions.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No restrictions linked to this PG yet.</p>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Ban className="h-5 w-5 text-red-600" /> Restrictions
+              </h2>
+              <Button size="sm" variant="outline" onClick={() => setRestrictionsOpen(true)} className="rounded-xl border-slate-200">
+                Configure Restrictions
+              </Button>
+            </div>
+            <Card className="mb-8 rounded-2xl shadow-sm border-slate-100">
+              <CardContent className="p-5">
+                {selectedRestrictionIds.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No restrictions selected. Click "Configure Restrictions" to select.</p>
                 ) : (
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {restrictions.map((r) => (
-                      <label key={r.id} className="flex items-center gap-2 text-sm">
-                        <Checkbox checked={selectedRestrictionIds.includes(r.id)} onCheckedChange={() => toggleRestriction(r.id)} />
-                        <span>{r.name}</span>
-                      </label>
-                    ))}
+                  <div className="flex flex-wrap gap-2 animate-fade-in">
+                    {restrictions
+                      .filter((r) => selectedRestrictionIds.includes(r.id))
+                      .map((r) => (
+                        <Badge key={r.id} variant="destructive" className="px-2.5 py-1 text-xs bg-red-50 text-red-800 border-red-100 hover:bg-red-50">
+                          {r.name}
+                        </Badge>
+                      ))}
                   </div>
                 )}
-                <div className="flex gap-2">
-                  <Input placeholder="Add custom restriction" value={newRestriction} onChange={(e) => setNewRestriction(e.target.value)} />
-                  <Button variant="outline" onClick={addRestriction} disabled={createRestriction.isPending}>
-                    {createRestriction.isPending ? "Adding..." : "Add"}
-                  </Button>
-                </div>
-                <Button onClick={saveRestrictions} disabled={linkRestrictionMutation.isPending}>
-                  {linkRestrictionMutation.isPending ? "Saving..." : "Save Restrictions"}
-                </Button>
               </CardContent>
             </Card>
+
+            {/* RESTRICTIONS SIDEBAR SHEET */}
+            <Sheet open={restrictionsOpen} onOpenChange={setRestrictionsOpen}>
+              <SheetContent side="right" className="w-[400px] max-w-full overflow-y-auto space-y-6">
+                <SheetHeader>
+                  <SheetTitle>Configure Restrictions</SheetTitle>
+                </SheetHeader>
+                <div className="space-y-6 py-4">
+                  {restrictionsLoading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : restrictionsError ? (
+                    <div className="text-center space-y-3">
+                      <p className="text-sm text-muted-foreground">Failed to load restrictions.</p>
+                      <Button size="sm" variant="outline" onClick={() => refetchRestrictions()}>Retry</Button>
+                    </div>
+                  ) : restrictions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No restrictions linked to this PG yet.</p>
+                  ) : (
+                    <div className="grid gap-3 border rounded-xl p-4 bg-muted/10">
+                      {restrictions.map((r) => (
+                        <label key={r.id} className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                          <Checkbox checked={selectedRestrictionIds.includes(r.id)} onCheckedChange={() => toggleRestriction(r.id)} />
+                          <span className="font-medium text-foreground">{r.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="space-y-2 border-t pt-4">
+                    <Label className="text-xs text-muted-foreground">Create Custom Restriction</Label>
+                    <div className="flex gap-2">
+                      <Input placeholder="e.g. No Guests allowed after 10PM" value={newRestriction} onChange={(e) => setNewRestriction(e.target.value)} />
+                      <Button variant="outline" onClick={async () => {
+                        await addRestriction();
+                        setNewRestriction("");
+                      }} disabled={createRestriction.isPending}>
+                        {createRestriction.isPending ? "Adding..." : "Add"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <Button onClick={async () => {
+                    await saveRestrictions();
+                    setRestrictionsOpen(false);
+                  }} disabled={linkRestrictionMutation.isPending} className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl">
+                    {linkRestrictionMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Clock className="h-5 w-5" /> Dining Schedule
-            </h2>
-            <Card>
-              <CardContent className="p-4 space-y-4">
-                {diningLoading ? (
-                  <div className="flex items-center justify-center py-6">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Clock className="h-5 w-5 text-indigo-600" /> Dining Schedule
+              </h2>
+              <Button size="sm" variant="outline" onClick={() => setDiningOpen(true)} className="rounded-xl border-slate-200">
+                Configure Dining
+              </Button>
+            </div>
+            <Card className="mb-8 rounded-2xl shadow-sm border-slate-100">
+              <CardContent className="p-5">
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="p-4 rounded-2xl border bg-card hover:shadow-sm transition-shadow">
+                    <span className="text-[10px] font-bold text-teal-600 uppercase tracking-wider block mb-1">Breakfast</span>
+                    <strong className="text-sm font-bold text-foreground block">{breakfastMenu || "Not configured"}</strong>
+                    <span className="text-xs text-muted-foreground block mt-1">{breakfastStart ? `${breakfastStart} - ${breakfastEnd}` : "Time not set"}</span>
                   </div>
-                ) : diningError ? (
-                  <div className="text-center space-y-3">
-                    <p className="text-sm text-muted-foreground">Failed to load dining schedule.</p>
-                    <Button size="sm" variant="outline" onClick={() => refetchDining()}>Retry</Button>
+                  <div className="p-4 rounded-2xl border bg-card hover:shadow-sm transition-shadow">
+                    <span className="text-[10px] font-bold text-teal-600 uppercase tracking-wider block mb-1">Lunch</span>
+                    <strong className="text-sm font-bold text-foreground block">{lunchMenu || "Not configured"}</strong>
+                    <span className="text-xs text-muted-foreground block mt-1">{lunchStart ? `${lunchStart} - ${lunchEnd}` : "Time not set"}</span>
                   </div>
-                ) : (
-                  <>
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <div className="space-y-2">
-                        <Label>Breakfast menu</Label>
-                        <Input value={breakfastMenu} onChange={(e) => setBreakfastMenu(e.target.value)} placeholder="Poha, tea" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Lunch menu</Label>
-                        <Input value={lunchMenu} onChange={(e) => setLunchMenu(e.target.value)} placeholder="Rice, dal" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Dinner menu</Label>
-                        <Input value={dinnerMenu} onChange={(e) => setDinnerMenu(e.target.value)} placeholder="Roti, sabzi" />
-                      </div>
-                    </div>
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <div className="space-y-2">
-                        <Label>Breakfast time</Label>
-                        <div className="flex gap-2">
-                          <Input type="time" value={breakfastStart} onChange={(e) => setBreakfastStart(e.target.value)} />
-                          <Input type="time" value={breakfastEnd} onChange={(e) => setBreakfastEnd(e.target.value)} />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Lunch time</Label>
-                        <div className="flex gap-2">
-                          <Input type="time" value={lunchStart} onChange={(e) => setLunchStart(e.target.value)} />
-                          <Input type="time" value={lunchEnd} onChange={(e) => setLunchEnd(e.target.value)} />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Dinner time</Label>
-                        <div className="flex gap-2">
-                          <Input type="time" value={dinnerStart} onChange={(e) => setDinnerStart(e.target.value)} />
-                          <Input type="time" value={dinnerEnd} onChange={(e) => setDinnerEnd(e.target.value)} />
-                        </div>
-                      </div>
-                    </div>
-                    <Button onClick={saveDining} disabled={updateDiningMutation.isPending}>
-                      {updateDiningMutation.isPending ? "Saving..." : "Save Dining Schedule"}
-                    </Button>
-                  </>
-                )}
+                  <div className="p-4 rounded-2xl border bg-card hover:shadow-sm transition-shadow">
+                    <span className="text-[10px] font-bold text-teal-600 uppercase tracking-wider block mb-1">Dinner</span>
+                    <strong className="text-sm font-bold text-foreground block">{dinnerMenu || "Not configured"}</strong>
+                    <span className="text-xs text-muted-foreground block mt-1">{dinnerStart ? `${dinnerStart} - ${dinnerEnd}` : "Time not set"}</span>
+                  </div>
+                </div>
               </CardContent>
             </Card>
+
+            {/* DINING SCHEDULE SIDEBAR SHEET */}
+            <Sheet open={diningOpen} onOpenChange={setDiningOpen}>
+              <SheetContent side="right" className="w-[450px] max-w-full overflow-y-auto space-y-6">
+                <SheetHeader>
+                  <SheetTitle>Configure Dining Schedule</SheetTitle>
+                </SheetHeader>
+                <div className="space-y-6 py-4">
+                  {diningLoading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : diningError ? (
+                    <div className="text-center space-y-3">
+                      <p className="text-sm text-muted-foreground">Failed to load dining schedule.</p>
+                      <Button size="sm" variant="outline" onClick={() => refetchDining()}>Retry</Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Breakfast Menu</Label>
+                          <Input value={breakfastMenu} onChange={(e) => setBreakfastMenu(e.target.value)} placeholder="Poha, tea" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Breakfast Time</Label>
+                          <div className="flex gap-2">
+                            <Input type="time" value={breakfastStart} onChange={(e) => setBreakfastStart(e.target.value)} />
+                            <Input type="time" value={breakfastEnd} onChange={(e) => setBreakfastEnd(e.target.value)} />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 border-t pt-4">
+                        <div className="space-y-2">
+                          <Label>Lunch Menu</Label>
+                          <Input value={lunchMenu} onChange={(e) => setLunchMenu(e.target.value)} placeholder="Rice, dal" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Lunch Time</Label>
+                          <div className="flex gap-2">
+                            <Input type="time" value={lunchStart} onChange={(e) => setLunchStart(e.target.value)} />
+                            <Input type="time" value={lunchEnd} onChange={(e) => setLunchEnd(e.target.value)} />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 border-t pt-4">
+                        <div className="space-y-2">
+                          <Label>Dinner Menu</Label>
+                          <Input value={dinnerMenu} onChange={(e) => setDinnerMenu(e.target.value)} placeholder="Roti, sabzi" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Dinner Time</Label>
+                          <div className="flex gap-2">
+                            <Input type="time" value={dinnerStart} onChange={(e) => setDinnerStart(e.target.value)} />
+                            <Input type="time" value={dinnerEnd} onChange={(e) => setDinnerEnd(e.target.value)} />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="pt-4 border-t">
+                  <Button onClick={async () => {
+                    await saveDining();
+                    setDiningOpen(false);
+                  }} disabled={updateDiningMutation.isPending} className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl">
+                    {updateDiningMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
           </section>
         </>
       )}

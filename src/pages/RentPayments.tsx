@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/common/PageHeader";
 import { useApp } from "@/context/AppContext";
 import { toast } from "@/components/ui/use-toast";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   Select,
   SelectContent,
@@ -98,6 +99,7 @@ const RentPayments = () => {
   const [month, setMonth] = useState(() => new Date().getMonth() + 1);
   const [year, setYear] = useState(() => new Date().getFullYear());
 
+  const [manualPaymentOpen, setManualPaymentOpen] = useState(false);
   const [roomTenantId, setRoomTenantId] = useState("");
   const [tenantId, setTenantId] = useState("");
   const [amountPaid, setAmountPaid] = useState("");
@@ -180,6 +182,11 @@ const RentPayments = () => {
       <PageHeader
         title="Rent & Payments"
         description="View collection for the selected month and record cash or offline payments."
+        actions={
+          <Button size="sm" className="gap-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl shadow-sm" onClick={() => setManualPaymentOpen(true)} disabled={!selectedPgId}>
+            <IndianRupee className="h-4 w-4" /> Record Manual Payment
+          </Button>
+        }
       />
 
       <div className="flex flex-wrap gap-3 items-end">
@@ -307,74 +314,77 @@ const RentPayments = () => {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Record manual payment</CardTitle>
-          <p className="text-sm text-muted-foreground font-normal">
-            Use when rent was collected offline. The period matches the month and year selected above.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4 max-w-xl">
-          {unpaidOptions.length > 0 && (
-            <div className="space-y-1">
-              <Label>Select tenant with pending rent</Label>
-              <Select
-                value={selectedUnpaidKey || "manual"}
-                onValueChange={(v) => {
-                  if (v === "manual") {
-                    setSelectedUnpaidKey("");
-                    setRoomTenantId("");
-                    setTenantId("");
-                    setAmountPaid("");
-                  } else {
-                    applyUnpaidSelection(v);
-                  }
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose tenant…" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="manual">Enter details manually</SelectItem>
-                  {unpaidOptions.map((o) => (
-                    <SelectItem key={o.key} value={o.key}>{o.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+      <Sheet open={manualPaymentOpen} onOpenChange={setManualPaymentOpen}>
+        <SheetContent side="right" className="w-[400px] max-w-full space-y-6">
+          <SheetHeader>
+            <SheetTitle>Record manual payment</SheetTitle>
+          </SheetHeader>
+          <div className="space-y-4 py-4">
+            {unpaidOptions.length > 0 && (
+              <div className="space-y-1">
+                <Label>Select tenant with pending rent</Label>
+                <Select
+                  value={selectedUnpaidKey || "manual"}
+                  onValueChange={(v) => {
+                    if (v === "manual") {
+                      setSelectedUnpaidKey("");
+                      setRoomTenantId("");
+                      setTenantId("");
+                      setAmountPaid("");
+                    } else {
+                      applyUnpaidSelection(v);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose tenant…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual">Enter details manually</SelectItem>
+                    {unpaidOptions.map((o) => (
+                      <SelectItem key={o.key} value={o.key}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <Label>Room–tenant ID</Label>
-              <Input
-                value={roomTenantId}
-                onChange={(e) => setRoomTenantId(e.target.value)}
-                placeholder="From booking / tenant record"
-                autoComplete="off"
-              />
+            <div className="grid gap-3">
+              <div className="space-y-1">
+                <Label>Room–tenant ID</Label>
+                <Input
+                  value={roomTenantId}
+                  onChange={(e) => setRoomTenantId(e.target.value)}
+                  placeholder="From booking / tenant record"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Tenant ID</Label>
+                <Input
+                  value={tenantId}
+                  onChange={(e) => setTenantId(e.target.value)}
+                  placeholder="Tenant profile ID"
+                  autoComplete="off"
+                />
+              </div>
             </div>
             <div className="space-y-1">
-              <Label>Tenant ID</Label>
-              <Input
-                value={tenantId}
-                onChange={(e) => setTenantId(e.target.value)}
-                placeholder="Tenant profile ID"
-                autoComplete="off"
-              />
+              <Label>Amount received (₹)</Label>
+              <Input value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} inputMode="decimal" placeholder="e.g. 8500" />
             </div>
+
+            <CanAccess permission="account_record_payment">
+              <Button onClick={async () => {
+                await handleManual();
+                setManualPaymentOpen(false);
+              }} disabled={manualMut.isPending || !selectedPgId} className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl mt-4">
+                {manualMut.isPending ? "Saving…" : "Record payment"}
+              </Button>
+            </CanAccess>
           </div>
-          <div className="space-y-1 max-w-xs">
-            <Label>Amount received (₹)</Label>
-            <Input value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} inputMode="decimal" placeholder="e.g. 8500" />
-          </div>
-          <CanAccess permission="account_record_payment">
-            <Button onClick={handleManual} disabled={manualMut.isPending || !selectedPgId}>
-              {manualMut.isPending ? "Saving…" : "Record payment"}
-            </Button>
-          </CanAccess>
-        </CardContent>
-      </Card>
+        </SheetContent>
+      </Sheet>
     </div>
     </CanAccessPage>
   );

@@ -455,11 +455,38 @@ export function normalizePropertyTenantsList(raw: unknown): PropertyTenant[] {
   return list.map(normalizeSingleTenant);
 }
 
-/** PATCH body — basic profile only (matches owner “edit tenant basic”). */
 export interface UpdatePropertyTenantPayload {
   name?: string;
   phone?: string;
   email?: string;
+  remarks?: string;
+  alternatePhone?: string;
+  foodPreference?: string;
+  dob?: string;
+  gender?: string;
+  bloodGroup?: string;
+  currentAddress?: string;
+  permanentAddress?: string;
+  nationality?: string;
+  gstNumber?: string;
+  panNumber?: string;
+  companyName?: string;
+  companyAddress?: string;
+  businessOwnerName?: string;
+  fatherName?: string;
+  fatherPhone?: string;
+  fatherOccupation?: string;
+  motherName?: string;
+  motherPhone?: string;
+  motherOccupation?: string;
+  guardianName?: string;
+  guardianPhone?: string;
+  guardianAddress?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  upiId?: string;
+  emergencyContact?: string;
+  workAddress?: string;
 }
 
 export async function updatePropertyTenant(

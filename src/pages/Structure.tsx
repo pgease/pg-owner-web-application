@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Building2,
   Layers,
@@ -15,6 +16,7 @@ import {
   ChevronRight,
   ArrowRight,
   Info,
+  MapPin,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,6 +59,57 @@ export default function Structure() {
   const currentPropertyId = selectedPgId;
   const propertyList = properties;
   const setCurrentPropertyId = setSelectedPgId;
+  const navigate = useNavigate();
+
+  const [locating, setLocating] = useState(false);
+
+  const NOMINATIM_UA = "PGEase-OwnerWeb/1.0 (support@pgease.in)";
+
+  const reverseGeocode = async (lat: number, lon: number) => {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`;
+      const res = await fetch(url, { headers: { "User-Agent": NOMINATIM_UA, Accept: "application/json" } });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const displayName = data.display_name ?? "";
+      const postcode = data.address?.postcode?.match(/\d{6}/)?.[0] ?? null;
+      const city = data.address?.city ?? data.address?.town ?? data.address?.village ?? "";
+      const state = data.address?.state ?? "";
+      return { displayName, postcode, city, state };
+    } catch {
+      return null;
+    }
+  };
+
+  const handleUseLocation = async () => {
+    if (!navigator.geolocation) {
+      toast({ title: "Location not supported by your browser", variant: "destructive" });
+      return;
+    }
+    setLocating(true);
+    try {
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000 });
+      });
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      const rev = await reverseGeocode(lat, lon);
+      if (rev) {
+        setPropertyForm((prev) => ({
+          ...prev,
+          address: rev.displayName,
+          pincode: rev.postcode || "",
+          city: rev.city || "",
+          state: rev.state || "",
+        }));
+        toast({ title: "Location applied successfully" });
+      }
+    } catch (e) {
+      toast({ title: "Could not get current location", variant: "destructive" });
+    } finally {
+      setLocating(false);
+    }
+  };
 
   // State for Navigation Hierarchy
   const [selectedBlockId, setSelectedBlockId] = useState<string>("");
@@ -431,9 +484,14 @@ export default function Structure() {
                               return (
                                 <div
                                   key={idx}
-                                  className={`rounded-lg p-2 text-xs flex flex-col justify-between border ${
+                                  onClick={() => {
+                                    if (isOccupied && assignedTenant?.id) {
+                                      navigate(`/tenants/${assignedTenant.id}`);
+                                    }
+                                  }}
+                                  className={`rounded-lg p-2 text-xs flex flex-col justify-between border transition-all ${
                                     isOccupied
-                                      ? "bg-emerald-50/70 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200"
+                                      ? "bg-emerald-50/70 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 cursor-pointer"
                                       : "bg-muted/40 border-dashed border-border text-muted-foreground"
                                   }`}
                                 >
@@ -491,7 +549,24 @@ export default function Structure() {
               </div>
 
               <div className="space-y-1">
-                <Label>Full Address</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Full Address</Label>
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    className="h-auto p-0 text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1"
+                    disabled={locating}
+                    onClick={handleUseLocation}
+                  >
+                    {locating ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <MapPin className="h-3.5 w-3.5" />
+                    )}
+                    Use my current location
+                  </Button>
+                </div>
                 <Input
                   placeholder="e.g. 12th Main, Indiranagar"
                   value={propertyForm.address}
@@ -530,9 +605,13 @@ export default function Structure() {
                 <div className="space-y-1">
                   <Label>Contact Number</Label>
                   <Input
-                    placeholder="e.g. 917701953356"
+                    placeholder="10-digit number"
+                    maxLength={10}
                     value={propertyForm.contactNumber}
-                    onChange={(e) => setPropertyForm({ ...propertyForm, contactNumber: e.target.value })}
+                    onChange={(e) => {
+                      const cleanVal = e.target.value.replace(/\D/g, "").slice(0, 10);
+                      setPropertyForm({ ...propertyForm, contactNumber: cleanVal });
+                    }}
                   />
                 </div>
               </div>

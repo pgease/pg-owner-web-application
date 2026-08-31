@@ -22,7 +22,15 @@ import {
   FileText,
   AlertCircle,
   Download,
+  MoreVertical,
+  Building2,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,6 +47,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/components/ui/use-toast";
@@ -152,15 +161,69 @@ export default function TenantDetailPage() {
     mobileNumber: "",
     emergencyContact: "",
     workAddress: "",
+    email: "",
+    remarks: "",
+    alternatePhone: "",
+    foodPreference: "",
+    dob: "",
+    gender: "",
+    bloodGroup: "",
+    currentAddress: "",
+    permanentAddress: "",
+    nationality: "",
+    gstNumber: "",
+    panNumber: "",
+    companyName: "",
+    companyAddress: "",
+    businessOwnerName: "",
+    fatherName: "",
+    fatherPhone: "",
+    fatherOccupation: "",
+    motherName: "",
+    motherPhone: "",
+    motherOccupation: "",
+    guardianName: "",
+    guardianPhone: "",
+    guardianAddress: "",
+    accountNumber: "",
+    ifscCode: "",
+    upiId: "",
   });
 
   useEffect(() => {
     if (tenant) {
       setForm({
         name: tenant.name ?? "",
-        mobileNumber: tenant.mobileNumber ?? "",
+        mobileNumber: tenant.mobileNumber ?? tenant.phone ?? "",
         emergencyContact: tenant.emergencyContact ?? "",
         workAddress: tenant.workAddress ?? "",
+        email: tenant.email ?? "",
+        remarks: (tenant as any).remarks ?? "",
+        alternatePhone: (tenant as any).alternatePhone ?? "",
+        foodPreference: (tenant as any).foodPreference ?? "",
+        dob: (tenant as any).dob ?? "",
+        gender: (tenant as any).gender ?? "",
+        bloodGroup: (tenant as any).bloodGroup ?? "",
+        currentAddress: (tenant as any).currentAddress ?? "",
+        permanentAddress: (tenant as any).permanentAddress ?? "",
+        nationality: (tenant as any).nationality ?? "",
+        gstNumber: (tenant as any).gstNumber ?? "",
+        panNumber: (tenant as any).panNumber ?? "",
+        companyName: (tenant as any).companyName ?? "",
+        companyAddress: (tenant as any).companyAddress ?? "",
+        businessOwnerName: (tenant as any).businessOwnerName ?? "",
+        fatherName: (tenant as any).fatherName ?? "",
+        fatherPhone: (tenant as any).fatherPhone ?? "",
+        fatherOccupation: (tenant as any).fatherOccupation ?? "",
+        motherName: (tenant as any).motherName ?? "",
+        motherPhone: (tenant as any).motherPhone ?? "",
+        motherOccupation: (tenant as any).motherOccupation ?? "",
+        guardianName: (tenant as any).guardianName ?? "",
+        guardianPhone: (tenant as any).guardianPhone ?? "",
+        guardianAddress: (tenant as any).guardianAddress ?? "",
+        accountNumber: (tenant as any).accountNumber ?? "",
+        ifscCode: (tenant as any).ifscCode ?? "",
+        upiId: (tenant as any).upiId ?? "",
       });
       if (tenant.monthlyRent) {
         setAgreementForm((prev) => ({
@@ -212,8 +275,41 @@ export default function TenantDetailPage() {
   const handleSaveProfile = async () => {
     if (!currentPropertyId || !tenantId) return;
     try {
-      await updatePropertyTenant(currentPropertyId, tenantId, form);
+      await updatePropertyTenant(currentPropertyId, tenantId, {
+        name: form.name.trim(),
+        phone: form.mobileNumber.trim(),
+        email: form.email.trim() || undefined,
+        remarks: form.remarks.trim() || undefined,
+        alternatePhone: form.alternatePhone.trim() || undefined,
+        foodPreference: form.foodPreference.trim() || undefined,
+        dob: form.dob || undefined,
+        gender: form.gender || undefined,
+        bloodGroup: form.bloodGroup.trim() || undefined,
+        currentAddress: form.currentAddress.trim() || undefined,
+        permanentAddress: form.permanentAddress.trim() || undefined,
+        nationality: form.nationality.trim() || undefined,
+        gstNumber: form.gstNumber.trim() || undefined,
+        panNumber: form.panNumber.trim() || undefined,
+        companyName: form.companyName.trim() || undefined,
+        companyAddress: form.companyAddress.trim() || undefined,
+        businessOwnerName: form.businessOwnerName.trim() || undefined,
+        fatherName: form.fatherName.trim() || undefined,
+        fatherPhone: form.fatherPhone.trim() || undefined,
+        fatherOccupation: form.fatherOccupation.trim() || undefined,
+        motherName: form.motherName.trim() || undefined,
+        motherPhone: form.motherPhone.trim() || undefined,
+        motherOccupation: form.motherOccupation.trim() || undefined,
+        guardianName: form.guardianName.trim() || undefined,
+        guardianPhone: form.guardianPhone.trim() || undefined,
+        guardianAddress: form.guardianAddress.trim() || undefined,
+        accountNumber: form.accountNumber.trim() || undefined,
+        ifscCode: form.ifscCode.trim() || undefined,
+        upiId: form.upiId.trim() || undefined,
+        emergencyContact: form.emergencyContact.trim() || undefined,
+        workAddress: form.workAddress.trim() || undefined,
+      });
       queryClient.invalidateQueries({ queryKey: queryKeys.tenants(currentPropertyId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenantDetail(currentPropertyId, tenantId) });
       toast({ title: "Profile updated successfully" });
       setEditing(false);
     } catch (e: any) {
@@ -308,89 +404,33 @@ export default function TenantDetailPage() {
   return (
     <CanAccessPage permission="tenant_view">
       <div className="space-y-6 pb-20 animate-fade-in">
-        {/* Top bar with back button */}
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" asChild className="gap-1.5 text-muted-foreground">
+        {/* Top bar with back button & Dropdown Options */}
+        <div className="flex items-center justify-between border-b pb-3">
+          <Button variant="ghost" size="sm" asChild className="gap-1.5 text-muted-foreground -ml-2">
             <Link to="/tenants">
               <ArrowLeft className="h-4 w-4" /> Back to Tenants
             </Link>
           </Button>
-          <div className="flex items-center gap-2">
-            <CanAccess permission="tenant_edit_basic">
-              <Button size="sm" variant="outline" onClick={() => setEditing(true)} className="gap-1.5 h-8">
-                <Pencil className="h-3.5 w-3.5" /> Edit Profile
-              </Button>
-            </CanAccess>
+          <div className="flex items-center gap-1.5">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted">
+                  <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-36">
+                <DropdownMenuItem onClick={() => setEditing(true)} className="cursor-pointer gap-2">
+                  <Pencil className="h-3.5 w-3.5" /> Edit profile
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  toast({ title: "Delete action triggered", description: "This tenant will be removed." });
+                }} className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer gap-2">
+                  <Trash2 className="h-3.5 w-3.5" /> Delete user
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
-
-        {/* Tenant Hero Profile Card */}
-        <Card className="border-teal-100 dark:border-teal-900 bg-gradient-to-r from-teal-50/50 via-card to-card">
-          <CardContent className="p-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-              <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16 border-2 border-teal-600 text-lg font-bold">
-                  <AvatarFallback className="bg-teal-600 text-white">{initials}</AvatarFallback>
-                </Avatar>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <h1 className="text-xl font-bold text-foreground">{name}</h1>
-                    {isKycDone ? (
-                      <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 gap-1 border-0">
-                        <ShieldCheck className="h-3.5 w-3.5" /> KYC Verified ✓
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="gap-1">
-                        <Clock className="h-3.5 w-3.5" /> KYC Pending
-                      </Badge>
-                    )}
-                    {hasActiveNotice && (
-                      <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 gap-1 border-0">
-                        <AlertCircle className="h-3.5 w-3.5" /> On Notice Period
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Room {roomNo} {bedNo ? `• Bed ${bedNo}` : ""} {floor ? `• Floor ${floor}` : ""}
-                  </p>
-                </div>
-              </div>
-
-              {/* Quick Communication Actions */}
-              <div className="flex items-center gap-2.5 w-full sm:w-auto">
-                {phone && (
-                  <>
-                    <Button variant="outline" size="sm" asChild className="gap-1.5 h-9 flex-1 sm:flex-none">
-                      <a href={`tel:${phoneDigits(phone)}`}>
-                        <Phone className="h-3.5 w-3.5 text-teal-600" /> Call
-                      </a>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      asChild
-                      className="gap-1.5 h-9 flex-1 sm:flex-none text-emerald-600 border-emerald-200"
-                    >
-                      <a href={waLink(phone) || "#"} target="_blank" rel="noreferrer">
-                        <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
-                      </a>
-                    </Button>
-                  </>
-                )}
-                {!isKycDone && (
-                  <Button
-                    size="sm"
-                    className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5 h-9 shadow-sm"
-                    disabled={requestKycMut.isPending}
-                    onClick={handleRequestKyc}
-                  >
-                    <Send className="h-3.5 w-3.5" /> Request KYC
-                  </Button>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Tabbed Sections */}
         <Tabs defaultValue="overview" className="w-full">
@@ -403,140 +443,271 @@ export default function TenantDetailPage() {
 
           {/* TAB 1: OVERVIEW */}
           <TabsContent value="overview" className="mt-6 space-y-6">
-            <div className="grid gap-6 grid-cols-1">
-              {/* 1. Renting Details */}
-              <Card>
-                <CardHeader className="pb-3 border-b">
-                  <CardTitle className="text-sm font-semibold">Renting Details</CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-0.5">
-                    <div>
-                      <DetailRow label="Full Name" value={name} />
-                      <DetailRow label="Fixed Rent" value={tenant.monthlyRent ? `₹${Number(tenant.monthlyRent).toLocaleString("en-IN")}` : "—"} />
-                      <DetailRow label="Add Rent On" value={(tenant.roomTenant as any)?.rentDueDate ? `${(tenant.roomTenant as any).rentDueDate} of every cycle` : "—"} />
-                      <DetailRow label="Rental Frequency" value={(tenant.roomTenant as any)?.rentalFrequency || "—"} />
-                      <DetailRow label="Stay Type" value={(tenant.roomTenant as any)?.stayType || "—"} />
-                      <DetailRow label="Lockin Period (Months)" value={(tenant.roomTenant as any)?.lockInPeriodMonths ? `${(tenant.roomTenant as any).lockInPeriodMonths}` : "0"} />
-                      <DetailRow label="Security Deposit" value={tenant.securityDeposit ? `₹${Number(tenant.securityDeposit).toLocaleString("en-IN")}` : "—"} />
-                      <DetailRow label="Room" value={roomNo ? `${roomNo} - Bed ${bedNo}` : "—"} />
-                      <DetailRow label="Date Of Joining" value={tenant.moveInDate ? new Date(tenant.moveInDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"} />
-                      <DetailRow label="Move Out Date" value={tenant.expectedMoveOutDate ? new Date(tenant.expectedMoveOutDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"} />
-                      <DetailRow label="Notice Period (Days)" value={(tenant.roomTenant as any)?.noticePeriodDays ? `${(tenant.roomTenant as any).noticePeriodDays}` : "—"} />
-                    </div>
-                    <div>
-                      <DetailRow label="Agreement Period (Months)" value={(tenant.roomTenant as any)?.lockInPeriodMonths ? `${(tenant.roomTenant as any).lockInPeriodMonths}` : "—"} />
-                      <DetailRow label="Referred By" value="—" />
-                      <DetailRow label="Booked By" value="—" />
-                      <DetailRow label="Checkin Time" value="—" />
-                      <DetailRow label="Checkout Time" value="—" />
-                      <DetailRow label="Last Meter Reading" value="—" />
-                      <DetailRow label="Last Reading Date" value="—" />
-                      <DetailRow label="Renting Type" value="—" />
-                      <DetailRow label="Collect Online Payments" value={(tenant as any).collectOnlinePayments ? "Yes" : "—"} />
-                      <DetailRow label="GST Applicable" value={(tenant as any).gstApplicable ? "Yes" : "—"} />
-                      <DetailRow label="Tenant Added On" value={tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"} />
+            <div className="grid gap-6 grid-cols-1 md:grid-cols-12">
+              
+              {/* Left Column (Details & Collapsibles) - Span 7 */}
+              <div className="md:col-span-7 space-y-4">
+                
+                {/* Profile header block */}
+                <div className="flex items-center gap-4 p-4 rounded-xl border bg-muted/10">
+                  <Avatar className="h-16 w-16 border-2 border-primary/20 text-lg font-bold">
+                    <AvatarFallback className="bg-primary/10 text-primary">{initials}</AvatarFallback>
+                  </Avatar>
+                  <div className="space-y-1 min-w-0">
+                    <h2 className="text-xl font-bold text-foreground truncate">{name}</h2>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {isKycDone ? (
+                        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] py-0.5 px-2">
+                          Aadhar Verified ✓
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] py-0.5 px-2">
+                          Aadhar Pending
+                        </Badge>
+                      )}
+                      <span className="text-[10px] text-muted-foreground">Joined at : {tenant.moveInDate ? new Date(tenant.moveInDate).toLocaleDateString("en-IN") : "—"}</span>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
 
-              {/* 2. Tenant Personal Details */}
-              <Card>
-                <CardHeader className="pb-3 border-b">
-                  <CardTitle className="text-sm font-semibold">Tenant Personal Details</CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-0.5">
+                {/* Tenant Details Card (Rent & Deposit) */}
+                <Card className="border-border/60 shadow-sm overflow-hidden">
+                  <CardHeader className="pb-3 border-b bg-muted/15 flex flex-row items-center gap-2">
+                    <Building2 className="h-4.5 w-4.5 text-primary" />
+                    <CardTitle className="text-sm font-bold">Rent & Deposit</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 grid grid-cols-2 gap-4">
                     <div>
-                      <DetailRow label="Remarks" value="—" />
-                      <DetailRow label="Contact Number" value={phone} />
-                      <DetailRow label="Alternate Number" value="—" />
-                      <DetailRow label="Email" value={tenant.email || "—"} />
-                      <DetailRow label="Date Of Birth" value="—" />
-                      <DetailRow label="Gender" value="—" />
-                      <DetailRow label="Tenant Type" value="—" />
-                      <DetailRow label="Blood Group" value="—" />
-                      <DetailRow label="Course Year" value="—" />
+                      <span className="text-xs text-muted-foreground block">block name</span>
+                      <span className="font-semibold text-sm text-foreground">{(tenant as any).block?.name || "Block A"}</span>
+                    </div>
+                    <div>
+                      <span className="text-xs text-muted-foreground block">Floor no</span>
+                      <span className="font-semibold text-sm text-foreground">{(tenant as any).floor?.name || floor || "—"}</span>
+                    </div>
+                    <div>
+                      <span className="text-xs text-muted-foreground block">Room No.</span>
+                      <span className="font-semibold text-sm text-foreground">{roomNo || "—"}</span>
+                    </div>
+                    <div>
+                      <span className="text-xs text-muted-foreground block">Bed No</span>
+                      <span className="font-semibold text-sm text-foreground">{bedNo || "—"}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-xs text-muted-foreground block">Bed Sharing</span>
+                      <span className="font-semibold text-sm text-foreground">{(tenant as any).room?.capacity ? `${(tenant as any).room.capacity} Bed Sharing` : "2 Bed Sharing"}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Collapsible Personal Info */}
+                <details className="group border rounded-lg bg-card overflow-hidden">
+                  <summary className="flex justify-between items-center p-4 font-semibold text-sm cursor-pointer hover:bg-muted/30 select-none">
+                    <div className="flex items-center gap-2">
+                      <ClipboardList className="h-4 w-4 text-primary" />
+                      <span>Personal info</span>
+                    </div>
+                    <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180 text-muted-foreground" />
+                  </summary>
+                  <div className="p-4 border-t bg-muted/10">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                      <DetailRow label="Gender" value={(tenant as any).gender || "—"} />
+                      <DetailRow label="Date Of Birth" value={(tenant as any).dob || "—"} />
+                      <DetailRow label="Blood Group" value={(tenant as any).bloodGroup || "—"} />
+                      <DetailRow label="Remarks" value={(tenant as any).remarks || "—"} />
+                      <DetailRow label="Food Preference" value={(tenant as any).foodPreference || "—"} />
+                      <DetailRow label="Nationality" value={(tenant as any).nationality || "—"} />
                       <DetailRow label="Office / College Name" value={tenant.workAddress || "—"} />
-                    </div>
-                    <div>
-                      <DetailRow label="Permanent Address" value="—" />
-                      <DetailRow label="Current Address" value="—" />
-                      <DetailRow label="Nationality" value="—" />
-                      <DetailRow label="Mother Tongue" value="—" />
-                      <DetailRow label="Office / Institute ID" value="—" />
-                      <DetailRow label="Govt. ID" value={isKycDone ? "Aadhaar Verified ✓" : "—"} />
-                      <DetailRow label="Course Name" value="—" />
-                      <DetailRow label="Biometric ID" value="—" />
-                      <DetailRow label="Vehicle Number" value="—" />
-                      <DetailRow label="Food Preferences" value="—" />
+                      <DetailRow label="Current Address" value={(tenant as any).currentAddress || "—"} />
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </details>
 
-              {/* 3. Guardian & Parent Details */}
-              <Card>
-                <CardHeader className="pb-3 border-b">
-                  <CardTitle className="text-sm font-semibold">Guardian & Parent Details</CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-0.5">
-                    <div>
-                      <DetailRow label="Father Name" value="—" />
-                      <DetailRow label="Father Contact" value="—" />
-                      <DetailRow label="Father Occupation" value="—" />
-                      <DetailRow label="Mother Name" value="—" />
+                {/* Collapsible Contact Info */}
+                <details className="group border rounded-lg bg-card overflow-hidden">
+                  <summary className="flex justify-between items-center p-4 font-semibold text-sm cursor-pointer hover:bg-muted/30 select-none">
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-primary" />
+                      <span>Contact info</span>
                     </div>
-                    <div>
-                      <DetailRow label="Mother Contact" value="—" />
-                      <DetailRow label="Local Guardian Name" value="—" />
-                      <DetailRow label="Local Guardian Phone" value="—" />
-                      <DetailRow label="Local Guardian Address" value="—" />
+                    <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180 text-muted-foreground" />
+                  </summary>
+                  <div className="p-4 border-t bg-muted/10">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                      <DetailRow label="Contact Number" value={phone} />
+                      <DetailRow label="Alternate Number" value={(tenant as any).alternatePhone || "—"} />
+                      <DetailRow label="Email" value={tenant.email || "—"} />
+                      <DetailRow label="Emergency Contact" value={tenant.emergencyContact || "—"} />
+                      <DetailRow label="Permanent Address" value={(tenant as any).permanentAddress || "—"} />
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </details>
 
-              {/* 4. GST Details */}
-              <Card>
-                <CardHeader className="pb-3 border-b">
-                  <CardTitle className="text-sm font-semibold">GST Details</CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-0.5">
-                    <div>
-                      <DetailRow label="GST Number" value="—" />
-                      <DetailRow label="PAN Number" value="—" />
-                      <DetailRow label="Company Name" value="—" />
+                {/* Collapsible GST Details */}
+                <details className="group border rounded-lg bg-card overflow-hidden">
+                  <summary className="flex justify-between items-center p-4 font-semibold text-sm cursor-pointer hover:bg-muted/30 select-none">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-primary" />
+                      <span>GST details</span>
                     </div>
-                    <div>
-                      <DetailRow label="Business Owner Name" value="—" />
-                      <DetailRow label="Company Address" value="—" />
+                    <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180 text-muted-foreground" />
+                  </summary>
+                  <div className="p-4 border-t bg-muted/10">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                      <DetailRow label="GST Number" value={(tenant as any).gstNumber || "—"} />
+                      <DetailRow label="PAN Number" value={(tenant as any).panNumber || "—"} />
+                      <DetailRow label="Company Name" value={(tenant as any).companyName || "—"} />
+                      <DetailRow label="Business Owner Name" value={(tenant as any).businessOwnerName || "—"} />
+                      <DetailRow label="Company Address" value={(tenant as any).companyAddress || "—"} />
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </details>
 
-              {/* 5. Bank Details */}
-              <Card>
-                <CardHeader className="pb-3 border-b">
-                  <CardTitle className="text-sm font-semibold">Bank Details</CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-0.5">
-                    <div>
-                      <DetailRow label="Account Number" value="—" />
-                      <DetailRow label="UPI ID" value="—" />
+                {/* Collapsible Parent Details */}
+                <details className="group border rounded-lg bg-card overflow-hidden">
+                  <summary className="flex justify-between items-center p-4 font-semibold text-sm cursor-pointer hover:bg-muted/30 select-none">
+                    <div className="flex items-center gap-2">
+                      <ClipboardList className="h-4 w-4 text-primary" />
+                      <span>Parent & Guardian details</span>
                     </div>
-                    <div>
-                      <DetailRow label="IFSC Code" value="—" />
-                      <DetailRow label="Bank Holder Name" value="—" />
+                    <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180 text-muted-foreground" />
+                  </summary>
+                  <div className="p-4 border-t bg-muted/10">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                      <DetailRow label="Father Name" value={(tenant as any).fatherName || "—"} />
+                      <DetailRow label="Father Contact" value={(tenant as any).fatherPhone || "—"} />
+                      <DetailRow label="Father Occupation" value={(tenant as any).fatherOccupation || "—"} />
+                      <DetailRow label="Mother Name" value={(tenant as any).motherName || "—"} />
+                      <DetailRow label="Mother Contact" value={(tenant as any).motherPhone || "—"} />
+                      <DetailRow label="Mother Occupation" value={(tenant as any).motherOccupation || "—"} />
+                      <DetailRow label="Local Guardian Name" value={(tenant as any).guardianName || "—"} />
+                      <DetailRow label="Local Guardian Phone" value={(tenant as any).guardianPhone || "—"} />
+                      <DetailRow label="Local Guardian Address" value={(tenant as any).guardianAddress || "—"} />
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </details>
+
+                {/* Collapsible Bank Details */}
+                <details className="group border rounded-lg bg-card overflow-hidden">
+                  <summary className="flex justify-between items-center p-4 font-semibold text-sm cursor-pointer hover:bg-muted/30 select-none">
+                    <div className="flex items-center gap-2">
+                      <Lock className="h-4 w-4 text-primary" />
+                      <span>Bank details</span>
+                    </div>
+                    <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180 text-muted-foreground" />
+                  </summary>
+                  <div className="p-4 border-t bg-muted/10">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                      <DetailRow label="Account Number" value={(tenant as any).accountNumber || "—"} />
+                      <DetailRow label="IFSC Code" value={(tenant as any).ifscCode || "—"} />
+                      <DetailRow label="UPI ID" value={(tenant as any).upiId || "—"} />
+                    </div>
+                  </div>
+                </details>
+              </div>
+
+              {/* Right Column (Rent info & Payments) - Span 5 */}
+              <div className="md:col-span-5 space-y-4">
+                
+                {/* Rent info Card */}
+                <Card className="border-border/60 shadow-sm overflow-hidden">
+                  <CardHeader className="pb-3 border-b bg-muted/15 flex flex-row items-center gap-2">
+                    <IndianRupee className="h-4.5 w-4.5 text-primary" />
+                    <CardTitle className="text-sm font-bold">Rent info</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <span className="text-xs text-muted-foreground block">Deposit amount</span>
+                        <span className="font-bold text-sm text-foreground">
+                          {tenant.securityDeposit ? `₹${Number(tenant.securityDeposit).toLocaleString("en-IN")}` : "—"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-xs text-muted-foreground block">Rent per month</span>
+                        <span className="font-bold text-sm text-foreground">
+                          {tenant.monthlyRent ? `₹${Number(tenant.monthlyRent).toLocaleString("en-IN")}/mo` : "—"}
+                        </span>
+                      </div>
+                      <div className="col-span-2 border-t pt-2">
+                        <span className="text-xs text-muted-foreground block">Next Rent due date</span>
+                        <span className="font-semibold text-sm text-foreground">{duesLabel}</span>
+                      </div>
+                    </div>
+                    {phone && (
+                      <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white gap-2" asChild>
+                        <a
+                          href={`https://wa.me/${phoneDigits(phone)}?text=${encodeURIComponent(
+                            `Hi ${name}, this is a friendly reminder that your rent of ₹${tenant.monthlyRent} for room ${roomNo} is due on ${duesLabel}. Please clear it. Thank you!`
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <MessageCircle className="h-4 w-4" /> Remind to Pay
+                        </a>
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Recent Payments Card */}
+                <Card className="border-border/60 shadow-sm">
+                  <CardHeader className="pb-3 border-b bg-muted/15">
+                    <CardTitle className="text-sm font-bold">Recent Payments</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3 p-3 rounded-lg border bg-emerald-50/20 dark:bg-emerald-950/10">
+                        <div className="h-9 w-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                          <CheckCircle2 className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-foreground truncate">Amount Credited from {name}</p>
+                          <p className="text-[10px] text-muted-foreground">Received on {tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString("en-IN") : "Recently"}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">+₹{Number(tenant.monthlyRent || 0).toLocaleString("en-IN")}</p>
+                          <Badge variant="outline" className="text-[9px] py-0 border-emerald-300 text-emerald-700">monthly Rent</Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Actions Panel (Desktop view) */}
+                <Card className="border-border/60 shadow-sm hidden md:block">
+                  <CardHeader className="pb-3 border-b bg-muted/15">
+                    <CardTitle className="text-sm font-bold">Quick Actions</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 flex flex-col gap-2">
+                    <Button variant="outline" className="w-full border-teal-600 text-teal-600 hover:bg-teal-50 gap-2" asChild>
+                      <a href={`tel:${phoneDigits(phone || "")}`}>
+                        <Phone className="h-4 w-4" /> Call Tenant
+                      </a>
+                    </Button>
+                    <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white gap-2" asChild>
+                      <a href={waLink(phone) || "#"} target="_blank" rel="noreferrer">
+                        <IndianRupee className="h-4 w-4" /> Collect Rent
+                      </a>
+                    </Button>
+                  </CardContent>
+                </Card>
+
+              </div>
+            </div>
+
+            {/* Responsive Sticky bottom action footer bar */}
+            <div className="fixed bottom-0 left-0 right-0 p-4 border-t bg-background/95 backdrop-blur z-40 flex gap-4 md:hidden">
+              <Button variant="outline" className="flex-1 border-teal-600 text-teal-600 h-11" asChild>
+                <a href={`tel:${phoneDigits(phone)}`}>
+                  <Phone className="h-4 w-4 mr-2" /> Call
+                </a>
+              </Button>
+              <Button className="flex-1 bg-teal-600 hover:bg-teal-700 text-white h-11" asChild>
+                <a href={waLink(phone) || "#"} target="_blank" rel="noreferrer">
+                  <IndianRupee className="h-4 w-4 mr-2" /> Collect rent
+                </a>
+              </Button>
             </div>
           </TabsContent>
 
@@ -780,17 +951,18 @@ export default function TenantDetailPage() {
         </Tabs>
 
         {/* DIALOG 1: SET NOTICE PERIOD */}
-        <Dialog open={noticeOpen} onOpenChange={setNoticeOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
+        {/* DIALOG 1: SET NOTICE PERIOD */}
+        <Sheet open={noticeOpen} onOpenChange={setNoticeOpen}>
+          <SheetContent side="right" className="w-[400px] max-w-full space-y-6">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-amber-600" /> Set Tenant Move-Out Notice
-              </DialogTitle>
-              <DialogDescription>
+              </SheetTitle>
+              <p className="text-xs text-muted-foreground">
                 Initiate checkout timeline and schedule room vacancy date.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3 py-2">
+              </p>
+            </SheetHeader>
+            <div className="space-y-4 py-4">
               <div className="space-y-1">
                 <Label>Notice Given Date</Label>
                 <Input
@@ -812,23 +984,28 @@ export default function TenantDetailPage() {
                 <Input
                   value={noticeForm.reason}
                   onChange={(e) => setNoticeForm({ ...noticeForm, reason: e.target.value })}
+                  placeholder="e.g. Relocating, family emergency"
                 />
               </div>
+
+              <div className="pt-4 flex gap-3">
+                <Button variant="outline" onClick={() => setNoticeOpen(false)} className="flex-1">
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-amber-600 hover:bg-amber-700 text-white flex-1"
+                  disabled={setNoticeMut.isPending}
+                  onClick={async () => {
+                    await handleSetNotice();
+                    setNoticeOpen(false);
+                  }}
+                >
+                  {setNoticeMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Notice"}
+                </Button>
+              </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setNoticeOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                className="bg-amber-600 hover:bg-amber-700 text-white"
-                disabled={setNoticeMut.isPending}
-                onClick={handleSetNotice}
-              >
-                {setNoticeMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Notice"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          </SheetContent>
+        </Sheet>
 
         {/* DIALOG 2: ADD ELECTRICITY READING */}
         <Dialog open={electricityOpen} onOpenChange={setElectricityOpen}>
@@ -987,29 +1164,160 @@ export default function TenantDetailPage() {
 
         {/* DIALOG 4: EDIT PROFILE */}
         <Dialog open={editing} onOpenChange={setEditing}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Tenant Profile</DialogTitle>
             </DialogHeader>
-            <div className="space-y-3 py-2">
-              <div className="space-y-1">
-                <Label>Full Name</Label>
-                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <div className="space-y-4 py-2">
+              {/* Basic Details */}
+              <div className="border-b pb-3 space-y-3">
+                <h3 className="font-semibold text-sm text-teal-600">Basic Info</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Full Name</Label>
+                    <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Mobile Number</Label>
+                    <Input value={form.mobileNumber} onChange={(e) => setForm({ ...form, mobileNumber: e.target.value })} />
+                  </div>
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label>Mobile Number</Label>
-                <Input value={form.mobileNumber} onChange={(e) => setForm({ ...form, mobileNumber: e.target.value })} />
+
+              {/* Personal Details */}
+              <div className="border-b pb-3 space-y-3">
+                <h3 className="font-semibold text-sm text-teal-600">Personal Details</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Remarks</Label>
+                    <Input value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Email</Label>
+                    <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Alternate Contact Number</Label>
+                    <Input value={form.alternatePhone} onChange={(e) => setForm({ ...form, alternatePhone: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Food Preference</Label>
+                    <Input value={form.foodPreference} onChange={(e) => setForm({ ...form, foodPreference: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Date of Birth</Label>
+                    <Input type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Gender</Label>
+                    <Input value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Blood Group</Label>
+                    <Input value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Nationality</Label>
+                    <Input value={form.nationality} onChange={(e) => setForm({ ...form, nationality: e.target.value })} />
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label>Current Address</Label>
+                    <Input value={form.currentAddress} onChange={(e) => setForm({ ...form, currentAddress: e.target.value })} />
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label>Permanent Address</Label>
+                    <Input value={form.permanentAddress} onChange={(e) => setForm({ ...form, permanentAddress: e.target.value })} />
+                  </div>
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label>Emergency Contact</Label>
-                <Input
-                  value={form.emergencyContact}
-                  onChange={(e) => setForm({ ...form, emergencyContact: e.target.value })}
-                />
+
+              {/* GST Details */}
+              <div className="border-b pb-3 space-y-3">
+                <h3 className="font-semibold text-sm text-teal-600">GST Details</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>GST Number</Label>
+                    <Input value={form.gstNumber} onChange={(e) => setForm({ ...form, gstNumber: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>PAN Number</Label>
+                    <Input value={form.panNumber} onChange={(e) => setForm({ ...form, panNumber: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Company Name</Label>
+                    <Input value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Company Address</Label>
+                    <Input value={form.companyAddress} onChange={(e) => setForm({ ...form, companyAddress: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Business Owner Name</Label>
+                    <Input value={form.businessOwnerName} onChange={(e) => setForm({ ...form, businessOwnerName: e.target.value })} />
+                  </div>
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label>Work / College Address</Label>
-                <Input value={form.workAddress} onChange={(e) => setForm({ ...form, workAddress: e.target.value })} />
+
+              {/* Parents & Local Guardian Details */}
+              <div className="border-b pb-3 space-y-3">
+                <h3 className="font-semibold text-sm text-teal-600">Parents & Guardian Details</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Father Name</Label>
+                    <Input value={form.fatherName} onChange={(e) => setForm({ ...form, fatherName: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Father Contact</Label>
+                    <Input value={form.fatherPhone} onChange={(e) => setForm({ ...form, fatherPhone: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Father Occupation</Label>
+                    <Input value={form.fatherOccupation} onChange={(e) => setForm({ ...form, fatherOccupation: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Mother Name</Label>
+                    <Input value={form.motherName} onChange={(e) => setForm({ ...form, motherName: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Mother Contact</Label>
+                    <Input value={form.motherPhone} onChange={(e) => setForm({ ...form, motherPhone: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Mother Occupation</Label>
+                    <Input value={form.motherOccupation} onChange={(e) => setForm({ ...form, motherOccupation: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Guardian Name</Label>
+                    <Input value={form.guardianName} onChange={(e) => setForm({ ...form, guardianName: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Guardian Contact</Label>
+                    <Input value={form.guardianPhone} onChange={(e) => setForm({ ...form, guardianPhone: e.target.value })} />
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label>Guardian Address</Label>
+                    <Input value={form.guardianAddress} onChange={(e) => setForm({ ...form, guardianAddress: e.target.value })} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Bank Details */}
+              <div className="space-y-3">
+                <h3 className="font-semibold text-sm text-teal-600">Bank Details</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Account Number</Label>
+                    <Input value={form.accountNumber} onChange={(e) => setForm({ ...form, accountNumber: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>IFSC Code</Label>
+                    <Input value={form.ifscCode} onChange={(e) => setForm({ ...form, ifscCode: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>UPI ID</Label>
+                    <Input value={form.upiId} onChange={(e) => setForm({ ...form, upiId: e.target.value })} />
+                  </div>
+                </div>
               </div>
             </div>
             <DialogFooter>

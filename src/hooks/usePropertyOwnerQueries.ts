@@ -334,24 +334,15 @@ export function useRoomsList(
       if (bid && fid) {
         let rooms: RoomItem[] = [];
         try {
-          const raw = await getRoomsList(propertyId, { blockId: bid, floorId: fid });
-          rooms = roomsFromListResponse(raw);
+          const rawAlt = await getRooms(propertyId, {
+            page: 1,
+            limit: 200,
+            blockId: bid,
+            floorId: fid,
+          });
+          rooms = roomsFromListResponse(rawAlt);
         } catch (err) {
-          console.warn("Failed to fetch rooms via getRoomsList, falling back to getRooms:", err);
-        }
-
-        if (rooms.length === 0) {
-          try {
-            const rawAlt = await getRooms(propertyId, {
-              page: 1,
-              limit: 200,
-              blockId: bid,
-              floorId: fid,
-            });
-            rooms = roomsFromListResponse(rawAlt);
-          } catch (err) {
-            console.error("Failed to fetch rooms via getRooms:", err);
-          }
+          console.error("Failed to fetch rooms via getRooms:", err);
         }
         return rooms;
       }
@@ -387,14 +378,6 @@ export function usePropertyTenantDetail(propertyId?: string | null, tenantId?: s
     queryKey: queryKeys.tenantDetail(propertyId, tenantId),
     queryFn: async () => {
       if (!propertyId || !tenantId) return null;
-      try {
-        const direct = await getPropertyTenantById(propertyId, tenantId);
-        if (direct && typeof direct === "object") {
-          return direct;
-        }
-      } catch (err) {
-        console.warn("Failed to fetch tenant detail directly, trying list fallback:", err);
-      }
       const list = await getPropertyTenants(propertyId);
       const found = list.find((t) => (t.roomTenant?.id ?? t.id) === tenantId || t.id === tenantId);
       if (!found) {

@@ -3,6 +3,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   Select,
   SelectContent,
@@ -11,10 +13,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useApp } from "@/context/AppContext";
-import { addTenant, type BlockItem, type FloorItem } from "@/api/propertyOwner";
+import { addTenant, updatePropertyTenant, type BlockItem, type FloorItem } from "@/api/propertyOwner";
 import { toast } from "@/components/ui/use-toast";
 import { useBlocks, useFloors, useRoomsList } from "@/hooks/usePropertyOwnerQueries";
-import { Check, Search, Calendar, ChevronRight, ChevronLeft } from "lucide-react";
+import { Check, Search, ChevronRight, ChevronLeft, Plus, Minus } from "lucide-react";
 
 function idStr(id: unknown): string {
   if (id === undefined || id === null) return "";
@@ -24,6 +26,12 @@ function idStr(id: unknown): string {
 function hasSelectValue(id: unknown): boolean {
   return idStr(id) !== "";
 }
+
+const STEPS = [
+  { number: 1 as const, label: "Tenant Details" },
+  { number: 2 as const, label: "Stay Details" },
+  { number: 3 as const, label: "Payment Details" },
+];
 
 export interface AddTenantFormProps {
   onSuccess?: () => void;
@@ -36,6 +44,7 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
   const { selectedPgId, properties } = useApp();
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [otherDetailsOpen, setOtherDetailsOpen] = useState(false);
 
   // --- STEP 1: Tenant Details State ---
   const [name, setName] = useState("");
@@ -48,6 +57,45 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
   const [isTempBed, setIsTempBed] = useState(false);
   const [bookedBy, setBookedBy] = useState("");
   const [referredBy, setReferredBy] = useState("");
+  const [sendWhatsappReminder, setSendWhatsappReminder] = useState(true);
+  const [expandedOtherDetails, setExpandedOtherDetails] = useState<string>("none");
+
+  // Personal Details
+  const [remarks, setRemarks] = useState("");
+  const [email, setEmail] = useState("");
+  const [alternatePhone, setAlternatePhone] = useState("");
+  const [foodPreference, setFoodPreference] = useState("");
+  const [dob, setDob] = useState("");
+  const [gender, setGender] = useState("");
+  const [bloodGroup, setBloodGroup] = useState("");
+  const [currentAddress, setCurrentAddress] = useState("");
+  const [permanentAddress, setPermanentAddress] = useState("");
+  const [nationality, setNationality] = useState("");
+
+  // GST Details
+  const [gstNumber, setGstNumber] = useState("");
+  const [panNumber, setPanNumber] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [companyAddress, setCompanyAddress] = useState("");
+  const [businessOwnerName, setBusinessOwnerName] = useState("");
+
+  // Parent Details
+  const [fatherName, setFatherName] = useState("");
+  const [fatherPhone, setFatherPhone] = useState("");
+  const [fatherOccupation, setFatherOccupation] = useState("");
+  const [motherName, setMotherName] = useState("");
+  const [motherPhone, setMotherPhone] = useState("");
+  const [motherOccupation, setMotherOccupation] = useState("");
+
+  // Local Guardian Details
+  const [guardianName, setGuardianName] = useState("");
+  const [guardianPhone, setGuardianPhone] = useState("");
+  const [guardianAddress, setGuardianAddress] = useState("");
+
+  // Bank Details
+  const [accountNumber, setAccountNumber] = useState("");
+  const [ifscCode, setIfscCode] = useState("");
+  const [upiId, setUpiId] = useState("");
 
   // --- STEP 2: Stay Details State ---
   const [stayType, setStayType] = useState("Long Stay");
@@ -70,6 +118,7 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
   const [joiningDueAmt, setJoiningDueAmt] = useState("0");
   const [joiningCollAmt, setJoiningCollAmt] = useState("0");
 
+  const [showOtherDues, setShowOtherDues] = useState(false);
   const [duesSearch, setDuesSearch] = useState("");
   const [otherDues, setOtherDues] = useState<Array<{ id: string; label: string; mode: "consumption" | "fixed"; amount: string }>>([
     { id: "rent", label: "Rent", mode: "consumption", amount: "" },
@@ -145,7 +194,7 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
     setDepositDueAmt(securityDeposit);
   }, [fixedRent, securityDeposit]);
 
-  const getValidationError = (): string | null => {
+  const getStepOneError = (): string | null => {
     if (!selectedPgId) return "Select a PG from the header.";
     if (!name.trim()) return "Enter tenant name.";
     const digits = phone.replace(/\D/g, "");
@@ -154,11 +203,22 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
     return null;
   };
 
-  const validationError = getValidationError();
+  const stepOneError = getStepOneError();
+
+  const goNext = () => {
+    if (step === 1 && stepOneError) {
+      toast({ title: "Let's finish this step first", description: stepOneError, variant: "destructive" });
+      return;
+    }
+    setStep((s) => (Math.min(3, s + 1) as 1 | 2 | 3));
+  };
+
+  const goBack = () => setStep((s) => (Math.max(1, s - 1) as 1 | 2 | 3));
 
   const handleInviteTenant = async () => {
-    const err = getValidationError();
+    const err = getStepOneError();
     if (err) {
+      setStep(1);
       toast({ title: "Cannot Add Tenant", description: err, variant: "destructive" });
       return;
     }
@@ -212,7 +272,7 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
         }
       };
 
-      await addTenant(propertyId, {
+      const addedTenant = await addTenant(propertyId, {
         name: fullPayload.tenantDetails.name,
         phone: fullPayload.tenantDetails.phone,
         floorId: fullPayload.tenantDetails.floorId,
@@ -226,8 +286,44 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
         electricityBill: 0,
       });
 
+      // Save secondary custom profile fields
+      if (addedTenant?.id) {
+        await updatePropertyTenant(propertyId, addedTenant.id, {
+          remarks: remarks.trim() || undefined,
+          email: email.trim() || undefined,
+          alternatePhone: alternatePhone.trim() || undefined,
+          foodPreference: foodPreference || undefined,
+          dob: dob || undefined,
+          gender: gender || undefined,
+          bloodGroup: bloodGroup.trim() || undefined,
+          currentAddress: currentAddress.trim() || undefined,
+          permanentAddress: permanentAddress.trim() || undefined,
+          nationality: nationality.trim() || undefined,
+          gstNumber: gstNumber.trim() || undefined,
+          panNumber: panNumber.trim() || undefined,
+          companyName: companyName.trim() || undefined,
+          companyAddress: companyAddress.trim() || undefined,
+          businessOwnerName: businessOwnerName.trim() || undefined,
+          fatherName: fatherName.trim() || undefined,
+          fatherPhone: fatherPhone.trim() || undefined,
+          fatherOccupation: fatherOccupation.trim() || undefined,
+          motherName: motherName.trim() || undefined,
+          motherPhone: motherPhone.trim() || undefined,
+          motherOccupation: motherOccupation.trim() || undefined,
+          guardianName: guardianName.trim() || undefined,
+          guardianPhone: guardianPhone.trim() || undefined,
+          guardianAddress: guardianAddress.trim() || undefined,
+          accountNumber: accountNumber.trim() || undefined,
+          ifscCode: ifscCode.trim() || undefined,
+          upiId: upiId.trim() || undefined,
+          emergencyContact: bookedBy.trim() || undefined,
+          workAddress: referredBy.trim() || undefined,
+        });
+      }
+
       console.log("Full RentOK-Style Onboarding Form Payload Submitted to Client Hooks:", fullPayload);
       toast({ title: "Tenant Added Successfully", description: "Invite sent & room allocated." });
+      queryClient.invalidateQueries({ queryKey: ["property", propertyId, "tenants"] });
       onSuccess?.();
     } catch (e: unknown) {
       toast({
@@ -245,75 +341,95 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
   );
 
   return (
-    <div className="space-y-6">
-      {/* 3-Step Wizard Progress Header */}
-      <div className="flex items-center justify-between border-b pb-4">
-        <div className="flex gap-2 w-full max-w-xl">
-          {[
-            { stepNum: 1, label: "Tenant Details" },
-            { stepNum: 2, label: "Stay Details" },
-            { stepNum: 3, label: "Payment Details" },
-          ].map((s) => (
-            <button
-              key={s.stepNum}
-              type="button"
-              onClick={() => setStep(s.stepNum as 1 | 2 | 3)}
-              className="flex-1 text-left focus:outline-none"
-            >
-              <div
-                className={`h-1 rounded transition-colors duration-300 ${
-                  step >= s.stepNum ? "bg-primary" : "bg-muted"
-                }`}
-              />
-              <span
-                className={`text-xs font-semibold mt-2 block transition-colors duration-300 ${
-                  step === s.stepNum
-                    ? "text-primary"
-                    : step > s.stepNum
-                    ? "text-foreground"
-                    : "text-muted-foreground"
-                }`}
-              >
-                {s.stepNum}. {s.label}
-              </span>
-            </button>
+    <div className="space-y-6 max-h-[85vh] overflow-y-auto pr-2 pb-6">
+      {/* HEADER + STEPPER */}
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <h2 className="text-xl font-bold text-foreground">Add Tenant</h2>
+          <p className="text-sm text-muted-foreground">
+            {selectedPg?.name ? `Onboarding to ${selectedPg.name}` : "Fill in a few details to onboard a new tenant."}
+          </p>
+        </div>
+
+        <div className="flex items-center">
+          {STEPS.map((s, idx) => (
+            <div key={s.number} className="flex items-center flex-1 last:flex-none">
+              <div className="flex flex-col items-center gap-1.5 shrink-0">
+                <div
+                  className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+                    step > s.number
+                      ? "bg-teal-600 text-white"
+                      : step === s.number
+                      ? "bg-teal-600 text-white ring-4 ring-teal-100"
+                      : "bg-muted text-muted-foreground border border-border"
+                  }`}
+                >
+                  {step > s.number ? <Check className="h-4 w-4" /> : s.number}
+                </div>
+                <span
+                  className={`text-[11px] font-medium whitespace-nowrap ${
+                    step === s.number ? "text-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  {s.label}
+                </span>
+              </div>
+              {idx < STEPS.length - 1 && (
+                <div className={`h-0.5 flex-1 mx-2 rounded transition-colors ${step > s.number ? "bg-teal-600" : "bg-border"}`} />
+              )}
+            </div>
           ))}
         </div>
       </div>
 
       {/* STEP 1: TENANT DETAILS */}
       {step === 1 && (
-        <div className="space-y-5 animate-fade-in">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Name</Label>
-              <Input
-                placeholder="Add your name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Contact Number</Label>
-              <div className="flex gap-2">
-                <span className="flex items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">
-                  +91
-                </span>
+        <Card className="border border-border/80 shadow-sm overflow-hidden">
+          <CardHeader className="pb-3 border-b bg-muted/10">
+            <CardTitle className="text-sm font-bold text-foreground">Tenant Details</CardTitle>
+          </CardHeader>
+          <CardContent className="p-5 space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Name</Label>
                 <Input
-                  placeholder="10-digit contact number"
-                  maxLength={10}
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  placeholder="Add your name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                 />
               </div>
+              <div className="space-y-2">
+                <Label>Contact Number</Label>
+                <div className="flex gap-2">
+                  <span className="flex items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">
+                    +91
+                  </span>
+                  <Input
+                    placeholder="10-digit contact number"
+                    maxLength={10}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  />
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="whatsapp-reminder"
+                    checked={sendWhatsappReminder}
+                    onChange={(e) => setSendWhatsappReminder(e.target.checked)}
+                    className="rounded border-input text-teal-600 focus:ring-teal-500 h-3.5 w-3.5 cursor-pointer"
+                  />
+                  <Label htmlFor="whatsapp-reminder" className="text-xs font-normal text-muted-foreground cursor-pointer select-none">
+                    Send Whatsapp Rent Reminder
+                  </Label>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Tenant Type</Label>
               <Select value={tenantType} onValueChange={setTenantType}>
-                <SelectTrigger>
+                <SelectTrigger className="md:w-64">
                   <SelectValue placeholder="Select Tenant Type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -323,103 +439,96 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Property</Label>
-              <Input value={selectedPg?.name || "Saksham Pg"} disabled className="bg-muted/50 cursor-not-allowed" />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
-            <div className="space-y-2">
-              <Label>Block</Label>
-              <Select
-                value={hasSelectValue(effectiveBlockId) ? effectiveBlockId : "none"}
-                onValueChange={(v) => {
-                  if (v === "none") return;
-                  setSelectedBlockId(v);
-                  setSelectedFloorId("");
-                  setSelectedRoomId("");
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Block" />
-                </SelectTrigger>
-                <SelectContent>
-                  {blocks.filter((b) => hasSelectValue(b.id)).map((b) => (
-                    <SelectItem key={idStr(b.id)} value={idStr(b.id)}>
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                  {blocks.length === 0 && !blocksQuery.isLoading && <SelectItem value="none" disabled>No blocks</SelectItem>}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Floor</Label>
-              <Select
-                value={hasSelectValue(effectiveFloorId) ? effectiveFloorId : "none"}
-                onValueChange={(v) => {
-                  if (v === "none") return;
-                  setSelectedFloorId(v);
-                  setSelectedRoomId("");
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Floor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {floors.filter((f) => hasSelectValue(f.id)).map((f) => (
-                    <SelectItem key={idStr(f.id)} value={idStr(f.id)}>
-                      {f.name}
-                    </SelectItem>
-                  ))}
-                  {floors.length === 0 && !floorsQuery.isLoading && <SelectItem value="none" disabled>No floors</SelectItem>}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Room & Bed</Label>
-              <div className="flex gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
+              <div className="space-y-2">
+                <Label>Block</Label>
                 <Select
-                  value={hasSelectValue(effectiveRoomId) ? effectiveRoomId : "none"}
+                  value={hasSelectValue(effectiveBlockId) ? effectiveBlockId : "none"}
                   onValueChange={(v) => {
                     if (v === "none") return;
-                    setSelectedRoomId(v);
+                    setSelectedBlockId(v);
+                    setSelectedFloorId("");
+                    setSelectedRoomId("");
                   }}
                 >
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder={roomsInitialLoading ? "Loading…" : "Room"} />
+                  <SelectTrigger>
+                    <SelectValue placeholder="Block" />
                   </SelectTrigger>
                   <SelectContent>
-                    {selectableRooms.map((r, idx) => (
-                      <SelectItem key={`${idStr(r.id)}-${idx}`} value={idStr(r.id)}>
-                        Room {String(r.roomNumber)}
-                        {typeof r.availableBeds === "number" ? ` (${r.availableBeds} free)` : ""}
+                    {blocks.filter((b) => hasSelectValue(b.id)).map((b) => (
+                      <SelectItem key={idStr(b.id)} value={idStr(b.id)}>
+                        {b.name}
                       </SelectItem>
                     ))}
-                    {selectableRooms.length === 0 && (
-                      <SelectItem value="none" disabled>
-                        {roomsInitialLoading ? "Loading rooms…" : "No rooms"}
-                      </SelectItem>
-                    )}
+                    {blocks.length === 0 && !blocksQuery.isLoading && <SelectItem value="none" disabled>No blocks</SelectItem>}
                   </SelectContent>
                 </Select>
-                <Input
-                  type="number"
-                  min={1}
-                  className="w-20"
-                  placeholder="Bed"
-                  value={bedNumber}
-                  onChange={(e) => setBedNumber(e.target.value)}
-                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Floor</Label>
+                <Select
+                  value={hasSelectValue(effectiveFloorId) ? effectiveFloorId : "none"}
+                  onValueChange={(v) => {
+                    if (v === "none") return;
+                    setSelectedFloorId(v);
+                    setSelectedRoomId("");
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Floor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {floors.filter((f) => hasSelectValue(f.id)).map((f) => (
+                      <SelectItem key={idStr(f.id)} value={idStr(f.id)}>
+                        {f.name}
+                      </SelectItem>
+                    ))}
+                    {floors.length === 0 && !floorsQuery.isLoading && <SelectItem value="none" disabled>No floors</SelectItem>}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Room & Bed</Label>
+                <div className="flex gap-2">
+                  <Select
+                    value={hasSelectValue(effectiveRoomId) ? effectiveRoomId : "none"}
+                    onValueChange={(v) => {
+                      if (v === "none") return;
+                      setSelectedRoomId(v);
+                    }}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder={roomsInitialLoading ? "Loading…" : "Room"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {selectableRooms.map((r, idx) => (
+                        <SelectItem key={`${idStr(r.id)}-${idx}`} value={idStr(r.id)}>
+                          Room {String(r.roomNumber)}
+                          {typeof r.availableBeds === "number" ? ` (${r.availableBeds} free)` : ""}
+                        </SelectItem>
+                      ))}
+                      {selectableRooms.length === 0 && (
+                        <SelectItem value="none" disabled>
+                          {roomsInitialLoading ? "Loading rooms…" : "No rooms"}
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="number"
+                    min={1}
+                    className="w-20"
+                    placeholder="Bed"
+                    value={bedNumber}
+                    onChange={(e) => setBedNumber(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="border-t pt-4 space-y-4">
-            <h4 className="text-sm font-semibold">Other Details</h4>
             <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/20">
               <div className="space-y-0.5">
                 <Label className="text-sm font-medium">Is this a temp bed?</Label>
@@ -429,7 +538,7 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                 type="button"
                 onClick={() => setIsTempBed(!isTempBed)}
                 className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  isTempBed ? "bg-primary" : "bg-input"
+                  isTempBed ? "bg-teal-600" : "bg-input"
                 }`}
               >
                 <span
@@ -440,390 +549,578 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
               </button>
             </div>
 
+            {/* Optional extra info, collapsed behind a single select drawer so the base form stays short */}
+            <div className="border-t pt-4">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Add more information (optional)</Label>
+                <button
+                  type="button"
+                  onClick={() => setOtherDetailsOpen(true)}
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 md:w-72"
+                >
+                  <span className="text-muted-foreground text-xs font-semibold">
+                    {expandedOtherDetails === "configured" ? "Other Details Configured" : "Add Other Details"}
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </div>
+
+              {/* SHEET SLIDE-OUT DRAWER */}
+              <Sheet open={otherDetailsOpen} onOpenChange={setOtherDetailsOpen}>
+                <SheetContent side="right" className="w-[450px] max-w-full overflow-y-auto space-y-6">
+                  <SheetHeader>
+                    <SheetTitle>Other Details</SheetTitle>
+                  </SheetHeader>
+
+                  <div className="space-y-6 py-4">
+                    {/* (A) Personal Details */}
+                    <details className="group border rounded-lg overflow-hidden bg-card/50" open>
+                      <summary className="flex justify-between items-center p-3 font-semibold text-xs cursor-pointer bg-muted/15 select-none border-b">
+                        <span>Personal Details</span>
+                        <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90 text-muted-foreground" />
+                      </summary>
+                      <div className="p-3.5 space-y-3.5 bg-background text-sm">
+                        <div className="space-y-1">
+                          <Label>Remarks</Label>
+                          <Input placeholder="Add your remarks here" value={remarks} onChange={(e) => setRemarks(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Email address</Label>
+                          <Input type="email" placeholder="Add your email here" value={email} onChange={(e) => setEmail(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Alternate Contact Number</Label>
+                          <div className="flex gap-2">
+                            <span className="flex items-center rounded-md border border-input bg-muted px-2.5 text-xs text-muted-foreground">
+                              +91
+                            </span>
+                            <Input placeholder="Alternate contact number" value={alternatePhone} onChange={(e) => setAlternatePhone(e.target.value)} />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Food Preference</Label>
+                          <Select value={foodPreference} onValueChange={setFoodPreference}>
+                            <SelectTrigger><SelectValue placeholder="Select food preference" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Veg">Veg</SelectItem>
+                              <SelectItem value="Non-Veg">Non-Veg</SelectItem>
+                              <SelectItem value="Eggitarian">Eggitarian</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Date of Birth</Label>
+                          <Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Gender</Label>
+                          <Select value={gender} onValueChange={setGender}>
+                            <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Male">Male</SelectItem>
+                              <SelectItem value="Female">Female</SelectItem>
+                              <SelectItem value="Other">Other</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Blood Group</Label>
+                          <Input placeholder="Select blood group" value={bloodGroup} onChange={(e) => setBloodGroup(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Current Address</Label>
+                          <Input placeholder="Enter current address" value={currentAddress} onChange={(e) => setCurrentAddress(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Permanent Address</Label>
+                          <Input placeholder="Enter permanent address" value={permanentAddress} onChange={(e) => setPermanentAddress(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Nationality</Label>
+                          <Input placeholder="Select nationality" value={nationality} onChange={(e) => setNationality(e.target.value)} />
+                        </div>
+                      </div>
+                    </details>
+
+                    {/* (B) GST Details */}
+                    <details className="group border rounded-lg overflow-hidden bg-card/50">
+                      <summary className="flex justify-between items-center p-3 font-semibold text-xs cursor-pointer bg-muted/15 select-none border-b">
+                        <span>GST Details</span>
+                        <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90 text-muted-foreground" />
+                      </summary>
+                      <div className="p-3.5 space-y-3.5 bg-background text-sm">
+                        <div className="space-y-1">
+                          <Label>GST Number</Label>
+                          <Input placeholder="Enter GST number" value={gstNumber} onChange={(e) => setGstNumber(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>PAN Number</Label>
+                          <Input placeholder="Enter PAN number" value={panNumber} onChange={(e) => setPanNumber(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Company Name</Label>
+                          <Input placeholder="Enter company name" value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Company Address</Label>
+                          <Input placeholder="Enter company address" value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Business Owner Name</Label>
+                          <Input placeholder="Enter business owner name" value={businessOwnerName} onChange={(e) => setBusinessOwnerName(e.target.value)} />
+                        </div>
+                      </div>
+                    </details>
+
+                    {/* (C) Parent Details */}
+                    <details className="group border rounded-lg overflow-hidden bg-card/50">
+                      <summary className="flex justify-between items-center p-3 font-semibold text-xs cursor-pointer bg-muted/15 select-none border-b">
+                        <span>Parent Details</span>
+                        <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90 text-muted-foreground" />
+                      </summary>
+                      <div className="p-3.5 space-y-3.5 bg-background text-sm">
+                        <div className="space-y-1">
+                          <Label>Father Name</Label>
+                          <Input placeholder="Enter father name" value={fatherName} onChange={(e) => setFatherName(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Father Contact Number</Label>
+                          <div className="flex gap-2">
+                            <span className="flex items-center rounded-md border border-input bg-muted px-2.5 text-xs text-muted-foreground">
+                              +91
+                            </span>
+                            <Input placeholder="Father contact number" value={fatherPhone} onChange={(e) => setFatherPhone(e.target.value)} />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Father Occupation</Label>
+                          <Input placeholder="Enter occupation" value={fatherOccupation} onChange={(e) => setFatherOccupation(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Mother Name</Label>
+                          <Input placeholder="Enter mother name" value={motherName} onChange={(e) => setMotherName(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Mother Contact Number</Label>
+                          <div className="flex gap-2">
+                            <span className="flex items-center rounded-md border border-input bg-muted px-2.5 text-xs text-muted-foreground">
+                              +91
+                            </span>
+                            <Input placeholder="Mother contact number" value={motherPhone} onChange={(e) => setMotherPhone(e.target.value)} />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Mother Occupation</Label>
+                          <Input placeholder="Enter occupation" value={motherOccupation} onChange={(e) => setMotherOccupation(e.target.value)} />
+                        </div>
+                      </div>
+                    </details>
+
+                    {/* (D) Local Guardian Details */}
+                    <details className="group border rounded-lg overflow-hidden bg-card/50">
+                      <summary className="flex justify-between items-center p-3 font-semibold text-xs cursor-pointer bg-muted/15 select-none border-b">
+                        <span>Local Guardian Details</span>
+                        <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90 text-muted-foreground" />
+                      </summary>
+                      <div className="p-3.5 space-y-3.5 bg-background text-sm">
+                        <div className="space-y-1">
+                          <Label>Guardian Name</Label>
+                          <Input placeholder="Enter guardian name" value={guardianName} onChange={(e) => setGuardianName(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Guardian Contact Number</Label>
+                          <div className="flex gap-2">
+                            <span className="flex items-center rounded-md border border-input bg-muted px-2.5 text-xs text-muted-foreground">
+                              +91
+                            </span>
+                            <Input placeholder="Guardian contact number" value={guardianPhone} onChange={(e) => setGuardianPhone(e.target.value)} />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Guardian Address</Label>
+                          <Input placeholder="Enter guardian address" value={guardianAddress} onChange={(e) => setGuardianAddress(e.target.value)} />
+                        </div>
+                      </div>
+                    </details>
+
+                    {/* (E) Bank Details */}
+                    <details className="group border rounded-lg overflow-hidden bg-card/50">
+                      <summary className="flex justify-between items-center p-3 font-semibold text-xs cursor-pointer bg-muted/15 select-none border-b">
+                        <span>Bank Details</span>
+                        <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90 text-muted-foreground" />
+                      </summary>
+                      <div className="p-3.5 space-y-3.5 bg-background text-sm">
+                        <div className="space-y-1">
+                          <Label>Account Number</Label>
+                          <Input placeholder="Enter account number" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>IFSC Code</Label>
+                          <Input placeholder="Enter IFSC code" value={ifscCode} onChange={(e) => setIfscCode(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>UPI ID</Label>
+                          <Input placeholder="Enter UPI ID" value={upiId} onChange={(e) => setUpiId(e.target.value)} />
+                        </div>
+                      </div>
+                    </details>
+                  </div>
+
+                  <div className="pt-4 border-t">
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setExpandedOtherDetails("configured");
+                        setOtherDetailsOpen(false);
+                      }}
+                      className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold"
+                    >
+                      Submit
+                    </Button>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Booked By</Label>
-                <Input
-                  placeholder="Booked By"
-                  value={bookedBy}
-                  onChange={(e) => setBookedBy(e.target.value)}
-                />
+                <Input placeholder="Booked By" value={bookedBy} onChange={(e) => setBookedBy(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label>Referred By</Label>
-                <Input
-                  placeholder="Referred By"
-                  value={referredBy}
-                  onChange={(e) => setReferredBy(e.target.value)}
-                />
+                <Input placeholder="Referred By" value={referredBy} onChange={(e) => setReferredBy(e.target.value)} />
               </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* STEP 2: STAY DETAILS */}
       {step === 2 && (
-        <div className="space-y-5 animate-fade-in">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Stay Type</Label>
-              <Select value={stayType} onValueChange={setStayType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Stay Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Long Stay">Long Stay</SelectItem>
-                  <SelectItem value="Daily Stay">Daily Stay</SelectItem>
-                  <SelectItem value="Short Stay">Short Stay</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-2">
-                <Label>Move-in</Label>
-                <Input
-                  type="date"
-                  value={moveInDate}
-                  onChange={(e) => setMoveInDate(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Move-out</Label>
-                <Input
-                  type="date"
-                  value={moveOutDate}
-                  onChange={(e) => setMoveOutDate(e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label>Lock-in Period</Label>
-              <Select value={lockInPeriod} onValueChange={setLockInPeriod}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Lock-in Period" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">0 months</SelectItem>
-                  <SelectItem value="1">1 month</SelectItem>
-                  <SelectItem value="2">2 months</SelectItem>
-                  <SelectItem value="3">3 months</SelectItem>
-                  <SelectItem value="6">6 months</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Notice Period</Label>
-              <Select value={noticePeriod} onValueChange={setNoticePeriod}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Notice Period" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="15">15 days</SelectItem>
-                  <SelectItem value="30">30 days</SelectItem>
-                  <SelectItem value="45">45 days</SelectItem>
-                  <SelectItem value="60">60 days</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Agreement Period</Label>
-              <Select value={agreementPeriod} onValueChange={setAgreementPeriod}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Agreement Period" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="3 Months">3 Months</SelectItem>
-                  <SelectItem value="6 Months">6 Months</SelectItem>
-                  <SelectItem value="11 Months">11 Months</SelectItem>
-                  <SelectItem value="12 Months">12 Months</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="border-t pt-4 space-y-4">
-            <h4 className="text-sm font-semibold text-foreground">Rental Terms</h4>
+        <Card className="border border-border/80 shadow-sm overflow-hidden">
+          <CardHeader className="pb-3 border-b bg-muted/10">
+            <CardTitle className="text-sm font-bold text-foreground">Stay Details</CardTitle>
+          </CardHeader>
+          <CardContent className="p-5 space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Fixed Rent</Label>
-                <div className="flex gap-2">
-                  <span className="flex items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">
-                    ₹
-                  </span>
-                  <Input
-                    type="number"
-                    min={0}
-                    placeholder="0"
-                    value={fixedRent}
-                    onChange={(e) => setFixedRent(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Rental Frequency</Label>
-                <Select value={rentalFrequency} onValueChange={setRentalFrequency}>
+                <Label>Stay Type</Label>
+                <Select value={stayType} onValueChange={setStayType}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Rental Frequency" />
+                    <SelectValue placeholder="Stay Type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Monthly">Monthly</SelectItem>
-                    <SelectItem value="Weekly">Weekly</SelectItem>
-                    <SelectItem value="Daily">Daily</SelectItem>
+                    <SelectItem value="Long Stay">Long Stay</SelectItem>
+                    <SelectItem value="Daily Stay">Daily Stay</SelectItem>
+                    <SelectItem value="Short Stay">Short Stay</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
+                  <Label>Move-in</Label>
+                  <Input type="date" value={moveInDate} onChange={(e) => setMoveInDate(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Move-out</Label>
+                  <Input type="date" value={moveOutDate} onChange={(e) => setMoveOutDate(e.target.value)} />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
+              <div className="space-y-2">
+                <Label>Lock-in Period</Label>
+                <Select value={lockInPeriod} onValueChange={setLockInPeriod}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Lock-in Period" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">0 months</SelectItem>
+                    <SelectItem value="1">1 month</SelectItem>
+                    <SelectItem value="2">2 months</SelectItem>
+                    <SelectItem value="3">3 months</SelectItem>
+                    <SelectItem value="6">6 months</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Notice Period</Label>
+                <Select value={noticePeriod} onValueChange={setNoticePeriod}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Notice Period" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="15">15 days</SelectItem>
+                    <SelectItem value="30">30 days</SelectItem>
+                    <SelectItem value="45">45 days</SelectItem>
+                    <SelectItem value="60">60 days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Agreement Period</Label>
+                <Select value={agreementPeriod} onValueChange={setAgreementPeriod}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Agreement Period" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="3 Months">3 Months</SelectItem>
+                    <SelectItem value="6 Months">6 Months</SelectItem>
+                    <SelectItem value="11 Months">11 Months</SelectItem>
+                    <SelectItem value="12 Months">12 Months</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Add Rent On</Label>
-                <Select value={rentDueDate} onValueChange={setRentDueDate}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Add Rent On" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1st">1st of every month</SelectItem>
-                    <SelectItem value="5th">5th of every month</SelectItem>
-                    <SelectItem value="10th">10th of every month</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Regular Security Deposit</Label>
-                <div className="flex gap-2">
-                  <span className="flex items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">
-                    ₹
-                  </span>
-                  <Input
-                    type="number"
-                    min={0}
-                    placeholder="0"
-                    value={securityDeposit}
-                    onChange={(e) => setSecurityDeposit(e.target.value)}
-                  />
+            <div className="border-t pt-4 space-y-4">
+              <h4 className="text-sm font-bold text-foreground">Rental Terms</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Fixed Rent</Label>
+                  <div className="flex gap-2">
+                    <span className="flex items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">
+                      ₹
+                    </span>
+                    <Input type="number" min={0} placeholder="0" value={fixedRent} onChange={(e) => setFixedRent(e.target.value)} />
+                  </div>
                 </div>
+                <div className="space-y-2">
+                  <Label>Rental Frequency</Label>
+                  <Select value={rentalFrequency} onValueChange={setRentalFrequency}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Rental Frequency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Monthly">Monthly</SelectItem>
+                      <SelectItem value="Weekly">Weekly</SelectItem>
+                      <SelectItem value="Daily">Daily</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Add Rent On</Label>
+                  <Select value={rentDueDate} onValueChange={setRentDueDate}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Add Rent On" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1st">1st of every month</SelectItem>
+                      <SelectItem value="5th">5th of every month</SelectItem>
+                      <SelectItem value="10th">10th of every month</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Regular Security Deposit</Label>
+                  <div className="flex gap-2">
+                    <span className="flex items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">
+                      ₹
+                    </span>
+                    <Input type="number" min={0} placeholder="0" value={securityDeposit} onChange={(e) => setSecurityDeposit(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/20">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium">Electricity Meter</Label>
+                  <p className="text-xs text-muted-foreground">Calculate charges based on sub-meter consumption</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setElectricityMeter(!electricityMeter)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    electricityMeter ? "bg-teal-600" : "bg-input"
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-background shadow ring-0 transition duration-200 ease-in-out ${
+                      electricityMeter ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* STEP 3: PAYMENT DETAILS */}
+      {step === 3 && (
+        <Card className="border border-border/80 shadow-sm overflow-hidden">
+          <CardHeader className="pb-3 border-b bg-muted/10">
+            <CardTitle className="text-sm font-bold text-foreground">Payment Details</CardTitle>
+          </CardHeader>
+          <CardContent className="p-5 space-y-5">
+            <div className="space-y-3">
+              <h4 className="text-sm font-bold text-foreground">Opening Balance</h4>
+              <div className="rounded-lg border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted/50 border-b">
+                      <th className="p-3 text-left font-medium text-muted-foreground">Due Type</th>
+                      <th className="p-3 text-left font-medium text-muted-foreground">Due For</th>
+                      <th className="p-3 text-left font-medium text-muted-foreground">Due Amount (₹)</th>
+                      <th className="p-3 text-left font-medium text-muted-foreground">Collection (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    <tr>
+                      <td className="p-3 font-medium text-foreground">Aug Rent</td>
+                      <td className="p-3 text-muted-foreground text-xs">31 Aug' 26 - 31 Aug' 26</td>
+                      <td className="p-2">
+                        <Input type="number" className="w-28 h-8 text-sm" value={rentDueAmt} onChange={(e) => setRentDueAmt(e.target.value)} />
+                      </td>
+                      <td className="p-2">
+                        <Input type="number" className="w-28 h-8 text-sm" value={rentCollAmt} onChange={(e) => setRentCollAmt(e.target.value)} />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 font-medium text-foreground">Security Deposit</td>
+                      <td className="p-3 text-muted-foreground text-xs">One Time</td>
+                      <td className="p-2">
+                        <Input type="number" className="w-28 h-8 text-sm" value={depositDueAmt} onChange={(e) => setDepositDueAmt(e.target.value)} />
+                      </td>
+                      <td className="p-2">
+                        <Input type="number" className="w-28 h-8 text-sm" value={depositCollAmt} onChange={(e) => setDepositCollAmt(e.target.value)} />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-3 font-medium text-foreground">Joining Fee</td>
+                      <td className="p-3 text-muted-foreground text-xs">One Time</td>
+                      <td className="p-2">
+                        <Input type="number" className="w-28 h-8 text-sm" value={joiningDueAmt} onChange={(e) => setJoiningDueAmt(e.target.value)} />
+                      </td>
+                      <td className="p-2">
+                        <Input type="number" className="w-28 h-8 text-sm" value={joiningCollAmt} onChange={(e) => setJoiningCollAmt(e.target.value)} />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
 
-            <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/20">
-              <div className="space-y-0.5">
-                <Label className="text-sm font-medium">Electricity Meter</Label>
-                <p className="text-xs text-muted-foreground">Calculate charges based on sub-meter consumption</p>
-              </div>
+            {/* Other dues collapsed by default — most tenants don't need this */}
+            <div className="border-t pt-4">
               <button
                 type="button"
-                onClick={() => setElectricityMeter(!electricityMeter)}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  electricityMeter ? "bg-primary" : "bg-input"
-                }`}
+                onClick={() => setShowOtherDues((v) => !v)}
+                className="flex items-center gap-2 text-sm font-medium text-teal-700 hover:text-teal-800"
               >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-background shadow ring-0 transition duration-200 ease-in-out ${
-                    electricityMeter ? "translate-x-5" : "translate-x-0"
-                  }`}
-                />
+                {showOtherDues ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                {showOtherDues ? "Hide other dues" : "Add other dues (optional)"}
               </button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* STEP 3: PAYMENT DETAILS & OPENING BALANCES */}
-      {step === 3 && (
-        <div className="space-y-5 animate-fade-in">
-          <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-foreground">Opening Balance</h4>
-            <div className="rounded-lg border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-muted/50 border-b">
-                    <th className="p-3 text-left font-medium text-muted-foreground">Due Type</th>
-                    <th className="p-3 text-left font-medium text-muted-foreground">Due For</th>
-                    <th className="p-3 text-left font-medium text-muted-foreground">Due Amount (₹)</th>
-                    <th className="p-3 text-left font-medium text-muted-foreground">Collection (₹)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  <tr>
-                    <td className="p-3 font-medium text-foreground">Aug Rent</td>
-                    <td className="p-3 text-muted-foreground text-xs">31 Aug' 26 - 31 Aug' 26</td>
-                    <td className="p-2">
-                      <Input
-                        type="number"
-                        className="w-28 h-8 text-sm"
-                        value={rentDueAmt}
-                        onChange={(e) => setRentDueAmt(e.target.value)}
-                      />
-                    </td>
-                    <td className="p-2">
-                      <Input
-                        type="number"
-                        className="w-28 h-8 text-sm"
-                        value={rentCollAmt}
-                        onChange={(e) => setRentCollAmt(e.target.value)}
-                      />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="p-3 font-medium text-foreground">Security Deposit</td>
-                    <td className="p-3 text-muted-foreground text-xs">One Time</td>
-                    <td className="p-2">
-                      <Input
-                        type="number"
-                        className="w-28 h-8 text-sm"
-                        value={depositDueAmt}
-                        onChange={(e) => setDepositDueAmt(e.target.value)}
-                      />
-                    </td>
-                    <td className="p-2">
-                      <Input
-                        type="number"
-                        className="w-28 h-8 text-sm"
-                        value={depositCollAmt}
-                        onChange={(e) => setDepositCollAmt(e.target.value)}
-                      />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="p-3 font-medium text-foreground">Joining Fee</td>
-                    <td className="p-3 text-muted-foreground text-xs">One Time</td>
-                    <td className="p-2">
-                      <Input
-                        type="number"
-                        className="w-28 h-8 text-sm"
-                        value={joiningDueAmt}
-                        onChange={(e) => setJoiningDueAmt(e.target.value)}
-                      />
-                    </td>
-                    <td className="p-2">
-                      <Input
-                        type="number"
-                        className="w-28 h-8 text-sm"
-                        value={joiningCollAmt}
-                        onChange={(e) => setJoiningCollAmt(e.target.value)}
-                      />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="border-t pt-4 space-y-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <h4 className="text-sm font-semibold text-foreground">Add Other Dues</h4>
-              <div className="relative w-full sm:w-60">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search dues here..."
-                  className="pl-8 h-9 text-xs"
-                  value={duesSearch}
-                  onChange={(e) => setDuesSearch(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-72 overflow-y-auto pr-1">
-              {filteredDues.map((d, index) => {
-                const isConsumption = d.mode === "consumption";
-                return (
-                  <div
-                    key={d.id}
-                    className="flex flex-col justify-between border rounded-lg p-3 bg-muted/10 space-y-2 hover:bg-muted/25 transition-colors"
-                  >
-                    <div className="flex justify-between items-start gap-2">
-                      <span className="text-xs font-semibold text-foreground leading-snug">{d.label}</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const updated = [...otherDues];
-                          const realIdx = otherDues.findIndex((x) => x.id === d.id);
-                          updated[realIdx].mode = isConsumption ? "fixed" : "consumption";
-                          if (isConsumption) {
-                            updated[realIdx].amount = "0";
-                          } else {
-                            updated[realIdx].amount = "";
-                          }
-                          setOtherDues(updated);
-                        }}
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors ${
-                          isConsumption
-                            ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900"
-                            : "bg-primary/5 text-primary border-primary/20"
-                        }`}
-                      >
-                        {isConsumption ? "As per consumption" : "Fixed Amount"}
-                      </button>
-                    </div>
-                    {!isConsumption && (
-                      <div className="flex gap-2 items-center">
-                        <span className="text-xs text-muted-foreground">₹</span>
-                        <Input
-                          type="number"
-                          placeholder="Amount"
-                          className="h-7 text-xs flex-1"
-                          value={d.amount}
-                          onChange={(e) => {
-                            const updated = [...otherDues];
-                            const realIdx = otherDues.findIndex((x) => x.id === d.id);
-                            updated[realIdx].amount = e.target.value;
-                            setOtherDues(updated);
-                          }}
-                        />
-                      </div>
-                    )}
+              {showOtherDues && (
+                <div className="space-y-4 mt-4 animate-fade-in">
+                  <div className="relative w-full sm:w-60">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search dues here..."
+                      className="pl-8 h-9 text-xs"
+                      value={duesSearch}
+                      onChange={(e) => setDuesSearch(e.target.value)}
+                    />
                   </div>
-                );
-              })}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 max-h-80 overflow-y-auto pr-1">
+                    {filteredDues.map((d) => (
+                      <div
+                        key={d.id}
+                        className="flex flex-col justify-between border rounded-lg p-3.5 bg-muted/10 space-y-2.5 hover:bg-muted/20 transition-all shadow-sm"
+                      >
+                        <div className="flex flex-col gap-1.5 w-full">
+                          <span className="text-xs font-bold text-foreground leading-snug">{d.label}</span>
+                          <div className="flex gap-2 w-full">
+                            <Select
+                              value={d.mode}
+                              onValueChange={(val: "consumption" | "fixed") => {
+                                const updated = [...otherDues];
+                                const realIdx = otherDues.findIndex((x) => x.id === d.id);
+                                updated[realIdx].mode = val;
+                                updated[realIdx].amount = val === "fixed" ? "0" : "";
+                                setOtherDues(updated);
+                              }}
+                            >
+                              <SelectTrigger className="h-8 text-xs flex-1">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="consumption">As per consumption</SelectItem>
+                                <SelectItem value="fixed">Fixed Amount</SelectItem>
+                              </SelectContent>
+                            </Select>
+
+                            {d.mode === "fixed" && (
+                              <div className="relative flex-1">
+                                <span className="absolute left-2.5 top-2 text-xs text-muted-foreground">₹</span>
+                                <Input
+                                  type="number"
+                                  className="h-8 pl-6 pr-1 text-xs w-full font-bold"
+                                  placeholder="0"
+                                  value={d.amount}
+                                  onChange={(e) => {
+                                    const updated = [...otherDues];
+                                    const realIdx = otherDues.findIndex((x) => x.id === d.id);
+                                    updated[realIdx].amount = e.target.value;
+                                    setOtherDues(updated);
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/* FOOTER WIZARD ACTIONS */}
-      {validationError && step === 3 && (
-        <p className="text-xs text-amber-700 dark:text-amber-400 mt-2 font-medium">
-          ⚠️ {validationError}
-        </p>
+      {step === 1 && stepOneError && (
+        <p className="text-xs text-amber-700 dark:text-amber-400 font-semibold">⚠️ {stepOneError}</p>
       )}
 
+      {/* WIZARD NAVIGATION */}
       {showFooter && (
-        <div className="flex justify-between items-center border-t pt-4">
+        <div className="flex justify-between items-center gap-3 border-t pt-4">
           <div>
-            {step > 1 && (
-              <Button type="button" variant="outline" onClick={() => setStep((step - 1) as 1 | 2 | 3)}>
+            {step > 1 ? (
+              <Button type="button" variant="outline" onClick={goBack}>
                 <ChevronLeft className="h-4 w-4 mr-1" /> Back
               </Button>
-            )}
-          </div>
-          <div className="flex gap-2">
-            {onCancel && (
-              <Button type="button" variant="ghost" onClick={onCancel}>
-                Cancel
-              </Button>
-            )}
-            {step < 3 ? (
-              <Button
-                type="button"
-                onClick={() => setStep((step + 1) as 1 | 2 | 3)}
-                disabled={step === 1 && (!name.trim() || phone.replace(/\D/g, "").length < 10 || !hasSelectValue(effectiveRoomId))}
-              >
-                Continue <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
             ) : (
-              <Button
-                type="button"
-                onClick={handleInviteTenant}
-                disabled={submitting || !!validationError}
-              >
-                {submitting ? "Inviting…" : "Invite & Save Tenant"}
-              </Button>
+              onCancel && (
+                <Button type="button" variant="outline" onClick={onCancel}>
+                  Cancel
+                </Button>
+              )
             )}
           </div>
+
+          {step < 3 ? (
+            <Button type="button" className="bg-teal-600 hover:bg-teal-700 text-white min-w-32" onClick={goNext}>
+              Continue <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              className="bg-teal-600 hover:bg-teal-700 text-white min-w-32"
+              onClick={handleInviteTenant}
+              disabled={submitting || !!stepOneError}
+            >
+              {submitting ? "Adding…" : "Add Tenant"}
+            </Button>
+          )}
         </div>
       )}
     </div>

@@ -50,6 +50,8 @@ import {
   tenantRentDueLabel,
   tenantRoomNo,
   tenantVerificationLabel,
+  tenantFloor,
+  tenantBedNo,
 } from "@/lib/tenantDisplay";
 import { cn } from "@/lib/utils";
 
@@ -391,80 +393,86 @@ const Tenants = () => {
               <span className="hidden sm:inline">KYC credits are managed in Plans when enabled.</span>
             </div>
           </div>
-          <Table>
-            <TableHeader>
-              <TableRow className="border-b bg-sky-50/90 hover:bg-sky-50/90 dark:bg-sky-950/40 dark:hover:bg-sky-950/40">
-                <TableHead className="font-semibold text-sky-950 dark:text-sky-50">Name</TableHead>
-                <TableHead className="font-semibold text-sky-950 dark:text-sky-50">Room</TableHead>
-                <TableHead className="font-semibold text-sky-950 dark:text-sky-50">Rent</TableHead>
-                <TableHead className="hidden font-semibold text-sky-950 md:table-cell dark:text-sky-50">Next due</TableHead>
-                <TableHead className="font-semibold text-sky-950 dark:text-sky-50">Dues</TableHead>
-                <TableHead className="font-semibold text-sky-950 dark:text-sky-50">Status</TableHead>
-                <TableHead className="text-right font-semibold text-sky-950 dark:text-sky-50">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredTenants.map((row) => {
-                const wa = row.phone ? waLink(row.phone) : null;
-                return (
-                  <TableRow
-                    key={row.id}
-                    className="cursor-pointer"
-                    onClick={() => navigate(`/tenants/${row.id}`)}
-                  >
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-9 w-9 border">
-                          <AvatarFallback className="text-xs font-medium">{tenantInitials(row)}</AvatarFallback>
-                        </Avatar>
-                        <Link
-                          to={`/tenants/${row.id}`}
-                          className="font-semibold text-primary hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {tenantDisplayName(row)}
-                        </Link>
+          <div className="flex flex-col gap-3 p-4">
+            {filteredTenants.map((row) => {
+              const wa = row.phone ? waLink(row.phone) : null;
+              const isVerified = tenantVerificationLabel(row) === "verified";
+              const initial = tenantInitials(row);
+              return (
+                <Card
+                  key={row.id}
+                  className="cursor-pointer hover:shadow-md transition-shadow duration-200 border-border/60 overflow-hidden"
+                  onClick={() => navigate(`/tenants/${row.id}`)}
+                >
+                  <CardContent className="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    {/* Left Details block */}
+                    <div className="flex items-center gap-4 min-w-0 flex-1">
+                      <Avatar className="h-12 w-12 border shrink-0">
+                        <AvatarFallback className="text-sm font-semibold bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-300">
+                          {initial}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-bold text-base text-foreground truncate">
+                            {tenantDisplayName(row)}
+                          </h3>
+                          {isVerified ? (
+                            <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-50 text-[10px] py-0 px-2 font-medium">
+                              Aadhar verified
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-50 text-[10px] py-0 px-2 font-medium">
+                              Pending verification
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center text-xs text-muted-foreground gap-x-2 mt-1">
+                          <span className="font-semibold text-foreground">floor: {tenantFloor(row)}</span>
+                          <span className="text-border">|</span>
+                          <span className="font-semibold text-foreground">Room no: {tenantRoomNo(row)}</span>
+                          <span className="text-border">|</span>
+                          <span className="font-semibold text-foreground">Bed no: {tenantBedNo(row)}</span>
+                        </div>
                       </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{tenantRoomNo(row)}</TableCell>
-                    <TableCell className="font-medium">{tenantRentAmount(row)}</TableCell>
-                    <TableCell className="hidden text-muted-foreground md:table-cell">{tenantRentDueLabel(row)}</TableCell>
-                    <TableCell>
-                      <span className="text-muted-foreground text-sm">—</span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="font-normal">
-                        {statusLabel(row)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                        <Button variant="outline" size="icon" className="h-8 w-8" asChild>
-                          <Link to="/rent-payments" title="Rent & dues">
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </Link>
+                    </div>
+
+                    {/* Middle Info block (Rent & Dues) */}
+                    <div className="flex items-center gap-4 text-xs shrink-0 flex-wrap md:flex-nowrap md:mx-6">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-muted-foreground uppercase font-semibold">Rent</span>
+                        <span className="font-bold text-sm text-foreground">{tenantRentAmount(row)}/mo</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-muted-foreground uppercase font-semibold">Due Status</span>
+                        <span className="text-xs text-orange-600 dark:text-orange-400 font-bold bg-orange-50 dark:bg-orange-950/20 px-2 py-0.5 rounded mt-0.5">
+                          Rent due: {tenantRentDueLabel(row)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Right Quick actions block */}
+                    <div className="flex items-center gap-2 shrink-0 justify-end" onClick={(e) => e.stopPropagation()}>
+                      {tenantPhone(row) !== "—" && (
+                        <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-lg border-teal-600/30 text-teal-600 hover:bg-teal-50" asChild>
+                          <a href={`tel:${phoneDigits(row.phone ?? "")}`}>
+                            <Phone className="h-3.5 w-3.5" /> Call
+                          </a>
                         </Button>
-                        {tenantPhone(row) !== "—" ? (
-                          <Button variant="outline" size="icon" className="h-8 w-8" asChild>
-                            <a href={`tel:${phoneDigits(row.phone ?? "")}`} title="Call">
-                              <Phone className="h-3.5 w-3.5" />
-                            </a>
-                          </Button>
-                        ) : null}
-                        {wa ? (
-                          <Button variant="outline" size="icon" className="h-8 w-8 text-emerald-600" asChild>
-                            <a href={wa} target="_blank" rel="noreferrer" title="WhatsApp">
-                              <MessageCircle className="h-3.5 w-3.5" />
-                            </a>
-                          </Button>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                      )}
+                      {wa && (
+                        <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-lg border-emerald-600/30 text-emerald-600 hover:bg-emerald-50" asChild>
+                          <a href={wa} target="_blank" rel="noreferrer">
+                            <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                          </a>
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         </Card>
       )}
     </div>
