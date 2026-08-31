@@ -204,12 +204,12 @@ const AppSidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }: AppSideb
                     <button
                       onClick={() => toggleGroup(item.title)}
                       className={cn(
-                        "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                        "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 group",
                         "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                         active && "text-sidebar-accent-foreground font-semibold"
                       )}
                     >
-                      <item.icon className={cn("h-[18px] w-[18px] shrink-0", active && "text-sidebar-accent-foreground")} />
+                      <item.icon className={cn("h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-3", active && "text-sidebar-accent-foreground")} />
                       <span className="flex-1 text-left">{item.title}</span>
                       <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", open && "rotate-180")} />
                     </button>
@@ -245,7 +245,7 @@ const AppSidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }: AppSideb
                               <NavLink
                                 to={child.url}
                                 end
-                                className="block rounded-md px-3 py-1.5 text-[13px] font-medium text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                className="block rounded-md px-3 py-1.5 text-[13px] font-medium text-sidebar-muted transition-all duration-200 transform hover:translate-x-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                                 activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-semibold shadow-sm animate-scale-in"
                                 onClick={onMobileClose}
                               >
@@ -273,18 +273,18 @@ const AppSidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }: AppSideb
                 ) : topLocked ? (
                   <div className="px-1">{renderLocked(item.title, item.icon)}</div>
                 ) : (
-                  <NavLink
+                   <NavLink
                     to={item.url}
                     end={item.url === "/"}
                     className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 group",
                       "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                       collapsed && "justify-center px-2"
                     )}
                     activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-semibold shadow-sm animate-scale-in"
                     onClick={onMobileClose}
                   >
-                    <item.icon className={cn("h-[18px] w-[18px] shrink-0", active && "text-sidebar-primary-foreground")} />
+                    <item.icon className={cn("h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-3", active && "text-sidebar-primary-foreground")} />
                     {!collapsed && <span>{item.title}</span>}
                   </NavLink>
                 )}

@@ -194,9 +194,18 @@ const Dashboard = () => {
         </div>
 
         {isLoading && (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-brand-600" />
-            <span className="ml-2 text-sm text-slate-500 font-medium">Loading dashboard data…</span>
+          <div className="space-y-6 animate-fade-in">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-4">
+              <div className="md:col-span-2 h-[120px] bg-slate-100/80 dark:bg-slate-900/60 animate-pulse rounded-2xl" />
+              <div className="md:col-span-2 h-[120px] bg-slate-100/80 dark:bg-slate-900/60 animate-pulse rounded-2xl" />
+              <div className="md:col-span-2 h-[120px] bg-slate-100/80 dark:bg-slate-900/60 animate-pulse rounded-2xl" />
+              <div className="md:col-span-2 h-[120px] bg-slate-100/80 dark:bg-slate-900/60 animate-pulse rounded-2xl" />
+              <div className="md:col-span-4 h-[120px] bg-slate-100/80 dark:bg-slate-900/60 animate-pulse rounded-2xl" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="h-[280px] bg-slate-100/80 dark:bg-slate-900/60 animate-pulse rounded-2xl" />
+              <div className="h-[280px] bg-slate-100/80 dark:bg-slate-900/60 animate-pulse rounded-2xl" />
+            </div>
           </div>
         )}
 

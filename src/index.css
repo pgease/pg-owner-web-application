@@ -103,10 +103,21 @@
 }
 
 
-/* ================= UTILITIES ================= */
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--muted)) transparent;
   }
+  
+  .bg-gradient-flow {
+    background: linear-gradient(270deg, rgba(13, 148, 136, 0.08), rgba(16, 185, 129, 0.08), rgba(99, 102, 241, 0.08));
+    background-size: 600% 600%;
+    animation: flowGradient 16s ease infinite;
+  }
+}
+
+@keyframes flowGradient {
+  0% { background-position: 0% 50% }
+  50% { background-position: 100% 50% }
+  100% { background-position: 0% 50% }
 }

@@ -61,10 +61,10 @@ export default function Plans() {
 
   const rawPlanName = featuresData?.planName || currentPlanData?.currentPlan?.name || "Free";
   const currentPlanKey: PlanTierKey = rawPlanName.toLowerCase().includes("pro")
-    ? "Pro"
+    ? "PRO"
     : rawPlanName.toLowerCase().includes("lite")
-    ? "Lite"
-    : "Free";
+    ? "LITE"
+    : "FREE";
 
   const apiFeatureKeys = buildFeatureKeySet(featuresData?.features);
   const hasExplicitApiList = Boolean(featuresData?.features && featuresData.features.length > 0);
@@ -192,7 +192,7 @@ export default function Plans() {
       />
 
       {/* CURRENT SUBSCRIPTION BANNER */}
-      <Card className="border-teal-200 dark:border-teal-900 bg-gradient-to-br from-teal-500/5 via-emerald-500/5 to-transparent">
+      <Card className="border-teal-200 dark:border-teal-900 bg-gradient-flow backdrop-blur-md shadow-sm">
         <CardContent className="p-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
@@ -208,9 +208,9 @@ export default function Plans() {
                 </Badge>
               </div>
               <h3 className="text-xl font-bold text-foreground">
-                {currentPlanKey === "Pro"
+                {currentPlanKey === "PRO"
                   ? "PG Ease Professional Suite"
-                  : currentPlanKey === "Lite"
+                  : currentPlanKey === "LITE"
                   ? "PG Ease Growth Suite"
                   : "PG Ease Starter Edition"}
               </h3>
@@ -227,7 +227,7 @@ export default function Plans() {
                   <Building className="h-3.5 w-3.5" /> Properties Limit
                 </div>
                 <div className="text-sm font-bold text-foreground">
-                  {currentPlanData?.propertiesUsage?.used ?? 1} / {currentPlanData?.propertiesUsage?.max ?? (currentPlanKey === "Free" ? 1 : 5)}
+                  {currentPlanData?.propertiesUsage?.used ?? 1} / {currentPlanData?.propertiesUsage?.max ?? (currentPlanKey === "FREE" ? 1 : 5)}
                 </div>
               </div>
               <div className="text-left sm:text-right">
@@ -235,7 +235,7 @@ export default function Plans() {
                   <Users className="h-3.5 w-3.5" /> Tenants Limit
                 </div>
                 <div className="text-sm font-bold text-foreground">
-                  {currentPlanData?.tenantsUsage?.used ?? 2} / {currentPlanData?.tenantsUsage?.max ?? (currentPlanKey === "Free" ? 15 : 100)}
+                  {currentPlanData?.tenantsUsage?.used ?? 2} / {currentPlanData?.tenantsUsage?.max ?? (currentPlanKey === "FREE" ? 15 : 100)}
                 </div>
               </div>
             </div>
@@ -245,7 +245,7 @@ export default function Plans() {
 
       {/* ACTIVE FEATURES GRID */}
       {activeFeaturesToShow.length > 0 && (
-        <Card className="border-teal-200 dark:border-teal-900 bg-gradient-to-br from-teal-500/[0.01] via-emerald-500/[0.01] to-transparent shadow-sm">
+        <Card className="border-teal-200 dark:border-teal-900 bg-gradient-flow shadow-sm">
           <CardHeader className="pb-3 border-b bg-muted/5">
             <CardTitle className="text-sm font-bold flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-teal-600 animate-pulse" />
