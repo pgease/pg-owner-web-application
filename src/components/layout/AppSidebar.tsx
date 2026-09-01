@@ -305,16 +305,17 @@ const AppSidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }: AppSideb
         </ul>
       </nav>
 
-      <div className="border-t border-sidebar-border px-3 py-3">
+      <div className="border-t border-sidebar-border p-3 space-y-1 mt-auto">
         <button
           onClick={handleLogout}
           className={cn(
-            "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-destructive",
-            "hover:bg-destructive/10 hover:text-destructive"
+            "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-red-600 dark:text-red-400 bg-red-50/60 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-950/60 transition-colors border border-red-200/80 dark:border-red-900/40 shadow-xs",
+            collapsed && "justify-center px-2"
           )}
+          title="Sign Out"
         >
-          <LogOut className="h-[18px] w-[18px]" />
-          {!collapsed && <span>Logout</span>}
+          <LogOut className="h-[18px] w-[18px] shrink-0 text-red-600 dark:text-red-400" />
+          {!collapsed && <span>Sign Out / Logout</span>}
         </button>
       </div>
 
