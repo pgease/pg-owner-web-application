@@ -34,6 +34,11 @@ import EditStaffPermissions from "./pages/team/EditStaffPermissions";
 import { FeaturePlaceholder } from "./pages/FeaturePlaceholder";
 import ApiCatalogPage from "./pages/reference/ApiCatalogPage";
 import LeadsPage from "./pages/tenants/LeadsPage";
+import WifiManagementPage from "./pages/property/WifiManagementPage";
+import PropertyNoticesPage from "./pages/property/PropertyNoticesPage";
+import GuestRequestsPage from "./pages/operations/GuestRequestsPage";
+import NightOutRequestsPage from "./pages/operations/NightOutRequestsPage";
+import FoodDiningPage from "./pages/food/FoodDiningPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -83,14 +88,17 @@ const App = () => (
                         <Route path="/kpis" element={<Dashboard />} />
                         <Route path="/tenants/add" element={<AddTenantPage />} />
                         <Route path="/tenants/vacant-rooms" element={<Tenants />} />
-                        <Route path="/tenants/onboarding" element={<Tenants />} />
-                        <Route path="/tenants/guests" element={<Tenants />} />
+                        <Route path="/tenants/guests" element={<GuestRequestsPage />} />
                         <Route path="/tenants/kyc" element={<Kyc />} />
                         <Route path="/tenants/:tenantId" element={<TenantDetailPage />} />
                         <Route path="/tenants" element={<Tenants />} />
                         <Route path="/leads" element={<LeadsPage />} />
                         <Route path="/my-pgs" element={<MyPGs />} />
                         <Route path="/my-pgs/structure" element={<Structure />} />
+                        <Route path="/my-pgs/amenities" element={<MyPGs />} />
+                        <Route path="/my-pgs/restrictions" element={<MyPGs />} />
+                        <Route path="/my-pgs/wifi" element={<WifiManagementPage />} />
+                        <Route path="/my-pgs/notices" element={<PropertyNoticesPage />} />
                         <Route path="/my-pgs/rooms" element={<MyPGs />} />
                         <Route path="/my-pgs/bank" element={<MyPGs />} />
                         <Route path="/rent-payments" element={<RentPayments />} />
@@ -116,14 +124,8 @@ const App = () => (
                         <Route path="/team" element={<TeamIndex />} />
                         <Route path="/team/add-staff" element={<AddStaff />} />
                         <Route path="/team/:staffId/permissions" element={<EditStaffPermissions />} />
-                        <Route
-                          path="/food"
-                          element={<FeaturePlaceholder title="Food Menu" permission="food_view_edit" />}
-                        />
-                        <Route
-                          path="/nightout"
-                          element={<FeaturePlaceholder title="Night Out" permission="nightout_view" />}
-                        />
+                        <Route path="/food" element={<FoodDiningPage />} />
+                        <Route path="/nightout" element={<NightOutRequestsPage />} />
                         <Route
                           path="/attendance"
                           element={<FeaturePlaceholder title="Attendance" permission="attend_view" />}

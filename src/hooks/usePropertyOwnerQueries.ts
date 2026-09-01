@@ -42,12 +42,19 @@ import {
   updateStaffPermissions,
   uploadPhoto,
   createBlock,
+  updateBlock,
+  deleteBlock,
   createCustomAmenity,
   createCustomRestriction,
   createFloor,
+  updateFloor,
+  deleteFloor,
   createRoom,
+  deleteRoom,
+  moveTenant,
   createStaff,
   type BlockItem,
+  type MoveTenantPayload,
   type CreateRoomPayload,
   type CreateStaffPayload,
   type CreateStaffPermissionDefinitionPayload,
@@ -84,7 +91,20 @@ import {
   getElectricityDues,
   addElectricityDues,
   updateElectricityDues,
-  deleteElectricityDues
+  deleteElectricityDues,
+  getWifiHierarchy,
+  updateFloorWifi,
+  updateBlockWifi,
+  updatePropertyWifiHierarchy,
+  getGuestRequests,
+  updateGuestRequestStatus,
+  getNightOutRequests,
+  updateNightOutRequestStatus,
+  createPropertyNotice,
+  getPropertyNotices,
+  deletePropertyNotice,
+  getActivityLogs,
+  getActivityLogModules,
 } from "@/api/propertyOwner";
 
 /**
@@ -988,3 +1008,214 @@ export function useDeleteElectricityDuesMutation(propertyId: string | null | und
     },
   });
 }
+
+// ==========================================================
+// WIFI MANAGEMENT HOOKS
+// ==========================================================
+
+export function useWifiHierarchy(propertyId?: string | null) {
+  return useQuery({
+    queryKey: ['wifiHierarchy', propertyId],
+    queryFn: () => getWifiHierarchy(propertyId!),
+    enabled: Boolean(propertyId),
+    staleTime: 60_000,
+  });
+}
+
+export function useUpdateFloorWifiMutation(propertyId?: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ floorId, payload }: { floorId: string; payload: { wifiSsid: string; wifiPassword?: string; wifiDetails?: any } }) =>
+      updateFloorWifi(propertyId!, floorId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['wifiHierarchy', propertyId] });
+    },
+  });
+}
+
+export function useUpdateBlockWifiMutation(propertyId?: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ blockId, payload }: { blockId: string; payload: { wifiSsid: string; wifiPassword?: string } }) =>
+      updateBlockWifi(propertyId!, blockId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['wifiHierarchy', propertyId] });
+    },
+  });
+}
+
+export function useUpdatePropertyWifiHierarchyMutation(propertyId?: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { blocks?: any[]; floors?: any[] }) =>
+      updatePropertyWifiHierarchy(propertyId!, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['wifiHierarchy', propertyId] });
+    },
+  });
+}
+
+// ==========================================================
+// GUEST REQUESTS HOOKS
+// ==========================================================
+
+export function useGuestRequests(propertyId?: string | null, status = "pending") {
+  return useQuery({
+    queryKey: ['guestRequests', propertyId, status],
+    queryFn: () => getGuestRequests(propertyId!, status),
+    enabled: Boolean(propertyId),
+    staleTime: 30_000,
+  });
+}
+
+export function useUpdateGuestRequestStatusMutation(propertyId?: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ requestId, payload }: { requestId: string; payload: { status: "approved" | "rejected"; remarks?: string } }) =>
+      updateGuestRequestStatus(propertyId!, requestId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['guestRequests', propertyId] });
+    },
+  });
+}
+
+// ==========================================================
+// NIGHT OUT REQUESTS HOOKS
+// ==========================================================
+
+export function useNightOutRequests(propertyId?: string | null, status = "pending") {
+  return useQuery({
+    queryKey: ['nightOutRequests', propertyId, status],
+    queryFn: () => getNightOutRequests(propertyId!, status),
+    enabled: Boolean(propertyId),
+    staleTime: 30_000,
+  });
+}
+
+export function useUpdateNightOutRequestStatusMutation(propertyId?: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ requestId, payload }: { requestId: string; payload: { status: "approved" | "rejected"; remarks?: string } }) =>
+      updateNightOutRequestStatus(propertyId!, requestId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['nightOutRequests', propertyId] });
+    },
+  });
+}
+
+// ==========================================================
+// PROPERTY NOTICES HOOKS
+// ==========================================================
+
+export function usePropertyNotices(propertyId?: string | null) {
+  return useQuery({
+    queryKey: ['propertyNotices', propertyId],
+    queryFn: () => getPropertyNotices(propertyId!),
+    enabled: Boolean(propertyId),
+    staleTime: 30_000,
+  });
+}
+
+export function useCreatePropertyNoticeMutation(propertyId?: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Parameters<typeof createPropertyNotice>[1]) =>
+      createPropertyNotice(propertyId!, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['propertyNotices', propertyId] });
+    },
+  });
+}
+
+export function useDeletePropertyNoticeMutation(propertyId?: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (noticeId: string) => deletePropertyNotice(propertyId!, noticeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['propertyNotices', propertyId] });
+    },
+  });
+}
+
+// ==========================================================
+// ACTIVITY LOGS HOOKS
+// ==========================================================
+
+export function useActivityLogs(params?: { limit?: number; offset?: number; module?: string; action?: string }) {
+  return useQuery({
+    queryKey: ['activityLogs', params],
+    queryFn: () => getActivityLogs(params),
+    staleTime: 30_000,
+  });
+}
+
+export function useActivityLogModules() {
+  return useQuery({
+    queryKey: ['activityLogModules'],
+    queryFn: () => getActivityLogModules(),
+    staleTime: 300_000,
+  });
+}
+
+export function useUpdateBlockMutation(propertyId?: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ blockId, name, displayOrder }: { blockId: string; name?: string; displayOrder?: number }) =>
+      updateBlock(propertyId!, blockId, { name, displayOrder }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["property", propertyId] });
+    },
+  });
+}
+
+export function useDeleteBlockMutation(propertyId?: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (blockId: string) => deleteBlock(propertyId!, blockId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["property", propertyId] });
+    },
+  });
+}
+
+export function useUpdateFloorMutation(propertyId?: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ floorId, name, displayOrder, blockId }: { floorId: string; name?: string; displayOrder?: number; blockId?: string }) =>
+      updateFloor(propertyId!, floorId, { name, displayOrder, blockId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["property", propertyId] });
+    },
+  });
+}
+
+export function useDeleteFloorMutation(propertyId?: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (floorId: string) => deleteFloor(propertyId!, floorId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["property", propertyId] });
+    },
+  });
+}
+
+export function useDeleteRoomMutation(propertyId?: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (roomId: string) => deleteRoom(propertyId!, roomId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["property", propertyId] });
+    },
+  });
+}
+
+export function useMoveTenantMutation(propertyId?: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: MoveTenantPayload) => moveTenant(propertyId!, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["property", propertyId] });
+    },
+  });
+}
+

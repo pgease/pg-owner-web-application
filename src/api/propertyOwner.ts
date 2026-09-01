@@ -265,6 +265,65 @@ export interface AddTenantPayload {
   joiningDate?: string;
   electricityBill?: number;
   email?: string;
+  gender?: string;
+  dob?: string;
+  alternateNumber?: string;
+  alternatePhone?: string;
+  tenantType?: string;
+  bloodGroup?: string;
+  courseName?: string;
+  courseYear?: string;
+  officeCollegeName?: string;
+  permanentAddress?: string;
+  currentAddress?: string;
+  nationality?: string;
+  motherTongue?: string;
+  govtId?: string;
+  officeInstituteId?: string;
+  biometricId?: string;
+  vehicleNumber?: string;
+  foodPreferences?: string;
+  foodPreference?: string;
+  remarks?: string;
+  fatherName?: string;
+  fatherContact?: string;
+  fatherPhone?: string;
+  fatherOccupation?: string;
+  motherName?: string;
+  motherContact?: string;
+  motherPhone?: string;
+  motherOccupation?: string;
+  guardianName?: string;
+  guardianContact?: string;
+  guardianPhone?: string;
+  guardianRelation?: string;
+  guardianAddress?: string;
+  guardianEmail?: string;
+  stayType?: string;
+  lockinPeriodMonths?: number;
+  noticePeriodDays?: number;
+  agreementPeriodMonths?: number;
+  referredBy?: string;
+  bookedBy?: string;
+  checkinTime?: string;
+  checkoutTime?: string;
+  lastMeterReading?: number;
+  lastReadingDate?: string;
+  rentingType?: string;
+  collectOnlinePayments?: boolean;
+  gstApplicable?: boolean;
+  gstPercentage?: number;
+  gstin?: string;
+  businessName?: string;
+  bankAccountHolderName?: string;
+  bankAccountNumber?: string;
+  bankIfscCode?: string;
+  bankName?: string;
+  bankUpiId?: string;
+  paymentDetails?: {
+    openingBalance?: Array<{ dueType: string; dueFor?: string; dueAmount: number; collection: number }>;
+    otherDues?: Array<{ dueType: string; mode: string; amount?: number | null }>;
+  };
 }
 
 export interface TenantResponse {
@@ -281,7 +340,7 @@ export interface TenantResponse {
   createdAt: string;
 }
 
-/** JSON body: always includes floorId, blockId, roomId (UUID strings). */
+/** JSON body: includes floorId, blockId, roomId and all passed profile/stay/bank/payment fields. */
 function serializeAddTenantBody(payload: AddTenantPayload): Record<string, unknown> {
   const floorId = String(payload.floorId ?? "").trim();
   const blockId = String(payload.blockId ?? "").trim();
@@ -311,16 +370,35 @@ function serializeAddTenantBody(payload: AddTenantPayload): Record<string, unkno
     rentDueDate: Number.isFinite(rentDue) ? rentDue : 5,
   };
 
-  if (payload.joiningDate && String(payload.joiningDate).trim() !== "") {
-    body.joiningDate = String(payload.joiningDate).trim();
+  // Optional string & number fields
+  const optionalFields: (keyof AddTenantPayload)[] = [
+    "joiningDate", "electricityBill", "email", "gender", "dob",
+    "alternateNumber", "tenantType", "bloodGroup", "courseName", "courseYear",
+    "officeCollegeName", "permanentAddress", "currentAddress", "nationality",
+    "motherTongue", "govtId", "officeInstituteId", "biometricId", "vehicleNumber",
+    "foodPreferences", "remarks", "fatherName", "fatherContact", "fatherOccupation",
+    "motherName", "motherContact", "motherOccupation", "guardianName",
+    "guardianContact", "guardianRelation", "guardianAddress", "guardianEmail",
+    "stayType", "lockinPeriodMonths", "noticePeriodDays", "agreementPeriodMonths",
+    "referredBy", "bookedBy", "checkinTime", "checkoutTime", "lastMeterReading",
+    "lastReadingDate", "rentingType", "collectOnlinePayments", "gstApplicable",
+    "gstPercentage", "gstin", "businessName", "bankAccountHolderName",
+    "bankAccountNumber", "bankIfscCode", "bankName", "bankUpiId", "paymentDetails"
+  ];
+
+  for (const key of optionalFields) {
+    const val = payload[key];
+    if (val !== undefined && val !== null && val !== "") {
+      body[key] = val;
+    }
   }
-  if (payload.electricityBill !== undefined && payload.electricityBill !== null) {
-    const e = Number(payload.electricityBill);
-    body.electricityBill = Number.isFinite(e) ? e : 0;
-  }
-  if (payload.email && String(payload.email).trim() !== "") {
-    body.email = String(payload.email).trim();
-  }
+
+  // Fallback aliases for duplicate names in spec
+  if (payload.alternatePhone && !body.alternateNumber) body.alternateNumber = payload.alternatePhone;
+  if (payload.foodPreference && !body.foodPreferences) body.foodPreferences = payload.foodPreference;
+  if (payload.fatherPhone && !body.fatherContact) body.fatherContact = payload.fatherPhone;
+  if (payload.motherPhone && !body.motherContact) body.motherContact = payload.motherPhone;
+  if (payload.guardianPhone && !body.guardianContact) body.guardianContact = payload.guardianPhone;
 
   return body;
 }
@@ -853,6 +931,86 @@ export async function createRoom(propertyId: string, payload: CreateRoomPayload)
     return raw.room;
   }
   return raw as RoomItem;
+}
+
+/** PUT /properties/{propertyId}/rooms/{roomId} */
+export async function updateRoom(propertyId: string, roomId: string, payload: Partial<CreateRoomPayload>) {
+  try {
+    return await httpRequest<RoomItem>(
+      `${PROPERTY_OWNER_BASE}/properties/${propertyId}/rooms/${roomId}`,
+      {
+        method: "PUT",
+        auth: true,
+        body: payload,
+      }
+    );
+  } catch {
+    return await httpRequest<RoomItem>(
+      `${PROPERTY_OWNER_BASE}/properties/${propertyId}/rooms/${roomId}`,
+      {
+        method: "PATCH",
+        auth: true,
+        body: payload,
+      }
+    );
+  }
+}
+
+/** PUT /properties/{propertyId}/blocks/{blockId} */
+export async function updateBlock(propertyId: string, blockId: string, payload: { name?: string; displayOrder?: number }) {
+  return httpRequest<BlockItem>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/blocks/${blockId}`,
+    {
+      method: "PUT",
+      auth: true,
+      body: payload,
+    }
+  );
+}
+
+/** DELETE /properties/{propertyId}/blocks/{blockId} */
+export async function deleteBlock(propertyId: string, blockId: string) {
+  return httpRequest<unknown>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/blocks/${blockId}`,
+    {
+      method: "DELETE",
+      auth: true,
+    }
+  );
+}
+
+/** PUT /properties/{propertyId}/floors/{floorId} */
+export async function updateFloor(propertyId: string, floorId: string, payload: { name?: string; displayOrder?: number; blockId?: string }) {
+  return httpRequest<FloorItem>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/floors/${floorId}`,
+    {
+      method: "PUT",
+      auth: true,
+      body: payload,
+    }
+  );
+}
+
+/** DELETE /properties/{propertyId}/floors/{floorId} */
+export async function deleteFloor(propertyId: string, floorId: string) {
+  return httpRequest<unknown>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/floors/${floorId}`,
+    {
+      method: "DELETE",
+      auth: true,
+    }
+  );
+}
+
+/** DELETE /properties/{propertyId}/rooms/{roomId} */
+export async function deleteRoom(propertyId: string, roomId: string) {
+  return httpRequest<unknown>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/rooms/${roomId}`,
+    {
+      method: "DELETE",
+      auth: true,
+    }
+  );
 }
 
 // ─── Amenities/Restrictions APIs ─────────────────────────────────────────────
@@ -1481,3 +1639,198 @@ export async function deleteElectricityDues(propertyId: string, roomTenantId: st
     }
   );
 }
+
+// ==========================================================
+// WIFI MANAGEMENT HIERARCHY
+// ==========================================================
+
+export async function getWifiHierarchy(propertyId: string) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/wifi-details`, {
+    auth: true,
+  });
+}
+
+export async function updateFloorWifi(propertyId: string, floorId: string, payload: { wifiSsid: string; wifiPassword?: string; wifiDetails?: any }) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/floors/${floorId}/wifi`, {
+    method: "PUT",
+    body: payload,
+    auth: true,
+  });
+}
+
+export async function updateBlockWifi(propertyId: string, blockId: string, payload: { wifiSsid: string; wifiPassword?: string }) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/blocks/${blockId}/wifi`, {
+    method: "PUT",
+    body: payload,
+    auth: true,
+  });
+}
+
+export async function updatePropertyWifiHierarchy(propertyId: string, payload: { blocks?: any[]; floors?: any[] }) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/wifi-details`, {
+    method: "PUT",
+    body: payload,
+    auth: true,
+  });
+}
+
+// ==========================================================
+// GUEST ARRIVAL REQUESTS
+// ==========================================================
+
+export async function createGuestRequest(propertyId: string, payload: {
+  tenantId?: string;
+  guestName: string;
+  guestPhone?: string;
+  relationship?: string;
+  expectedArrival?: string;
+  purpose?: string;
+}) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/guest-requests`, {
+    method: "POST",
+    body: payload,
+    auth: true,
+  });
+}
+
+export async function getGuestRequests(propertyId: string, status?: string) {
+  const qs = status && status !== "all" ? `?status=${encodeURIComponent(status)}` : "";
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/guest-requests${qs}`, {
+    auth: true,
+  });
+}
+
+export async function updateGuestRequestStatus(
+  propertyId: string,
+  requestId: string,
+  statusOrPayload: "approved" | "rejected" | { status: "approved" | "rejected"; remarks?: string },
+  remarks?: string
+) {
+  const body = typeof statusOrPayload === "object" ? statusOrPayload : { status: statusOrPayload, remarks };
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/guest-requests/${requestId}/status`, {
+    method: "PATCH",
+    body,
+    auth: true,
+  });
+}
+
+// ==========================================================
+// NIGHT OUT / LATE PASS REQUESTS
+// ==========================================================
+
+export async function createNightOutRequest(propertyId: string, payload: {
+  tenantId?: string;
+  leaveDate: string;
+  returnDate: string;
+  reason?: string;
+  destinationAddress?: string;
+}) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/night-out-requests`, {
+    method: "POST",
+    body: payload,
+    auth: true,
+  });
+}
+
+export async function getNightOutRequests(propertyId: string, status?: string) {
+  const qs = status && status !== "all" ? `?status=${encodeURIComponent(status)}` : "";
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/night-out-requests${qs}`, {
+    auth: true,
+  });
+}
+
+export async function updateNightOutRequestStatus(
+  propertyId: string,
+  requestId: string,
+  statusOrPayload: "approved" | "rejected" | { status: "approved" | "rejected"; remarks?: string },
+  remarks?: string
+) {
+  const body = typeof statusOrPayload === "object" ? statusOrPayload : { status: statusOrPayload, remarks };
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/night-out-requests/${requestId}/status`, {
+    method: "PATCH",
+    body,
+    auth: true,
+  });
+}
+
+// ==========================================================
+// PROPERTY NOTICES & ANNOUNCEMENTS
+// ==========================================================
+
+export interface CreateNoticePayload {
+  title: string;
+  message: string;
+  category?: string;
+  priority?: string;
+  targetType?: string;
+  attachmentUrl?: string;
+  expiresAt?: string;
+}
+
+export async function createPropertyNotice(propertyId: string, payload: CreateNoticePayload) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/notices`, {
+    method: "POST",
+    body: payload,
+    auth: true,
+  });
+}
+
+export async function getPropertyNotices(propertyId: string) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/notices`, {
+    auth: true,
+  });
+}
+
+export async function deletePropertyNotice(propertyId: string, noticeId: string) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/notices/${noticeId}`, {
+    method: "DELETE",
+    auth: true,
+  });
+}
+
+// ==========================================================
+// MOVE / TRANSFER TENANT
+// ==========================================================
+
+export interface MoveTenantPayload {
+  roomTenantId: string;
+  targetPropertyId: string;
+  targetRoomId: string;
+  targetBedNumber: number;
+  transferDate: string;
+  newMonthlyRent?: number;
+  newSecurityDeposit?: number;
+  transferSecurityDeposit?: boolean;
+  remarks?: string;
+}
+
+export async function moveTenant(propertyId: string, payload: MoveTenantPayload) {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/tenants/move`, {
+    method: "POST",
+    body: payload,
+    auth: true,
+  });
+}
+
+// ==========================================================
+// ACTIVITY LOGS & AUDIT TRAIL
+// ==========================================================
+
+export async function getActivityLogs(params?: { limit?: number; offset?: number; module?: string; action?: string }) {
+  const q = new URLSearchParams();
+  if (params?.limit) q.set("limit", String(params.limit));
+  if (params?.offset) q.set("offset", String(params.offset));
+  if (params?.module) q.set("module", params.module);
+  if (params?.action) q.set("action", params.action);
+
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/activity-logs?${q.toString()}`, {
+    auth: true,
+  });
+}
+
+export async function getActivityLogModules() {
+  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/activity-logs/modules`, {
+    auth: true,
+  });
+}
+

@@ -24,6 +24,7 @@ import {
   Download,
   MoreVertical,
   Building2,
+  ArrowRightLeft,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -78,7 +79,11 @@ import {
   useDeleteElectricityDuesMutation,
   useSetTenantNoticeMutation,
   useClearTenantNoticeMutation,
+  useMoveTenantMutation,
+  useRoomsList,
 } from "@/hooks/usePropertyOwnerQueries";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 function phoneDigits(phone: string): string {
@@ -125,6 +130,54 @@ export default function TenantDetailPage() {
 
   const setNoticeMut = useSetTenantNoticeMutation(currentPropertyId);
   const clearNoticeMut = useClearTenantNoticeMutation(currentPropertyId);
+
+  // Move Tenant State
+  const { properties } = useApp();
+  const propertyList = Array.isArray(properties) ? properties : [];
+  const [moveModalOpen, setMoveModalOpen] = useState(false);
+  const [targetPropertyId, setTargetPropertyId] = useState<string>("");
+  const [targetRoomId, setTargetRoomId] = useState<string>("");
+  const [targetBedNumber, setTargetBedNumber] = useState<number>(1);
+  const [transferDate, setTransferDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [newRent, setNewRent] = useState<string>("");
+  const [newDeposit, setNewDeposit] = useState<string>("");
+  const [transferDeposit, setTransferDeposit] = useState<boolean>(true);
+  const [moveRemarks, setMoveRemarks] = useState<string>("");
+
+  const moveMutation = useMoveTenantMutation(currentPropertyId);
+
+  const effectiveTargetPropertyId = targetPropertyId || currentPropertyId || "";
+  const targetRoomsQuery = useRoomsList(effectiveTargetPropertyId, undefined, undefined, { requireBlockAndFloor: false });
+  const targetRooms = targetRoomsQuery.data ?? [];
+
+  const handleConfirmMove = async () => {
+    if (!tenant || !targetRoomId) {
+      toast({ title: "Please select target room", variant: "destructive" });
+      return;
+    }
+    try {
+      await moveMutation.mutateAsync({
+        roomTenantId: tenant.id,
+        targetPropertyId: effectiveTargetPropertyId,
+        targetRoomId,
+        targetBedNumber: Number(targetBedNumber) || 1,
+        transferDate: transferDate || new Date().toISOString().split("T")[0],
+        newMonthlyRent: newRent ? Number(newRent) : undefined,
+        newSecurityDeposit: newDeposit ? Number(newDeposit) : undefined,
+        transferSecurityDeposit: transferDeposit,
+        remarks: moveRemarks.trim() || undefined,
+      });
+      toast({
+        title: "Tenant Relocated Successfully! 🚚",
+        description: `${tenantDisplayName(tenant)} has been moved to room.`,
+      });
+      setMoveModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenants(currentPropertyId) });
+      if (tenantId) queryClient.invalidateQueries({ queryKey: queryKeys.tenantDetail(currentPropertyId, tenantId) });
+    } catch (e: any) {
+      toast({ title: "Could not move tenant", description: e?.message, variant: "destructive" });
+    }
+  };
 
   // Dialog States
   const [editing, setEditing] = useState(false);
@@ -411,7 +464,16 @@ export default function TenantDetailPage() {
               <ArrowLeft className="h-4 w-4" /> Back to Tenants
             </Link>
           </Button>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 border-teal-300 text-teal-700 font-bold hover:bg-teal-50 shadow-xs"
+              onClick={() => setMoveModalOpen(true)}
+            >
+              <ArrowRightLeft className="h-4 w-4" /> Move Tenant
+            </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted">
@@ -1326,6 +1388,117 @@ export default function TenantDetailPage() {
               </Button>
               <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={handleSaveProfile}>
                 Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* MOVE TENANT DIALOG MODAL */}
+        <Dialog open={moveModalOpen} onOpenChange={setMoveModalOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-teal-700 font-bold">
+                <ArrowRightLeft className="h-5 w-5" /> Relocate Tenant - {tenant ? tenantDisplayName(tenant) : ""}
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2 text-sm">
+              <div className="space-y-1.5">
+                <Label>Target PG Property</Label>
+                <Select value={effectiveTargetPropertyId} onValueChange={setTargetPropertyId}>
+                  <SelectTrigger><SelectValue placeholder="Select Target PG" /></SelectTrigger>
+                  <SelectContent>
+                    {propertyList.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Target Room</Label>
+                  <Select value={targetRoomId} onValueChange={setTargetRoomId}>
+                    <SelectTrigger><SelectValue placeholder="Select Room" /></SelectTrigger>
+                    <SelectContent>
+                      {targetRooms.map((r: any) => (
+                        <SelectItem key={r.id} value={r.id}>
+                          Room {r.roomNumber} ({r.availableBeds ?? 1} bed free)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Target Bed Number</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={targetBedNumber}
+                    onChange={(e) => setTargetBedNumber(parseInt(e.target.value, 10) || 1)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Transfer Effective Date</Label>
+                  <Input type="date" value={transferDate} onChange={(e) => setTransferDate(e.target.value)} />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>New Monthly Rent (Optional)</Label>
+                  <Input
+                    type="number"
+                    value={newRent}
+                    onChange={(e) => setNewRent(e.target.value)}
+                    placeholder="e.g. 5000"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>New Security Deposit (Optional)</Label>
+                <Input
+                  type="number"
+                  value={newDeposit}
+                  onChange={(e) => setNewDeposit(e.target.value)}
+                  placeholder="e.g. 5000"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <Checkbox
+                  id="detailTransferDeposit"
+                  checked={transferDeposit}
+                  onCheckedChange={(c) => setTransferDeposit(Boolean(c))}
+                />
+                <Label htmlFor="detailTransferDeposit" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                  Transfer existing paid Security Deposit to new stay
+                </Label>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Relocation Reason / Remarks</Label>
+                <Textarea
+                  value={moveRemarks}
+                  onChange={(e) => setMoveRemarks(e.target.value)}
+                  placeholder="e.g. Relocating to larger room on 2nd floor"
+                  rows={2}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setMoveModalOpen(false)}>Cancel</Button>
+              <Button
+                className="bg-teal-600 hover:bg-teal-700 text-white font-bold gap-1.5"
+                onClick={handleConfirmMove}
+                disabled={moveMutation.isPending || !tenant || !targetRoomId}
+              >
+                {moveMutation.isPending ? "Relocating..." : "Confirm Tenant Relocation"}
               </Button>
             </DialogFooter>
           </DialogContent>

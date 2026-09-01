@@ -15,11 +15,16 @@ import {
   ExternalLink,
   Phone,
   MessageCircle,
+  ArrowRightLeft,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -39,9 +44,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useApp } from "@/context/AppContext";
 import type { PropertyTenant } from "@/api/propertyOwner";
 import { roomHasVacancyForAllocation } from "@/api/propertyOwner";
-import { useBlocks, useFloors, usePropertyTenants, useRoomsList } from "@/hooks/usePropertyOwnerQueries";
+import { useBlocks, useFloors, usePropertyTenants, useRoomsList, useMoveTenantMutation } from "@/hooks/usePropertyOwnerQueries";
 import { FilterBar } from "@/components/common/FilterBar";
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
+import { toast } from "@/components/ui/use-toast";
 import {
   tenantDisplayName,
   tenantInitials,
@@ -106,6 +112,59 @@ const Tenants = () => {
   const [kycFilter, setKycFilter] = useState<"all" | "verified" | "pending">("all");
   const [selectedBlockId, setSelectedBlockId] = useState<string>("");
   const [selectedFloorId, setSelectedFloorId] = useState<string>("");
+
+  // Move Tenant State
+  const [moveModalOpen, setMoveModalOpen] = useState(false);
+  const [selectedTenantForMove, setSelectedTenantForMove] = useState<PropertyTenant | null>(null);
+  const [targetPropertyId, setTargetPropertyId] = useState<string>("");
+  const [targetRoomId, setTargetRoomId] = useState<string>("");
+  const [targetBedNumber, setTargetBedNumber] = useState<number>(1);
+  const [transferDate, setTransferDate] = useState<string>("");
+  const [newRent, setNewRent] = useState<string>("");
+  const [newDeposit, setNewDeposit] = useState<string>("");
+  const [transferDeposit, setTransferDeposit] = useState<boolean>(true);
+  const [moveRemarks, setMoveRemarks] = useState<string>("");
+
+  const moveMutation = useMoveTenantMutation(selectedPgId);
+
+  const effectiveTargetPropertyId = targetPropertyId || selectedPgId || "";
+  const targetRoomsQuery = useRoomsList(effectiveTargetPropertyId, undefined, undefined, { requireBlockAndFloor: false });
+  const targetRooms = targetRoomsQuery.data ?? [];
+
+  const handleOpenMoveModal = (tenant?: PropertyTenant) => {
+    if (tenant) setSelectedTenantForMove(tenant);
+    setTargetPropertyId(selectedPgId || "");
+    setTransferDate(new Date().toISOString().split("T")[0]);
+    setMoveModalOpen(true);
+  };
+
+  const handleConfirmMove = async () => {
+    if (!selectedTenantForMove || !targetRoomId) {
+      toast({ title: "Please select tenant and target room", variant: "destructive" });
+      return;
+    }
+    try {
+      await moveMutation.mutateAsync({
+        roomTenantId: selectedTenantForMove.id,
+        targetPropertyId: effectiveTargetPropertyId,
+        targetRoomId,
+        targetBedNumber: Number(targetBedNumber) || 1,
+        transferDate: transferDate || new Date().toISOString().split("T")[0],
+        newMonthlyRent: newRent ? Number(newRent) : undefined,
+        newSecurityDeposit: newDeposit ? Number(newDeposit) : undefined,
+        transferSecurityDeposit: transferDeposit,
+        remarks: moveRemarks.trim() || undefined,
+      });
+      toast({
+        title: "Tenant Relocated Successfully! 🚚",
+        description: `${tenantDisplayName(selectedTenantForMove)} moved to room successfully.`,
+      });
+      setMoveModalOpen(false);
+      setSelectedTenantForMove(null);
+    } catch (e: any) {
+      toast({ title: "Could not move tenant", description: e?.message, variant: "destructive" });
+    }
+  };
 
   const list = Array.isArray(properties) ? properties : [];
   const blocksQuery = useBlocks(selectedPgId);
@@ -453,6 +512,14 @@ const Tenants = () => {
 
                     {/* Right Quick actions block */}
                     <div className="flex items-center gap-2 shrink-0 justify-end" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-9 gap-1.5 rounded-lg border-teal-600/30 text-teal-700 hover:bg-teal-50 font-bold"
+                        onClick={() => handleOpenMoveModal(row)}
+                      >
+                        <ArrowRightLeft className="h-3.5 w-3.5" /> Move Tenant
+                      </Button>
                       {tenantPhone(row) !== "—" && (
                         <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-lg border-teal-600/30 text-teal-600 hover:bg-teal-50" asChild>
                           <a href={`tel:${phoneDigits(row.phone ?? "")}`}>
@@ -493,6 +560,15 @@ const Tenants = () => {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 border-teal-300 text-teal-700 font-bold hover:bg-teal-50 shadow-xs"
+              onClick={() => handleOpenMoveModal()}
+            >
+              <ArrowRightLeft className="h-4 w-4" />
+              Move Tenant
+            </Button>
             <Button variant="outline" size="sm" className="gap-2" asChild>
               <Link to="/support">
                 <Megaphone className="h-4 w-4" />
@@ -552,6 +628,137 @@ const Tenants = () => {
             {tenantTableSection}
           </>
         )}
+
+        {/* MOVE TENANT DIALOG MODAL */}
+        <Dialog open={moveModalOpen} onOpenChange={setMoveModalOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-teal-700 font-bold">
+                <ArrowRightLeft className="h-5 w-5" /> Move / Relocate Tenant
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2 text-sm">
+              <div className="space-y-1.5">
+                <Label>Select Tenant to Relocate</Label>
+                <Select
+                  value={selectedTenantForMove?.id || ""}
+                  onValueChange={(id) => {
+                    const found = (tenantsQuery.data || []).find((t) => t.id === id);
+                    if (found) setSelectedTenantForMove(found);
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Choose Tenant" /></SelectTrigger>
+                  <SelectContent>
+                    {(tenantsQuery.data || []).map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {tenantDisplayName(t)} (Room {tenantRoomNo(t)}, Bed {tenantBedNo(t)})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Target PG Property</Label>
+                <Select value={effectiveTargetPropertyId} onValueChange={setTargetPropertyId}>
+                  <SelectTrigger><SelectValue placeholder="Select Target PG" /></SelectTrigger>
+                  <SelectContent>
+                    {list.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Target Room</Label>
+                  <Select value={targetRoomId} onValueChange={setTargetRoomId}>
+                    <SelectTrigger><SelectValue placeholder="Select Room" /></SelectTrigger>
+                    <SelectContent>
+                      {targetRooms.map((r: any) => (
+                        <SelectItem key={r.id} value={r.id}>
+                          Room {r.roomNumber} ({r.availableBeds ?? 1} bed free)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Target Bed Number</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={targetBedNumber}
+                    onChange={(e) => setTargetBedNumber(parseInt(e.target.value, 10) || 1)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Transfer Effective Date</Label>
+                  <Input type="date" value={transferDate} onChange={(e) => setTransferDate(e.target.value)} />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>New Monthly Rent (Optional)</Label>
+                  <Input
+                    type="number"
+                    value={newRent}
+                    onChange={(e) => setNewRent(e.target.value)}
+                    placeholder="e.g. 5000"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>New Security Deposit (Optional)</Label>
+                <Input
+                  type="number"
+                  value={newDeposit}
+                  onChange={(e) => setNewDeposit(e.target.value)}
+                  placeholder="e.g. 5000"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <Checkbox
+                  id="transferDeposit"
+                  checked={transferDeposit}
+                  onCheckedChange={(c) => setTransferDeposit(Boolean(c))}
+                />
+                <Label htmlFor="transferDeposit" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                  Transfer existing paid Security Deposit to new stay
+                </Label>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Relocation Reason / Remarks</Label>
+                <Textarea
+                  value={moveRemarks}
+                  onChange={(e) => setMoveRemarks(e.target.value)}
+                  placeholder="e.g. Relocating to larger room on 2nd floor"
+                  rows={2}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setMoveModalOpen(false)}>Cancel</Button>
+              <Button
+                className="bg-teal-600 hover:bg-teal-700 text-white font-bold gap-1.5"
+                onClick={handleConfirmMove}
+                disabled={moveMutation.isPending || !selectedTenantForMove || !targetRoomId}
+              >
+                {moveMutation.isPending ? "Relocating..." : "Confirm Tenant Relocation"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </CanAccessPage>
   );

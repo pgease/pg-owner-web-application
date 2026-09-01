@@ -23,7 +23,7 @@ export default function AddTenantPage() {
 
   return (
     <CanAccessPage permission="tenant_add">
-      <div className="mx-auto max-w-3xl space-y-6 animate-fade-in pb-24">
+      <div className="w-full max-w-6xl mx-auto space-y-6 animate-fade-in pb-24">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" className="shrink-0" asChild>
             <Link to="/tenants" aria-label="Back to tenants">

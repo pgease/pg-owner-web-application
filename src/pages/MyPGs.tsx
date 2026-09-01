@@ -113,6 +113,14 @@ const MyPGs = () => {
     }
   }, [dining]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    if (tab === "amenities" || location.pathname === "/my-pgs/amenities") setAmenitiesOpen(true);
+    if (tab === "restrictions" || location.pathname === "/my-pgs/restrictions") setRestrictionsOpen(true);
+    if (tab === "dining") setDiningOpen(true);
+  }, [location.search, location.pathname]);
+
   const toggleAmenity = (id: string) => {
     setSelectedAmenityIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };

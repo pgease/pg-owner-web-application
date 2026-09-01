@@ -50,6 +50,9 @@ import {
   useFloors,
   useRoomsList,
   usePropertyTenants,
+  useDeleteBlockMutation,
+  useDeleteFloorMutation,
+  useDeleteRoomMutation,
 } from "@/hooks/usePropertyOwnerQueries";
 import { createProperty } from "@/api/propertyOwner";
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
@@ -155,10 +158,43 @@ export default function Structure() {
 
   const { data: tenantsData = [] } = usePropertyTenants(currentPropertyId);
 
-  // Mutations
+  // Create & Delete Mutations
   const createBlockMut = useCreateBlock(currentPropertyId);
   const createFloorMut = useCreateFloor(currentPropertyId, effectiveBlockId || undefined);
   const createRoomMut = useCreateRoom(currentPropertyId);
+
+  const deleteBlockMut = useDeleteBlockMutation(currentPropertyId);
+  const deleteFloorMut = useDeleteFloorMutation(currentPropertyId);
+  const deleteRoomMut = useDeleteRoomMutation(currentPropertyId);
+
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    open: boolean;
+    type: "block" | "floor" | "room";
+    id: string;
+    name: string;
+  }>({ open: false, type: "block", id: "", name: "" });
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm.id) return;
+    try {
+      if (deleteConfirm.type === "block") {
+        await deleteBlockMut.mutateAsync(deleteConfirm.id);
+        toast({ title: "Block Deleted 🗑️", description: `${deleteConfirm.name} removed.` });
+        if (selectedBlockId === deleteConfirm.id) setSelectedBlockId("");
+      } else if (deleteConfirm.type === "floor") {
+        await deleteFloorMut.mutateAsync(deleteConfirm.id);
+        toast({ title: "Floor Deleted 🗑️", description: `${deleteConfirm.name} removed.` });
+        if (selectedFloorId === deleteConfirm.id) setSelectedFloorId("");
+      } else if (deleteConfirm.type === "room") {
+        await deleteRoomMut.mutateAsync(deleteConfirm.id);
+        toast({ title: "Room Deleted 🗑️", description: `${deleteConfirm.name} removed.` });
+      }
+    } catch (e: any) {
+      toast({ title: "Could not delete", description: e?.message || "Ensure no active tenants occupy this structure before deleting.", variant: "destructive" });
+    } finally {
+      setDeleteConfirm({ open: false, type: "block", id: "", name: "" });
+    }
+  };
 
   const activeProperty = propertyList.find((p) => p.id === currentPropertyId);
 
@@ -331,14 +367,26 @@ export default function Structure() {
                     setSelectedBlockId(b.id);
                     setSelectedFloorId("");
                   }}
-                  className={`cursor-pointer rounded-xl border-2 p-3 text-center transition-all ${
+                  className={`relative group cursor-pointer rounded-xl border-2 p-3 text-center transition-all ${
                     isSelected
                       ? "border-teal-600 bg-teal-50/60 dark:bg-teal-950/40 shadow-sm font-bold text-teal-700 dark:text-teal-300"
                       : "border-border hover:border-teal-300 bg-card text-muted-foreground"
                   }`}
                 >
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="absolute top-1 right-1 h-6 w-6 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteConfirm({ open: true, type: "block", id: b.id, name: b.name });
+                    }}
+                    title={`Delete ${b.name}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
                   <Layers className="h-5 w-5 mx-auto mb-1 opacity-70" />
-                  <div className="text-sm truncate">{b.name}</div>
+                  <div className="text-sm truncate pr-4">{b.name}</div>
                 </div>
               );
             })}
@@ -379,16 +427,26 @@ export default function Structure() {
               {floors.map((f) => {
                 const isSelected = f.id === effectiveFloorId;
                 return (
-                  <Button
-                    key={f.id}
-                    variant={isSelected ? "default" : "outline"}
-                    className={`h-9 gap-1.5 ${
-                      isSelected ? "bg-teal-600 hover:bg-teal-700 text-white font-semibold" : ""
-                    }`}
-                    onClick={() => setSelectedFloorId(f.id)}
-                  >
-                    <Layers className="h-3.5 w-3.5" /> {f.name}
-                  </Button>
+                  <div key={f.id} className="inline-flex items-center gap-1">
+                    <Button
+                      variant={isSelected ? "default" : "outline"}
+                      className={`h-9 gap-1.5 ${
+                        isSelected ? "bg-teal-600 hover:bg-teal-700 text-white font-semibold" : ""
+                      }`}
+                      onClick={() => setSelectedFloorId(f.id)}
+                    >
+                      <Layers className="h-3.5 w-3.5" /> {f.name}
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                      onClick={() => setDeleteConfirm({ open: true, type: "floor", id: f.id, name: f.name })}
+                      title={`Delete ${f.name}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 );
               })}
               {floors.length === 0 && (
@@ -465,9 +523,20 @@ export default function Structure() {
                           <DoorOpen className="h-5 w-5 text-teal-600" />
                           <CardTitle className="text-base font-bold">Room {r.roomNumber}</CardTitle>
                         </div>
-                        <Badge variant="secondary" className="text-[10px]">
-                          {bedCount} Sharing
-                        </Badge>
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant="secondary" className="text-[10px]">
+                            {bedCount} Sharing
+                          </Badge>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full"
+                            onClick={() => setDeleteConfirm({ open: true, type: "room", id: r.id, name: `Room ${r.roomNumber}` })}
+                            title="Delete Room"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </CardHeader>
                       <CardContent className="p-4 pt-2 space-y-3">
 
@@ -755,6 +824,40 @@ export default function Structure() {
                 onClick={handleCreateRoom}
               >
                 {createRoomMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Room & Beds"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* DELETE CONFIRMATION DIALOG */}
+        <Dialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ ...deleteConfirm, open: false })}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600 font-bold">
+                <Trash2 className="h-5 w-5" /> Delete {deleteConfirm.type.toUpperCase()} - {deleteConfirm.name}
+              </DialogTitle>
+              <DialogDescription className="pt-2 text-xs text-slate-600">
+                Are you sure you want to delete <strong className="font-bold text-slate-900">{deleteConfirm.name}</strong>?
+                This action cannot be undone. Note: Structure items occupied by active residents cannot be deleted until room beds are vacated.
+              </DialogDescription>
+            </DialogHeader>
+
+            <DialogFooter className="mt-3">
+              <Button variant="outline" onClick={() => setDeleteConfirm({ open: false, type: "block", id: "", name: "" })}>
+                Cancel
+              </Button>
+              <Button
+                className="bg-red-600 hover:bg-red-700 text-white font-bold gap-1.5"
+                onClick={confirmDelete}
+                disabled={deleteBlockMut.isPending || deleteFloorMut.isPending || deleteRoomMut.isPending}
+              >
+                {deleteBlockMut.isPending || deleteFloorMut.isPending || deleteRoomMut.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" /> Confirm Delete
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
