@@ -18,6 +18,11 @@ export function tenantPhone(t: PropertyTenant): string {
   return p != null && String(p).trim() !== "" ? String(p).trim() : "—";
 }
 
+export function tenantBlock(t: PropertyTenant): string {
+  const n = t.block?.name;
+  return n != null && String(n).trim() !== "" ? String(n).trim() : "—";
+}
+
 export function tenantFloor(t: PropertyTenant): string {
   const n = t.floor?.name;
   return n != null && String(n).trim() !== "" ? String(n).trim() : "—";

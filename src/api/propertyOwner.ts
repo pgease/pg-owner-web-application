@@ -1430,20 +1430,29 @@ export async function getCurrentPlan() {
   });
 }
 
-export async function createPlanCheckoutOrder(planId: string, billingCycle: 'monthly' | 'annual' = 'monthly') {
+export async function createPlanCheckoutOrder(
+  planId: string,
+  payload?: { numberOfBeds?: number; durationMonths?: number; billingCycle?: 'monthly' | 'annual' } | 'monthly' | 'annual'
+) {
+  const body = typeof payload === 'object' ? payload : { billingCycle: payload || 'monthly' };
   return httpRequest<RazorpayOrderResponse>(`${PROPERTY_OWNER_BASE}/plans/${planId}/checkout-order`, {
     method: 'POST',
-    body: { billingCycle },
+    body,
     auth: true,
   });
 }
 
 export async function verifyPlanPayment(body: {
-  razorpayOrderId: string;
-  razorpayPaymentId: string;
-  razorpaySignature: string;
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  razorpaySignature?: string;
+  razorpay_order_id?: string;
+  razorpay_payment_id?: string;
+  razorpay_signature?: string;
   planId: string;
-  billingCycle: 'monthly' | 'annual';
+  numberOfBeds?: number;
+  durationMonths?: number;
+  billingCycle?: 'monthly' | 'annual';
 }) {
   return httpRequest<{ success: boolean; message: string; plan: SubscriptionPlan }>(`${PROPERTY_OWNER_BASE}/plans/verify-payment`, {
     method: 'POST',

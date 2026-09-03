@@ -26,6 +26,7 @@ import {
   useVerifyPlanPaymentMutation,
 } from "@/hooks/usePropertyOwnerQueries";
 import { buildFeatureKeySet, userHasFeatureForRow, type PlanTierKey } from "@/lib/planFeatures";
+import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/use-toast";
 
 declare global {
@@ -52,6 +53,12 @@ const features = [
 
 export default function Plans() {
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
+  const [bedsByPlan, setBedsByPlan] = useState<Record<string, number>>({
+    pro: 50,
+    enterprise: 150,
+    plan_pro: 50,
+    plan_enterprise: 150,
+  });
   const { data: featuresData, isLoading: isFeaturesLoading } = useMyFeaturesQuery();
   const { data: plansData, isLoading: isPlansLoading } = usePlansList();
   const { data: currentPlanData, isLoading: isCurrentPlanLoading, refetch: refetchCurrentPlan } = useCurrentPlan();
@@ -88,9 +95,11 @@ export default function Plans() {
       code: "FREE",
       priceMonthly: 0,
       priceAnnual: 0,
+      pricePerBed: 0,
+      minBeds: 1,
       maxProperties: 1,
       maxTenants: 15,
-      features: ["Up to 15 Tenants", "1 Property", "Manual Rent Tracking", "5 Free KYC Credits"],
+      features: ["Up to 15 Beds", "1 Property", "Manual Rent Tracking", "5 Free KYC Credits"],
       popular: false,
     },
     {
@@ -99,10 +108,12 @@ export default function Plans() {
       code: "PRO",
       priceMonthly: 999,
       priceAnnual: 9990,
+      pricePerBed: 20,
+      minBeds: 10,
       maxProperties: 5,
       maxTenants: 100,
       features: [
-        "Up to 100 Tenants",
+        "Dynamic Bed Quota Pricing",
         "5 Properties",
         "WhatsApp Automation",
         "Digital Rental Agreements",
@@ -116,11 +127,13 @@ export default function Plans() {
       code: "ENTERPRISE",
       priceMonthly: 2499,
       priceAnnual: 24990,
+      pricePerBed: 18,
+      minBeds: 50,
       maxProperties: 50,
       maxTenants: 1000,
       features: [
         "Unlimited Properties",
-        "Unlimited Tenants",
+        "High Capacity Bed Allowance",
         "Priority 24/7 Support",
         "Advanced Revenue Analytics",
         "Custom Branding",
@@ -131,9 +144,18 @@ export default function Plans() {
 
   const planCards = plansData?.plans && plansData.plans.length > 0 ? plansData.plans : fallbackPlans;
 
-  const handleUpgradeCheckout = async (planId: string) => {
+  const handleUpgradeCheckout = async (planId: string, bedCount?: number) => {
     try {
-      const order = await createOrderMut.mutateAsync({ planId, billingCycle });
+      const selectedBeds = bedCount || bedsByPlan[planId] || bedsByPlan[planId.toLowerCase()] || 50;
+      const durationMonths = billingCycle === "annual" ? 12 : 1;
+
+      const order = await createOrderMut.mutateAsync({
+        planId,
+        numberOfBeds: selectedBeds,
+        durationMonths,
+        billingCycle,
+      });
+
       if (!window.Razorpay) {
         const script = document.createElement("script");
         script.src = "https://checkout.razorpay.com/v1/checkout.js";
@@ -146,7 +168,7 @@ export default function Plans() {
         amount: order.amount,
         currency: order.currency || "INR",
         name: "PG Ease",
-        description: `Upgrade to ${planId} Plan (${billingCycle})`,
+        description: `Upgrade to ${planId} Plan (${selectedBeds} Beds, ${billingCycle})`,
         order_id: order.orderId,
         handler: async (response: any) => {
           try {
@@ -155,11 +177,13 @@ export default function Plans() {
               razorpayPaymentId: response.razorpay_payment_id,
               razorpaySignature: response.razorpay_signature,
               planId,
+              numberOfBeds: selectedBeds,
+              durationMonths,
               billingCycle,
             });
             toast({
               title: "Subscription Activated! 👑",
-              description: "Your account has been upgraded successfully.",
+              description: `Your account has been upgraded with ${selectedBeds} beds capacity.`,
             });
             refetchCurrentPlan();
           } catch (err: any) {
@@ -232,10 +256,10 @@ export default function Plans() {
               </div>
               <div className="text-left sm:text-right">
                 <div className="text-xs text-muted-foreground font-medium flex items-center gap-1 sm:justify-end">
-                  <Users className="h-3.5 w-3.5" /> Tenants Limit
+                  <Users className="h-3.5 w-3.5" /> Beds Allowance
                 </div>
-                <div className="text-sm font-bold text-foreground">
-                  {currentPlanData?.tenantsUsage?.used ?? 2} / {currentPlanData?.tenantsUsage?.max ?? (currentPlanKey === "FREE" ? 15 : 100)}
+                <div className="text-sm font-bold text-teal-700 dark:text-teal-400">
+                  {(currentPlanData as any)?.occupiedBeds ?? currentPlanData?.tenantsUsage?.used ?? 0} / {(currentPlanData as any)?.maxBeds ?? (currentPlanKey === "FREE" ? 15 : 50)} Beds
                 </div>
               </div>
             </div>
@@ -292,9 +316,15 @@ export default function Plans() {
       {/* PRICING CARDS */}
       <div className="grid gap-6 sm:grid-cols-3">
         {planCards.map((plan: any) => {
+          const planKey = (plan.code || plan.id || plan.name).toLowerCase();
           const isCurrent = plan.name.toLowerCase() === currentPlanKey.toLowerCase();
-          const price =
-            billingCycle === "annual" ? plan.priceAnnual || plan.priceMonthly * 10 : plan.priceMonthly;
+          const isFree = planKey.includes("free") || plan.name.toLowerCase() === "free";
+          
+          const currentBeds = bedsByPlan[plan.id] || bedsByPlan[planKey] || (planKey.includes("enterprise") ? 150 : 50);
+          const unitPrice = Number(plan.pricePerBed || (planKey.includes("enterprise") ? 18 : 20));
+          
+          const monthlyTotal = isFree ? 0 : currentBeds * unitPrice;
+          const calculatedPrice = billingCycle === "annual" ? monthlyTotal * 10 : monthlyTotal;
 
           return (
             <Card
@@ -329,24 +359,79 @@ export default function Plans() {
                   )}
                 </div>
                 <CardTitle className="text-xl font-bold">{plan.name}</CardTitle>
+                
                 <div className="mt-2">
                   <span className="text-3xl font-black text-foreground">
-                    ₹{price.toLocaleString("en-IN")}
+                    ₹{calculatedPrice.toLocaleString("en-IN")}
                   </span>
                   <span className="text-xs text-muted-foreground ml-1">
                     /{billingCycle === "annual" ? "year" : "month"}
                   </span>
                 </div>
+
+                {!isFree && (
+                  <p className="text-[11px] text-teal-600 dark:text-teal-400 font-semibold mt-1">
+                    ₹{unitPrice} per bed / month
+                  </p>
+                )}
+
                 <CardDescription className="text-xs mt-1">
                   {plan.name.toLowerCase() === "free"
-                    ? "Essential features for single property"
+                    ? "Essential starter tools for single property"
                     : plan.name.toLowerCase() === "pro"
-                    ? "Full automation & agreements for growing PGs"
-                    : "Tailored for large multi-property chains"}
+                    ? "Full automation & agreements with flexible beds"
+                    : "High capacity bed allowance for large PG chains"}
                 </CardDescription>
               </CardHeader>
 
               <CardContent className="space-y-4 pb-6">
+                {/* Bed Counter for Paid Plans */}
+                {!isFree && (
+                  <div className="bg-muted/40 p-3 rounded-xl border space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-foreground">Beds Capacity:</span>
+                      <span className="font-bold text-teal-600">{currentBeds} Beds</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0 font-bold"
+                        onClick={() => {
+                          const next = Math.max(10, currentBeds - 10);
+                          setBedsByPlan((prev) => ({ ...prev, [plan.id]: next, [planKey]: next }));
+                        }}
+                      >
+                        -10
+                      </Button>
+                      <Input
+                        type="number"
+                        min={10}
+                        step={5}
+                        value={currentBeds}
+                        onChange={(e) => {
+                          const v = Math.max(1, Number(e.target.value) || 1);
+                          setBedsByPlan((prev) => ({ ...prev, [plan.id]: v, [planKey]: v }));
+                        }}
+                        className="h-8 text-center text-xs font-bold"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-8 p-0 font-bold"
+                        onClick={() => {
+                          const next = currentBeds + 10;
+                          setBedsByPlan((prev) => ({ ...prev, [plan.id]: next, [planKey]: next }));
+                        }}
+                      >
+                        +10
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-2 border-t pt-4">
                   {(plan.features || []).map((feat: string, idx: number) => (
                     <div key={idx} className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -364,14 +449,14 @@ export default function Plans() {
                   }`}
                   variant={isCurrent ? "outline" : "default"}
                   disabled={isCurrent || createOrderMut.isPending}
-                  onClick={() => handleUpgradeCheckout(plan.id || plan.name.toLowerCase())}
+                  onClick={() => handleUpgradeCheckout(plan.id || plan.name.toLowerCase(), currentBeds)}
                 >
                   {createOrderMut.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : isCurrent ? (
                     "Active Plan"
                   ) : (
-                    "Upgrade to " + plan.name
+                    `Upgrade (${currentBeds} Beds)`
                   )}
                 </Button>
               </CardContent>

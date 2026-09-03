@@ -884,8 +884,18 @@ export function useCurrentPlan() {
 
 export function useCreatePlanCheckoutOrderMutation() {
   return useMutation({
-    mutationFn: ({ planId, billingCycle }: { planId: string; billingCycle?: 'monthly' | 'annual' }) =>
-      createPlanCheckoutOrder(planId, billingCycle),
+    mutationFn: ({
+      planId,
+      numberOfBeds,
+      durationMonths,
+      billingCycle,
+    }: {
+      planId: string;
+      numberOfBeds?: number;
+      durationMonths?: number;
+      billingCycle?: 'monthly' | 'annual';
+    }) =>
+      createPlanCheckoutOrder(planId, { numberOfBeds, durationMonths, billingCycle }),
   });
 }
 
