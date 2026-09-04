@@ -39,6 +39,8 @@ import PropertyNoticesPage from "./pages/property/PropertyNoticesPage";
 import GuestRequestsPage from "./pages/operations/GuestRequestsPage";
 import NightOutRequestsPage from "./pages/operations/NightOutRequestsPage";
 import FoodDiningPage from "./pages/food/FoodDiningPage";
+import ActivityLogsPage from "./pages/ActivityLogsPage";
+import NoticePeriodPage from "./pages/tenants/NoticePeriodPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -90,6 +92,10 @@ const App = () => (
                         <Route path="/tenants/vacant-rooms" element={<Tenants />} />
                         <Route path="/tenants/guests" element={<GuestRequestsPage />} />
                         <Route path="/tenants/kyc" element={<Kyc />} />
+                        <Route path="/tenants/notice-period" element={<NoticePeriodPage />} />
+                        <Route path="/tenants/notice" element={<NoticePeriodPage />} />
+                        <Route path="/tenants/onboarding" element={<NoticePeriodPage />} />
+                        <Route path="/notice-period" element={<NoticePeriodPage />} />
                         <Route path="/tenants/:tenantId" element={<TenantDetailPage />} />
                         <Route path="/tenants" element={<Tenants />} />
                         <Route path="/leads" element={<LeadsPage />} />
@@ -114,6 +120,9 @@ const App = () => (
                         <Route path="/reports/payments" element={<Reports />} />
                         <Route path="/reports/export" element={<Reports />} />
                         <Route path="/plans" element={<Plans />} />
+                        <Route path="/activity-logs" element={<ActivityLogsPage />} />
+                        <Route path="/audit-logs" element={<ActivityLogsPage />} />
+                        <Route path="/settings/activity-logs" element={<ActivityLogsPage />} />
                         <Route path="/settings" element={<SettingsPage />} />
                         <Route path="/settings/notifications" element={<SettingsPage />} />
                         <Route path="/support" element={<Support />} />

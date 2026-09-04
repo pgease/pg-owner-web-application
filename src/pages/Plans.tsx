@@ -66,27 +66,58 @@ export default function Plans() {
   const createOrderMut = useCreatePlanCheckoutOrderMutation();
   const verifyPaymentMut = useVerifyPlanPaymentMutation();
 
-  const rawPlanName = featuresData?.planName || currentPlanData?.currentPlan?.name || "Free";
+  const normalizedFeatures = (featuresData as any)?.data || featuresData;
+  const rawPlanName =
+    (currentPlanData as any)?.currentPlan?.name ||
+    (currentPlanData as any)?.currentPlan?.code ||
+    (currentPlanData as any)?.planDisplayName ||
+    (currentPlanData as any)?.planName ||
+    normalizedFeatures?.planDisplayName ||
+    normalizedFeatures?.planName ||
+    "Free";
+
   const currentPlanKey: PlanTierKey = rawPlanName.toLowerCase().includes("pro")
     ? "PRO"
-    : rawPlanName.toLowerCase().includes("lite")
+    : rawPlanName.toLowerCase().includes("lite") || rawPlanName.toLowerCase().includes("growth") || rawPlanName.toLowerCase().includes("premium")
     ? "LITE"
     : "FREE";
 
-  const apiFeatureKeys = buildFeatureKeySet(featuresData?.features);
-  const hasExplicitApiList = Boolean(featuresData?.features && featuresData.features.length > 0);
+  const ownerTierLevel = useMemo(() => {
+    const name = rawPlanName.toLowerCase();
+    if (name.includes("pro")) return 2;
+    if (name.includes("premium") || name.includes("lite") || name.includes("growth")) return 1;
+    return 0; // Free
+  }, [rawPlanName]);
+
+  const availableFeaturesArray = (Array.isArray((currentPlanData as any)?.features) && (currentPlanData as any).features.length > 0)
+    ? (currentPlanData as any).features
+    : normalizedFeatures?.features || [];
+  const apiFeatureKeys = buildFeatureKeySet(availableFeaturesArray);
+  const hasExplicitApiList = Boolean(availableFeaturesArray && availableFeaturesArray.length > 0);
 
   const activeFeaturesToShow = useMemo(() => {
-    if (featuresData?.features && featuresData.features.length > 0) {
-      return featuresData.features;
+    if (Array.isArray((currentPlanData as any)?.features) && (currentPlanData as any).features.length > 0) {
+      return (currentPlanData as any).features.map((f: any) => ({
+        featureKey: f.featureKey || f.name,
+        name: f.name || f.featureName,
+        description: f.description || "Included in your " + currentPlanKey + " plan",
+      }));
+    }
+    const feats = normalizedFeatures?.features;
+    if (Array.isArray(feats) && feats.length > 0) {
+      return feats.map((f: any) => ({
+        featureKey: f.featureKey || f.id,
+        name: f.name || f.featureName,
+        description: f.description || "Included in your " + currentPlanKey + " plan",
+      }));
     }
     const key = currentPlanKey.toLowerCase() as "free" | "lite" | "pro";
-    return features.filter(f => f[key]).map(f => ({
+    return features.filter((f) => f[key]).map((f) => ({
       featureKey: f.featureKey,
       name: f.name,
-      description: "Included in your " + currentPlanKey + " plan"
+      description: "Included in your " + currentPlanKey + " plan",
     }));
-  }, [featuresData, currentPlanKey]);
+  }, [currentPlanData, normalizedFeatures, currentPlanKey]);
 
   const fallbackPlans = [
     {
@@ -142,7 +173,57 @@ export default function Plans() {
     },
   ];
 
-  const planCards = plansData?.plans && plansData.plans.length > 0 ? plansData.plans : fallbackPlans;
+  const rawPlansList = useMemo(() => {
+    if (Array.isArray(plansData)) return plansData;
+    if (Array.isArray((plansData as any)?.plans)) return (plansData as any).plans;
+    return [];
+  }, [plansData]);
+
+  const planCards = useMemo(() => {
+    if (!rawPlansList || rawPlansList.length === 0) return fallbackPlans;
+    return rawPlansList.map((p: any) => {
+      const code = (p.code || p.name || "").toUpperCase();
+      const isFree = code.includes("FREE") || p.name?.toLowerCase() === "free";
+      const isPopular = p.isPopular ?? p.popular ?? code.includes("PRO");
+
+      let featureList: string[] = [];
+      if (Array.isArray(p.features)) {
+        featureList = p.features.map((f: any) =>
+          typeof f === "string" ? f : f.name || f.featureName || f.featureKey,
+        );
+      }
+      if (featureList.length === 0) {
+        featureList = isFree
+          ? ["Up to 15 Beds", "1 Property", "Manual Rent Tracking", "5 Free KYC Credits"]
+          : code.includes("PRO")
+          ? ["Dynamic Bed Quota Pricing", "Full Automation & Agmts", "Staff Permissions", "WhatsApp Reminders"]
+          : ["Unlimited Properties", "High Bed Allowance", "Priority 24/7 Support", "Revenue Analytics"];
+      }
+
+      const unitPrice =
+        Number(p.pricePerBed) > 0
+          ? Number(p.pricePerBed)
+          : code.includes("ENTERPRISE")
+          ? 18
+          : code.includes("PRO")
+          ? 20
+          : Number(p.price) || 0;
+
+      return {
+        id: p.id,
+        name: p.displayName || p.name,
+        code,
+        priceMonthly: Number(p.price) || 0,
+        priceAnnual: Math.round((Number(p.price) || 0) * 10),
+        pricePerBed: unitPrice,
+        minBeds: p.minBeds || (isFree ? 1 : 10),
+        maxProperties: p.maxProperties || (isFree ? 1 : 10),
+        maxTenants: p.maxTenants || (isFree ? 15 : 100),
+        features: featureList,
+        popular: isPopular,
+      };
+    });
+  }, [rawPlansList]);
 
   const handleUpgradeCheckout = async (planId: string, bedCount?: number) => {
     try {
@@ -240,7 +321,9 @@ export default function Plans() {
               </h3>
               <p className="text-xs text-muted-foreground">
                 {currentPlanData?.expiresAt
-                  ? `Renewal Date: ${new Date(currentPlanData.expiresAt).toLocaleDateString("en-IN")}`
+                  ? `Renewal Date: ${new Date(currentPlanData.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`
+                  : currentPlanKey === "PRO"
+                  ? "Active Subscription (50 Beds Quota)"
                   : "Free perpetual license for single property management"}
               </p>
             </div>
@@ -317,11 +400,26 @@ export default function Plans() {
       <div className="grid gap-6 sm:grid-cols-3">
         {planCards.map((plan: any) => {
           const planKey = (plan.code || plan.id || plan.name).toLowerCase();
-          const isCurrent = plan.name.toLowerCase() === currentPlanKey.toLowerCase();
-          const isFree = planKey.includes("free") || plan.name.toLowerCase() === "free";
+          const cardTierLevel = planKey.includes("pro")
+            ? 2
+            : planKey.includes("premium") || planKey.includes("enterprise") || planKey.includes("lite")
+            ? 1
+            : 0;
+
+          const isCurrent =
+            plan.id === (currentPlanData as any)?.planId ||
+            plan.id === (currentPlanData as any)?.currentPlan?.id ||
+            cardTierLevel === ownerTierLevel;
+          const isFree = cardTierLevel === 0;
+
+          // 1. Most Popular only when owner is on Free plan and card is Premium
+          const showPopularTag = ownerTierLevel === 0 && cardTierLevel === 1;
+
+          // 2. Can upgrade only if card is strictly a higher tier than owner tier
+          const canUpgrade = cardTierLevel > ownerTierLevel;
           
-          const currentBeds = bedsByPlan[plan.id] || bedsByPlan[planKey] || (planKey.includes("enterprise") ? 150 : 50);
-          const unitPrice = Number(plan.pricePerBed || (planKey.includes("enterprise") ? 18 : 20));
+          const currentBeds = bedsByPlan[plan.id] || bedsByPlan[planKey] || (cardTierLevel === 2 ? 50 : 50);
+          const unitPrice = Number(plan.pricePerBed || (cardTierLevel === 2 ? 49 : 29));
           
           const monthlyTotal = isFree ? 0 : currentBeds * unitPrice;
           const calculatedPrice = billingCycle === "annual" ? monthlyTotal * 10 : monthlyTotal;
@@ -330,12 +428,14 @@ export default function Plans() {
             <Card
               key={plan.id || plan.name}
               className={`relative flex flex-col justify-between transition-all ${
-                plan.popular
+                showPopularTag
                   ? "border-teal-600 shadow-xl shadow-teal-500/10 ring-2 ring-teal-600/20"
+                  : isCurrent
+                  ? "border-teal-600/50 bg-teal-500/[0.02]"
                   : "hover:border-teal-200 dark:hover:border-teal-800"
-              } ${isCurrent ? "bg-teal-500/[0.02]" : ""}`}
+              }`}
             >
-              {plan.popular && (
+              {showPopularTag && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <Badge className="bg-teal-600 text-white text-[10px] px-2.5 shadow-sm">MOST POPULAR</Badge>
                 </div>
@@ -376,17 +476,17 @@ export default function Plans() {
                 )}
 
                 <CardDescription className="text-xs mt-1">
-                  {plan.name.toLowerCase() === "free"
+                  {cardTierLevel === 0
                     ? "Essential starter tools for single property"
-                    : plan.name.toLowerCase() === "pro"
-                    ? "Full automation & agreements with flexible beds"
-                    : "High capacity bed allowance for large PG chains"}
+                    : cardTierLevel === 1
+                    ? "Growing property management with automated rent collection"
+                    : "Full automation & agreements with flexible beds quota"}
                 </CardDescription>
               </CardHeader>
 
               <CardContent className="space-y-4 pb-6">
-                {/* Bed Counter for Paid Plans */}
-                {!isFree && (
+                {/* Bed Counter for Paid Plans when active or can upgrade */}
+                {!isFree && (canUpgrade || isCurrent) && (
                   <div className="bg-muted/40 p-3 rounded-xl border space-y-2">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-foreground">Beds Capacity:</span>
@@ -441,24 +541,27 @@ export default function Plans() {
                   ))}
                 </div>
 
-                <Button
-                  className={`w-full font-semibold ${
-                    isCurrent
-                      ? "border-teal-600 text-teal-600"
-                      : "bg-teal-600 hover:bg-teal-700 text-white shadow-sm"
-                  }`}
-                  variant={isCurrent ? "outline" : "default"}
-                  disabled={isCurrent || createOrderMut.isPending}
-                  onClick={() => handleUpgradeCheckout(plan.id || plan.name.toLowerCase(), currentBeds)}
-                >
-                  {createOrderMut.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : isCurrent ? (
-                    "Active Plan"
-                  ) : (
-                    `Upgrade (${currentBeds} Beds)`
-                  )}
-                </Button>
+                {isCurrent ? (
+                  <Button
+                    className="w-full font-semibold border-teal-600 text-teal-600"
+                    variant="outline"
+                    disabled
+                  >
+                    Active Plan
+                  </Button>
+                ) : canUpgrade ? (
+                  <Button
+                    className="w-full font-semibold bg-teal-600 hover:bg-teal-700 text-white shadow-sm"
+                    disabled={createOrderMut.isPending}
+                    onClick={() => handleUpgradeCheckout(plan.id || plan.name.toLowerCase(), currentBeds)}
+                  >
+                    {createOrderMut.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      `Upgrade (${currentBeds} Beds)`
+                    )}
+                  </Button>
+                ) : null}
               </CardContent>
             </Card>
           );

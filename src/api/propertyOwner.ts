@@ -464,6 +464,11 @@ export interface PropertyTenant {
   block?: PropertyTenantBlockInfo;
   bed?: PropertyTenantBedInfo;
   notice?: PropertyTenantNotice;
+  isOnNotice?: boolean;
+  roomTenantId?: string;
+  roomNumber?: string;
+  roomNo?: string;
+  bedNo?: string;
   /** KYC / Aadhaar — set when API sends it */
   kycVerified?: boolean;
   aadhaarVerified?: boolean;
@@ -484,25 +489,69 @@ export interface PropertyTenant {
 /** @deprecated use PropertyTenant */
 export type PropertyTenantListItem = PropertyTenant;
 
-export function normalizeSingleTenant(t: any): PropertyTenant {
-  if (!t) return t;
+export function normalizeSingleTenant(raw: any): PropertyTenant {
+  if (!raw) return raw;
 
-  const monthlyRent = t.monthlyRent ?? t.roomTenant?.rentAmount ?? t.roomTenant?.monthlyRent ?? 0;
-  const securityDeposit = t.securityDeposit ?? t.roomTenant?.securityDeposit ?? 0;
-  const moveInDate = t.moveInDate ?? t.roomTenant?.startDate ?? t.roomTenant?.moveInDate ?? t.createdAt ?? "";
+  const root = raw && typeof raw === "object" && raw.data ? raw.data : raw;
+  const t = (root && root.tenant) ? root.tenant : root;
+  const stay = (root && root.currentStay) ? root.currentStay : (t.roomTenant || {});
+  const personal = t.personalDetails || {};
+  const guardian = t.guardianDetails || {};
+  const gst = t.gstDetails || {};
+  const bank = t.bankDetails || {};
+  const kyc = t.kyc || t.kycInfo || {};
 
-  const noticeGivenAt = t.noticeGivenAt ?? t.notice?.noticeStartedAt ?? null;
-  const expectedMoveOutDate = t.expectedMoveOutDate ?? t.notice?.vacateOn ?? null;
+  const monthlyRent = stay.rentAmount ?? t.monthlyRent ?? stay.monthlyRent ?? t.roomTenant?.rentAmount ?? t.roomTenant?.monthlyRent ?? 0;
+  const securityDeposit = stay.securityDeposit ?? t.securityDeposit ?? t.roomTenant?.securityDeposit ?? 0;
+  const moveInDate = stay.startDate ?? t.moveInDate ?? stay.moveInDate ?? t.roomTenant?.startDate ?? t.roomTenant?.moveInDate ?? t.createdAt ?? "";
+
+  const noticeGivenAt = stay.notice?.noticeStartedAt ?? t.noticeGivenAt ?? t.notice?.noticeStartedAt ?? null;
+  const expectedMoveOutDate = stay.notice?.vacateOn ?? t.expectedMoveOutDate ?? t.notice?.vacateOn ?? null;
+  const isOnNotice = Boolean(
+    t.notice?.isOnNotice ||
+    t.isOnNotice ||
+    stay.notice?.isOnNotice ||
+    stay.isOnNotice ||
+    (t.roomTenant && (t.roomTenant.isOnNotice || t.roomTenant.is_on_notice)) ||
+    (stay && (stay.isOnNotice || stay.is_on_notice)) ||
+    noticeGivenAt ||
+    expectedMoveOutDate
+  );
 
   const phone = t.phone ?? t.mobileNumber ?? "";
   const mobileNumber = t.mobileNumber ?? t.phone ?? "";
 
-  const roomNo = t.roomNo ?? t.room?.roomNumber ?? "";
-  const roomNumber = t.roomNumber ?? t.room?.roomNumber ?? "";
-  const bedNo = t.bedNo ?? t.bed?.bedNumber ?? "";
+  const roomNo = String(stay.roomNumber ?? t.roomNo ?? t.room?.roomNumber ?? "");
+  const roomNumber = String(stay.roomNumber ?? t.roomNumber ?? t.room?.roomNumber ?? "");
+  const bedNo = String(stay.bedNumber ?? t.bedNo ?? t.bed?.bedNumber ?? "");
+  const floor = stay.floor ?? t.floor?.name ?? t.floor ?? "";
+  const block = stay.block ?? t.block?.name ?? t.block ?? "";
+  const sharingType = stay.stayType ?? t.sharingType ?? "2 Bed Sharing";
+
+  const isKycVerified = Boolean(
+    kyc.isVerified ||
+    t.isKycVerified ||
+    t.is_kyc_verified ||
+    kyc.status === "completed" ||
+    kyc.status === "verified" ||
+    kyc.verified
+  );
+
+  const isKycRequested = Boolean(
+    kyc.status === "requested" ||
+    kyc.status === "pending_verification" ||
+    kyc.requestedAt ||
+    (t.kycInfo && t.kycInfo.status === "requested")
+  );
 
   return {
     ...t,
+    ...personal,
+    ...guardian,
+    ...gst,
+    ...bank,
+    id: t.id || root.id,
+    roomTenantId: stay.roomTenantId || t.roomTenantId || t.roomTenant?.id || t.id,
     phone,
     mobileNumber,
     monthlyRent,
@@ -510,9 +559,69 @@ export function normalizeSingleTenant(t: any): PropertyTenant {
     moveInDate,
     noticeGivenAt,
     expectedMoveOutDate,
+    isOnNotice,
+    notice: {
+      isOnNotice,
+      noticeStartedAt: noticeGivenAt,
+      vacateOn: expectedMoveOutDate,
+      daysUntilVacate: expectedMoveOutDate ? Math.ceil((new Date(expectedMoveOutDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000)) : null,
+    },
     roomNo,
     roomNumber,
     bedNo,
+    floor,
+    block,
+    sharingType,
+    // Personal details
+    alternatePhone: personal.alternatePhone ?? t.alternatePhone ?? "",
+    dob: personal.dob ?? t.dob ?? "",
+    gender: personal.gender ?? t.gender ?? "",
+    tenantType: personal.tenantType ?? t.tenantType ?? "",
+    bloodGroup: personal.bloodGroup ?? t.bloodGroup ?? "",
+    foodPreference: personal.foodPreferences ?? personal.foodPreference ?? t.foodPreference ?? "",
+    remarks: personal.remarks ?? t.remarks ?? "",
+    nationality: personal.nationality ?? t.nationality ?? "Indian",
+    workAddress: personal.officeOrCollegeName ?? personal.workAddress ?? t.workAddress ?? "",
+    currentAddress: personal.currentAddress ?? t.currentAddress ?? "",
+    permanentAddress: personal.permanentAddress ?? t.permanentAddress ?? "",
+    emergencyContact: personal.emergencyContact ?? t.emergencyContact ?? "",
+    // Guardian details
+    fatherName: guardian.fatherName ?? t.fatherName ?? "",
+    fatherPhone: guardian.fatherPhone ?? t.fatherPhone ?? "",
+    fatherOccupation: guardian.fatherOccupation ?? t.fatherOccupation ?? "",
+    motherName: guardian.motherName ?? t.motherName ?? "",
+    motherPhone: guardian.motherPhone ?? t.motherPhone ?? "",
+    motherOccupation: guardian.motherOccupation ?? t.motherOccupation ?? "",
+    guardianName: guardian.localGuardianName ?? guardian.guardianName ?? t.guardianName ?? "",
+    guardianPhone: guardian.localGuardianPhone ?? guardian.guardianPhone ?? t.guardianPhone ?? "",
+    guardianAddress: guardian.localGuardianAddress ?? guardian.guardianAddress ?? t.guardianAddress ?? "",
+    // GST
+    gstNumber: gst.gstNumber ?? t.gstNumber ?? "",
+    panNumber: gst.panNumber ?? t.panNumber ?? "",
+    companyName: gst.companyName ?? t.companyName ?? "",
+    businessOwnerName: gst.businessOwnerName ?? t.businessOwnerName ?? "",
+    companyAddress: gst.companyAddress ?? t.companyAddress ?? "",
+    // Bank
+    accountNumber: bank.bankAccountNumber ?? bank.accountNumber ?? t.accountNumber ?? "",
+    ifscCode: bank.bankIfscCode ?? bank.ifscCode ?? t.ifscCode ?? "",
+    upiId: bank.bankUpiId ?? bank.upiId ?? t.upiId ?? "",
+    accountHolderName: bank.bankAccountHolderName ?? bank.accountHolderName ?? t.name ?? "",
+    // KYC
+    isKycVerified,
+    isKycRequested,
+    kycInfo: kyc,
+    kycStatus: kyc.status ?? (isKycVerified ? "completed" : isKycRequested ? "requested" : "pending"),
+    // Full nested references
+    personalDetails: personal,
+    guardianDetails: guardian,
+    gstDetails: gst,
+    bankDetails: bank,
+    currentStay: stay,
+    paymentDetails: root.paymentDetails,
+    recentPayments: root.recentPayments || [],
+    staysHistory: root.staysHistory || [],
+    complaints: root.complaints || [],
+    agreements: root.agreements || [],
   };
 }
 
@@ -1547,8 +1656,14 @@ export async function setTenantNotice(
   return httpRequest<NoticePeriodResponse>(
     `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${roomTenantId}/notice`,
     {
-      method: 'POST',
-      body,
+      method: "POST",
+      auth: true,
+      body: {
+        vacateOn: body.expectedMoveOutDate,
+        expectedMoveOutDate: body.expectedMoveOutDate,
+        noticeGivenAt: body.noticeGivenAt,
+        reason: body.reason,
+      },
     }
   );
 }
@@ -1557,7 +1672,8 @@ export async function clearTenantNotice(propertyId: string, roomTenantId: string
   return httpRequest<{ success: boolean; message: string }>(
     `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${roomTenantId}/notice`,
     {
-      method: 'DELETE',
+      method: "DELETE",
+      auth: true,
     }
   );
 }
@@ -1585,12 +1701,38 @@ export interface ElectricityMeterDue {
 }
 
 export async function getElectricityDues(propertyId: string, roomTenantId: string) {
-  return httpRequest<{ dues: ElectricityMeterDue[] }>(
+  const raw = await httpRequest<any>(
     `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${roomTenantId}/electricity-meter-dues`,
     {
       auth: true,
     }
   );
+  const duesList: any[] = Array.isArray(raw?.dues)
+    ? raw.dues
+    : Array.isArray(raw?.electricityMeterDues)
+    ? raw.electricityMeterDues
+    : [];
+
+  const normalized: ElectricityMeterDue[] = duesList.map((d: any) => ({
+    ...d,
+    id: d.id,
+    propertyId: d.propertyId || d.property_id || propertyId,
+    roomTenantId: d.roomTenantId || d.room_tenant_id || roomTenantId,
+    previousReading: Number(d.initialReading ?? d.previousReading ?? 0),
+    currentReading: Number(d.finalReading ?? d.currentReading ?? 0),
+    unitsConsumed: Number(d.unitsConsumed ?? d.units_consumed ?? 0),
+    ratePerUnit: Number(d.amountPerUnit ?? d.ratePerUnit ?? 0),
+    totalAmount: Number(d.totalAmount ?? d.total_amount ?? 0),
+    readingDate: d.finalReadingDate || d.final_reading_date || d.createdAt || d.created_at || "",
+    dueDate: d.dueDate || d.due_date || "",
+    billingMonth: d.billingMonth ?? (d.finalReadingDate ? new Date(d.finalReadingDate).getMonth() + 1 : new Date().getMonth() + 1),
+    billingYear: d.billingYear ?? (d.finalReadingDate ? new Date(d.finalReadingDate).getFullYear() : new Date().getFullYear()),
+    isPaid: Boolean(d.isPaid ?? d.is_paid ?? false),
+    notes: d.description || d.notes || "",
+    createdAt: d.createdAt || d.created_at || "",
+  }));
+
+  return { dues: normalized };
 }
 
 export async function addElectricityDues(
@@ -1600,17 +1742,32 @@ export async function addElectricityDues(
     previousReading: number;
     currentReading: number;
     ratePerUnit: number;
-    billingMonth: number;
-    billingYear: number;
+    billingMonth?: number;
+    billingYear?: number;
+    initialReadingDate?: string;
+    finalReadingDate?: string;
     dueDate?: string;
     notes?: string;
   }
 ) {
+  const payload = {
+    initialReading: Number(body.previousReading),
+    finalReading: Number(body.currentReading),
+    amountPerUnit: Number(body.ratePerUnit),
+    previousReading: Number(body.previousReading),
+    currentReading: Number(body.currentReading),
+    ratePerUnit: Number(body.ratePerUnit),
+    initialReadingDate: body.initialReadingDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    finalReadingDate: body.finalReadingDate || new Date().toISOString(),
+    description: body.notes || undefined,
+    notes: body.notes || undefined,
+  };
+
   return httpRequest<{ success: boolean; message: string; due: ElectricityMeterDue }>(
     `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${roomTenantId}/electricity-meter-dues`,
     {
-      method: 'POST',
-      body,
+      method: "POST",
+      body: payload,
       auth: true,
     }
   );
@@ -1825,14 +1982,46 @@ export async function moveTenant(propertyId: string, payload: MoveTenantPayload)
 // ACTIVITY LOGS & AUDIT TRAIL
 // ==========================================================
 
-export async function getActivityLogs(params?: { limit?: number; offset?: number; module?: string; action?: string }) {
-  const q = new URLSearchParams();
-  if (params?.limit) q.set("limit", String(params.limit));
-  if (params?.offset) q.set("offset", String(params.offset));
-  if (params?.module) q.set("module", params.module);
-  if (params?.action) q.set("action", params.action);
+export interface ActivityLogItem {
+  id: string;
+  propertyId: string | null;
+  propertyOwnerId: string;
+  actorType: "property_owner" | "staff" | "tenant";
+  actorId: string;
+  actorSnapshot: Record<string, any> | null;
+  httpMethod: string;
+  routePattern: string;
+  category: string;
+  summary: string;
+  metadata: Record<string, any> | null;
+  createdAt: string;
+}
 
-  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/activity-logs?${q.toString()}`, {
+export interface ActivityLogsResponse {
+  items: ActivityLogItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export async function getActivityLogs(params?: {
+  page?: number;
+  limit?: number;
+  propertyId?: string;
+  category?: string;
+  actorType?: string;
+  httpMethod?: string;
+}) {
+  const q = new URLSearchParams();
+  if (params?.page) q.set("page", String(params.page));
+  if (params?.limit) q.set("limit", String(params.limit));
+  if (params?.propertyId && params.propertyId !== "all") q.set("propertyId", params.propertyId);
+  if (params?.category && params.category !== "all") q.set("category", params.category);
+  if (params?.actorType && params.actorType !== "all") q.set("actorType", params.actorType);
+  if (params?.httpMethod && params.httpMethod !== "all") q.set("httpMethod", params.httpMethod);
+
+  return httpRequest<ActivityLogsResponse>(`${PROPERTY_OWNER_BASE}/activity-logs?${q.toString()}`, {
     auth: true,
   });
 }

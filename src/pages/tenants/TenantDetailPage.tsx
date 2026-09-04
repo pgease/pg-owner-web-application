@@ -71,6 +71,7 @@ import {
   queryKeys,
   usePropertyTenantDetail,
   useRequestTenantKycMutation,
+  usePostManualRentMutation,
   usePropertyAgreements,
   useCreateAgreementMutation,
   useSendAgreementEsignMutation,
@@ -113,7 +114,19 @@ export default function TenantDetailPage() {
 
   const { data: tenant, isLoading } = usePropertyTenantDetail(currentPropertyId, tenantId);
 
-  const roomTenantId = tenant?.roomTenant?.id ?? tenant?.id ?? "";
+  const roomTenantId = tenant?.roomTenant?.id ?? (tenant as any)?.roomTenantId ?? tenant?.id ?? "";
+
+  // Manual payment collection state
+  const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    amountPaid: 0,
+    paymentMethod: "upi",
+    periodMonth: new Date().getMonth() + 1,
+    periodYear: new Date().getFullYear(),
+    reference: "",
+    notes: "Manual rent collection",
+  });
+  const postManualRentMut = usePostManualRentMutation(currentPropertyId);
 
   // React Query Mutations & Sub-resource hooks
   const requestKycMut = useRequestTenantKycMutation();
@@ -316,14 +329,83 @@ export default function TenantDetailPage() {
   const floor = tenantFloor(tenant);
   const rent = tenantRentAmount(tenant);
   const duesLabel = tenantRentDueLabel(tenant);
-  const isKycDone = Boolean(tenant.isKycVerified || tenant.kycInfo?.verified || tenant.kycStatus === "completed");
+  const isKycDone = Boolean(
+    tenant.isKycVerified ||
+    (tenant as any).is_kyc_verified ||
+    tenant.kycInfo?.isVerified ||
+    tenant.kycInfo?.status === "completed" ||
+    tenant.kycInfo?.status === "verified" ||
+    tenant.kycInfo?.verified ||
+    tenant.kycStatus === "completed" ||
+    tenant.kycStatus === "verified"
+  );
+  const isKycRequested = Boolean(
+    (tenant as any).isKycRequested ||
+    tenant.kycInfo?.status === "requested" ||
+    tenant.kycInfo?.status === "pending_verification" ||
+    tenant.kycStatus === "requested" ||
+    tenant.kycInfo?.requestedAt
+  );
+
+  const handleRecordManualPayment = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!currentPropertyId || !roomTenantId) {
+      toast({ title: "Tenant stay assignment missing", variant: "destructive" });
+      return;
+    }
+    const amt = Number(paymentForm.amountPaid);
+    if (!amt || amt <= 0) {
+      toast({ title: "Please enter a valid amount", variant: "destructive" });
+      return;
+    }
+    try {
+      await postManualRentMut.mutateAsync({
+        roomTenantId,
+        tenantId: tenant.id,
+        amountPaid: amt,
+        paymentMethod: paymentForm.paymentMethod,
+        periodMonth: Number(paymentForm.periodMonth),
+        periodYear: Number(paymentForm.periodYear),
+        reference: paymentForm.reference.trim() || undefined,
+        notes: paymentForm.notes.trim() || undefined,
+        status: "paid",
+      } as any);
+
+      toast({
+        title: "Payment Recorded Successfully! 🎉",
+        description: `₹${amt.toLocaleString("en-IN")} recorded for ${name}.`,
+      });
+      setRecordPaymentOpen(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenantDetail(currentPropertyId, tenantId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenants(currentPropertyId) });
+      queryClient.invalidateQueries({ queryKey: ["rent-collections", currentPropertyId] });
+      queryClient.invalidateQueries({ queryKey: ["propertyTenants"] });
+    } catch (err: any) {
+      toast({
+        title: "Failed to record payment",
+        description: err?.message || "Please check details and try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const matchingAgreement = (agreementsData?.agreements || []).find(
     (a) => a.roomTenantId === roomTenantId || a.tenantPhone === phone
   );
 
   const electricityDuesList = electricityData?.dues || [];
-  const hasActiveNotice = Boolean(tenant.noticeGivenAt || tenant.expectedMoveOutDate);
+  const hasActiveNotice = Boolean(
+    (tenant as any).isOnNotice ||
+    (tenant as any).is_on_notice ||
+    (tenant as any).currentStay?.notice?.isOnNotice ||
+    tenant.noticeGivenAt ||
+    (tenant as any).notice?.noticeStartedAt ||
+    tenant.expectedMoveOutDate ||
+    (tenant as any).notice?.vacateOn ||
+    (tenant as any).currentStay?.vacateOn
+  );
+  const noticeStartDate = tenant.noticeGivenAt || (tenant as any).notice?.noticeStartedAt || (tenant as any).currentStay?.notice?.noticeStartedAt || "Recently";
+  const noticeVacateDate = tenant.expectedMoveOutDate || (tenant as any).notice?.vacateOn || (tenant as any).currentStay?.notice?.vacateOn || (tenant as any).currentStay?.vacateOn;
 
   const handleSaveProfile = async () => {
     if (!currentPropertyId || !tenantId) return;
@@ -371,12 +453,19 @@ export default function TenantDetailPage() {
   };
 
   const handleRequestKyc = async () => {
+    if (!roomTenantId) {
+      toast({ title: "Room tenant ID missing", variant: "destructive" });
+      return;
+    }
     try {
       await requestKycMut.mutateAsync(roomTenantId);
       toast({
         title: "DigiLocker KYC Dispatched! 📲",
         description: `Aadhaar verification link sent to ${phone} via WhatsApp.`,
       });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenantDetail(currentPropertyId, tenantId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenants(currentPropertyId) });
+      queryClient.invalidateQueries({ queryKey: ["kycApplications"] });
     } catch (e: any) {
       toast({ title: "KYC Request failed", description: e?.message, variant: "destructive" });
     }
@@ -426,29 +515,46 @@ export default function TenantDetailPage() {
   };
 
   const handleSetNotice = async () => {
+    if (!roomTenantId) {
+      toast({ title: "Room tenant assignment missing", variant: "destructive" });
+      return;
+    }
+    const vacate = noticeForm.expectedMoveOutDate || noticeForm.noticeGivenAt;
+    if (!vacate) {
+      toast({ title: "Please select an expected move-out date", variant: "destructive" });
+      return;
+    }
     try {
       await setNoticeMut.mutateAsync({
         roomTenantId,
         body: {
           noticeGivenAt: noticeForm.noticeGivenAt,
-          expectedMoveOutDate: noticeForm.expectedMoveOutDate,
+          expectedMoveOutDate: vacate,
           reason: noticeForm.reason,
         },
       });
       toast({
         title: "Notice Period Initiated 🚪",
-        description: `Move-out scheduled for ${noticeForm.expectedMoveOutDate}.`,
+        description: `Move-out scheduled for ${vacate}.`,
       });
       setNoticeOpen(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenantDetail(currentPropertyId, tenantId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenants(currentPropertyId) });
     } catch (e: any) {
       toast({ title: "Failed to set notice", description: e?.message, variant: "destructive" });
     }
   };
 
   const handleClearNotice = async () => {
+    if (!roomTenantId) {
+      toast({ title: "Room tenant assignment missing", variant: "destructive" });
+      return;
+    }
     try {
       await clearNoticeMut.mutateAsync(roomTenantId);
       toast({ title: "Notice Period Cancelled", description: "Tenant status reset to active residency." });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenantDetail(currentPropertyId, tenantId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenants(currentPropertyId) });
     } catch (e: any) {
       toast({ title: "Failed to clear notice", description: e?.message, variant: "destructive" });
     }
@@ -519,13 +625,43 @@ export default function TenantDetailPage() {
                     <h2 className="text-xl font-bold text-foreground truncate">{name}</h2>
                     <div className="flex items-center gap-2 flex-wrap">
                       {isKycDone ? (
-                        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] py-0.5 px-2">
-                          Aadhar Verified ✓
+                        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] py-0.5 px-2 font-medium">
+                          Aadhaar Verified ✓
                         </Badge>
+                      ) : isKycRequested ? (
+                        <div className="flex items-center gap-1.5">
+                          <Badge className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] py-0.5 px-2 font-medium">
+                            KYC Requested ⏳
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-1.5 text-[10px] text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+                            onClick={handleRequestKyc}
+                            disabled={requestKycMut.isPending}
+                          >
+                            {requestKycMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Resend Link"}
+                          </Button>
+                        </div>
                       ) : (
-                        <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] py-0.5 px-2">
-                          Aadhar Pending
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] py-0.5 px-2 font-medium">
+                            Aadhar Pending
+                          </Badge>
+                          <Button
+                            size="sm"
+                            className="h-6 px-2 text-[10px] bg-teal-600 hover:bg-teal-700 text-white gap-1 rounded-full shadow-xs"
+                            onClick={handleRequestKyc}
+                            disabled={requestKycMut.isPending}
+                          >
+                            {requestKycMut.isPending ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <ShieldCheck className="h-3 w-3" />
+                            )}
+                            Request KYC
+                          </Button>
+                        </div>
                       )}
                       <span className="text-[10px] text-muted-foreground">Joined at : {tenant.moveInDate ? new Date(tenant.moveInDate).toLocaleDateString("en-IN") : "—"}</span>
                     </div>
@@ -573,6 +709,7 @@ export default function TenantDetailPage() {
                   </summary>
                   <div className="p-4 border-t bg-muted/10">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                      <DetailRow label="Tenant Type" value={(tenant as any).tenantType || "—"} />
                       <DetailRow label="Gender" value={(tenant as any).gender || "—"} />
                       <DetailRow label="Date Of Birth" value={(tenant as any).dob || "—"} />
                       <DetailRow label="Blood Group" value={(tenant as any).bloodGroup || "—"} />
@@ -660,6 +797,7 @@ export default function TenantDetailPage() {
                   </summary>
                   <div className="p-4 border-t bg-muted/10">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                      <DetailRow label="Account Holder Name" value={(tenant as any).accountHolderName || (tenant as any).bankAccountHolderName || name || "—"} />
                       <DetailRow label="Account Number" value={(tenant as any).accountNumber || "—"} />
                       <DetailRow label="IFSC Code" value={(tenant as any).ifscCode || "—"} />
                       <DetailRow label="UPI ID" value={(tenant as any).upiId || "—"} />
@@ -714,25 +852,83 @@ export default function TenantDetailPage() {
 
                 {/* Recent Payments Card */}
                 <Card className="border-border/60 shadow-sm">
-                  <CardHeader className="pb-3 border-b bg-muted/15">
+                  <CardHeader className="pb-3 border-b bg-muted/15 flex flex-row items-center justify-between">
                     <CardTitle className="text-sm font-bold">Recent Payments</CardTitle>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+                      onClick={() => {
+                        setPaymentForm((p) => ({
+                          ...p,
+                          amountPaid: Number(tenant.monthlyRent || rent || 0),
+                        }));
+                        setRecordPaymentOpen(true);
+                      }}
+                    >
+                      + Record
+                    </Button>
                   </CardHeader>
                   <CardContent className="p-4">
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3 p-3 rounded-lg border bg-emerald-50/20 dark:bg-emerald-950/10">
-                        <div className="h-9 w-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                          <CheckCircle2 className="h-5 w-5" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-foreground truncate">Amount Credited from {name}</p>
-                          <p className="text-[10px] text-muted-foreground">Received on {tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString("en-IN") : "Recently"}</p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">+₹{Number(tenant.monthlyRent || 0).toLocaleString("en-IN")}</p>
-                          <Badge variant="outline" className="text-[9px] py-0 border-emerald-300 text-emerald-700">monthly Rent</Badge>
-                        </div>
+                    {((tenant as any).recentPayments && (tenant as any).recentPayments.length > 0) ? (
+                      <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                        {(tenant as any).recentPayments.map((pay: any, pIdx: number) => {
+                          const payAmount = Number(pay.amount || pay.amountPaid || pay.amount_paid || 0);
+                          const payDate = pay.paidAt || pay.paid_at || pay.createdAt || pay.created_at;
+                          const method = pay.paymentMethod || pay.payment_method || "Payment";
+                          let noteText = "";
+                          if (typeof pay.notes === "string" && pay.notes.startsWith("{")) {
+                            try {
+                              const parsed = JSON.parse(pay.notes);
+                              noteText = parsed.notes || "";
+                            } catch(e) {}
+                          } else if (typeof pay.notes === "string") {
+                            noteText = pay.notes;
+                          }
+                          return (
+                            <div key={pay.id || pIdx} className="flex items-center gap-3 p-2.5 rounded-lg border bg-emerald-50/20 dark:bg-emerald-950/10">
+                              <div className="h-8 w-8 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0">
+                                <CheckCircle2 className="h-4 w-4" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-semibold text-foreground truncate">
+                                  {noteText || pay.dueType || `Rent via ${String(method).toUpperCase()}`}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground">
+                                  {payDate ? new Date(payDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "Recently"}
+                                </p>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                  +₹{payAmount.toLocaleString("en-IN")}
+                                </p>
+                                <Badge variant="outline" className="text-[9px] py-0 border-emerald-300 text-emerald-700 uppercase">
+                                  {pay.status || "Paid"}
+                                </Badge>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    </div>
+                    ) : (
+                      <div className="text-center py-4 space-y-2">
+                        <p className="text-xs text-muted-foreground">No recent payments recorded for this stay.</p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs text-teal-600 border-teal-600 hover:bg-teal-50 gap-1.5"
+                          onClick={() => {
+                            setPaymentForm((p) => ({
+                              ...p,
+                              amountPaid: Number(tenant.monthlyRent || rent || 0),
+                            }));
+                            setRecordPaymentOpen(true);
+                          }}
+                        >
+                          <IndianRupee className="h-3.5 w-3.5" /> Record Payment
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -747,11 +943,40 @@ export default function TenantDetailPage() {
                         <Phone className="h-4 w-4" /> Call Tenant
                       </a>
                     </Button>
-                    <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white gap-2" asChild>
-                      <a href={waLink(phone) || "#"} target="_blank" rel="noreferrer">
-                        <IndianRupee className="h-4 w-4" /> Collect Rent
-                      </a>
+                    <Button
+                      className="w-full bg-teal-600 hover:bg-teal-700 text-white gap-2 shadow-xs"
+                      onClick={() => {
+                        setPaymentForm((p) => ({
+                          ...p,
+                          amountPaid: Number(tenant.monthlyRent || rent || 0),
+                        }));
+                        setRecordPaymentOpen(true);
+                      }}
+                    >
+                      <IndianRupee className="h-4 w-4" /> Collect Rent / Mark Paid
                     </Button>
+                    {phone && (
+                      <Button variant="outline" className="w-full border-emerald-600 text-emerald-700 hover:bg-emerald-50 gap-2" asChild>
+                        <a href={waLink(phone) || "#"} target="_blank" rel="noreferrer">
+                          <MessageCircle className="h-4 w-4" /> Remind via WhatsApp
+                        </a>
+                      </Button>
+                    )}
+                    {!isKycDone && (
+                      <Button
+                        variant="outline"
+                        className="w-full border-blue-600 text-blue-600 hover:bg-blue-50 gap-2"
+                        onClick={handleRequestKyc}
+                        disabled={requestKycMut.isPending}
+                      >
+                        {requestKycMut.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <ShieldCheck className="h-4 w-4" />
+                        )}
+                        {isKycRequested ? "Resend KYC Link" : "Request KYC Verification"}
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -765,29 +990,36 @@ export default function TenantDetailPage() {
                   <Phone className="h-4 w-4 mr-2" /> Call
                 </a>
               </Button>
-              <Button className="flex-1 bg-teal-600 hover:bg-teal-700 text-white h-11" asChild>
-                <a href={waLink(phone) || "#"} target="_blank" rel="noreferrer">
-                  <IndianRupee className="h-4 w-4 mr-2" /> Collect rent
-                </a>
+              <Button
+                className="flex-1 bg-teal-600 hover:bg-teal-700 text-white h-11"
+                onClick={() => {
+                  setPaymentForm((p) => ({
+                    ...p,
+                    amountPaid: Number(tenant.monthlyRent || rent || 0),
+                  }));
+                  setRecordPaymentOpen(true);
+                }}
+              >
+                <IndianRupee className="h-4 w-4 mr-2" /> Collect rent
               </Button>
             </div>
           </TabsContent>
 
           {/* TAB 2: ELECTRICITY DUES */}
           <TabsContent value="electricity" className="mt-6 space-y-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <Card className="border-border/60 shadow-sm overflow-hidden flex flex-col">
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 border-b bg-muted/10">
                 <div>
-                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <CardTitle className="text-sm font-bold flex items-center gap-2">
                     <Zap className="h-4 w-4 text-amber-500" /> Electricity Meter Readings & Dues
                   </CardTitle>
-                  <CardDescription className="text-xs">
+                  <CardDescription className="text-xs mt-0.5">
                     Record sub-meter units and automatically calculate monthly billing dues.
                   </CardDescription>
                 </div>
                 <Button
                   size="sm"
-                  className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5 h-8"
+                  className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5 h-8 shrink-0 self-start sm:self-auto"
                   onClick={() => setElectricityOpen(true)}
                 >
                   <Plus className="h-3.5 w-3.5" /> Add Meter Reading
@@ -795,64 +1027,108 @@ export default function TenantDetailPage() {
               </CardHeader>
               <CardContent className="p-0">
                 {isElectricityLoading ? (
-                  <div className="flex justify-center py-8">
+                  <div className="flex flex-col items-center justify-center py-12 gap-2">
                     <Loader2 className="h-6 w-6 animate-spin text-teal-600" />
+                    <span className="text-xs text-muted-foreground">Loading electricity readings...</span>
                   </div>
                 ) : electricityDuesList.length === 0 ? (
-                  <div className="p-8 text-center text-xs text-muted-foreground">
-                    No electricity meter readings recorded yet. Click &quot;Add Meter Reading&quot; to log monthly units.
+                  <div className="p-10 text-center space-y-3">
+                    <div className="h-12 w-12 rounded-full bg-amber-50 dark:bg-amber-950/30 text-amber-600 flex items-center justify-center mx-auto">
+                      <Zap className="h-6 w-6" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-semibold text-foreground">No electricity readings recorded yet</h4>
+                      <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                        Log initial and monthly sub-meter readings to automatically generate electricity dues.
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5 h-8 mt-2"
+                      onClick={() => setElectricityOpen(true)}
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Add First Reading
+                    </Button>
                   </div>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/40 text-xs">
-                        <TableHead>Billing Month</TableHead>
-                        <TableHead>Readings (Prev → Curr)</TableHead>
-                        <TableHead>Units Consumed</TableHead>
-                        <TableHead>Rate / Unit</TableHead>
-                        <TableHead>Total Dues</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {electricityDuesList.map((due) => (
-                        <TableRow key={due.id}>
-                          <TableCell className="font-medium text-xs">
-                            {due.billingMonth}/{due.billingYear}
-                          </TableCell>
-                          <TableCell className="text-xs font-mono">
-                            {due.previousReading} → {due.currentReading}
-                          </TableCell>
-                          <TableCell className="text-xs font-semibold">{due.unitsConsumed} Units</TableCell>
-                          <TableCell className="text-xs">₹{due.ratePerUnit}</TableCell>
-                          <TableCell className="text-xs font-bold text-teal-600">
-                            ₹{due.totalAmount.toLocaleString("en-IN")}
-                          </TableCell>
-                          <TableCell>
-                            {due.isPaid ? (
-                              <Badge className="bg-emerald-100 text-emerald-800 text-[10px]">Paid ✓</Badge>
-                            ) : (
-                              <Badge variant="destructive" className="text-[10px]">Unpaid</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 w-7 p-0 text-destructive"
-                              onClick={async () => {
-                                await deleteElectricityMut.mutateAsync(due.id);
-                                toast({ title: "Reading deleted" });
-                              }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </TableCell>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/40 text-xs">
+                          <TableHead className="py-3 px-4">Billing Month / Date</TableHead>
+                          <TableHead className="py-3 px-4">Readings (Prev → Curr)</TableHead>
+                          <TableHead className="py-3 px-4">Units Consumed</TableHead>
+                          <TableHead className="py-3 px-4">Rate / Unit</TableHead>
+                          <TableHead className="py-3 px-4">Total Dues</TableHead>
+                          <TableHead className="py-3 px-4">Status</TableHead>
+                          <TableHead className="py-3 px-4 text-right">Action</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {electricityDuesList.map((due: any) => {
+                          const prev = Number(due.initialReading ?? due.previousReading ?? 0);
+                          const curr = Number(due.finalReading ?? due.currentReading ?? 0);
+                          const units = Number(due.unitsConsumed ?? Math.max(0, curr - prev));
+                          const rate = Number(due.amountPerUnit ?? due.ratePerUnit ?? 10);
+                          const total = Number(due.totalAmount ?? (units * rate));
+                          const dateStr = due.finalReadingDate || due.readingDate || due.createdAt;
+                          return (
+                            <TableRow key={due.id} className="hover:bg-muted/10 transition-colors">
+                              <TableCell className="py-3 px-4 font-semibold text-xs whitespace-nowrap">
+                                {dateStr
+                                  ? new Date(dateStr).toLocaleDateString("en-IN", {
+                                      month: "short",
+                                      year: "numeric",
+                                      day: "numeric",
+                                    })
+                                  : `Month ${due.billingMonth || 1}/${due.billingYear || 2026}`}
+                              </TableCell>
+                              <TableCell className="py-3 px-4 text-xs font-mono whitespace-nowrap">
+                                {prev} → {curr}
+                              </TableCell>
+                              <TableCell className="py-3 px-4 text-xs font-semibold whitespace-nowrap">
+                                {units.toFixed(1)} kWh
+                              </TableCell>
+                              <TableCell className="py-3 px-4 text-xs whitespace-nowrap">
+                                ₹{rate}/unit
+                              </TableCell>
+                              <TableCell className="py-3 px-4 text-xs font-bold text-teal-600 whitespace-nowrap">
+                                ₹{total.toLocaleString("en-IN")}
+                              </TableCell>
+                              <TableCell className="py-3 px-4 whitespace-nowrap">
+                                {due.isPaid ? (
+                                  <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-300">
+                                    Paid ✓
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="destructive" className="text-[10px]">
+                                    Unpaid
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="py-3 px-4 text-right whitespace-nowrap">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+                                  onClick={async () => {
+                                    try {
+                                      await deleteElectricityMut.mutateAsync(due.id);
+                                      toast({ title: "Reading deleted successfully" });
+                                    } catch (e: any) {
+                                      toast({ title: "Failed to delete reading", description: e?.message, variant: "destructive" });
+                                    }
+                                  }}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -860,44 +1136,52 @@ export default function TenantDetailPage() {
 
           {/* TAB 3: NOTICE PERIOD */}
           <TabsContent value="notice" className="mt-6 space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            <Card className="border-border/60 shadow-sm overflow-hidden flex flex-col">
+              <CardHeader className="pb-3 border-b bg-muted/15 p-5">
+                <CardTitle className="text-sm font-bold flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-teal-600" /> Notice Period & Checkout Management
                 </CardTitle>
-                <CardDescription className="text-xs">
-                  Track tenant move-out intentions, calculate checkout settlement, and free up bed availability.
+                <CardDescription className="text-xs mt-0.5">
+                  Track tenant move-out intentions, calculate checkout settlement, and schedule bed vacancy.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="p-5 space-y-4">
                 {hasActiveNotice ? (
-                  <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
+                  <div className="p-5 rounded-xl border border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="space-y-1">
                         <div className="text-sm font-bold text-amber-900 dark:text-amber-200 flex items-center gap-2">
                           <Clock className="h-4 w-4" /> Move-Out Notice Active
                         </div>
                         <p className="text-xs text-amber-700 dark:text-amber-400">
-                          Notice Given On: {tenant.noticeGivenAt || "Recently"} • Expected Move-Out:{" "}
-                          <span className="font-semibold">{tenant.expectedMoveOutDate}</span>
+                          Notice Given On:{" "}
+                          <span className="font-semibold">
+                            {noticeStartDate ? (new Date(noticeStartDate).toString() !== "Invalid Date" ? new Date(noticeStartDate).toLocaleDateString("en-IN") : noticeStartDate) : "Recently"}
+                          </span>
+                          {" "}• Expected Move-Out:{" "}
+                          <span className="font-bold underline">
+                            {noticeVacateDate ? (new Date(noticeVacateDate).toString() !== "Invalid Date" ? new Date(noticeVacateDate).toLocaleDateString("en-IN") : noticeVacateDate) : "Scheduled"}
+                          </span>
                         </p>
                       </div>
                       <Button
                         size="sm"
                         variant="outline"
-                        className="border-amber-300 text-amber-900 dark:text-amber-200 hover:bg-amber-100"
+                        className="border-amber-300 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40 shrink-0"
                         onClick={handleClearNotice}
+                        disabled={clearNoticeMut.isPending}
                       >
+                        {clearNoticeMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
                         Cancel Notice
                       </Button>
                     </div>
                   </div>
                 ) : (
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border p-4 rounded-xl bg-muted/20">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border p-5 rounded-xl bg-muted/20">
                     <div className="space-y-1">
                       <p className="text-sm font-semibold">No Active Notice</p>
                       <p className="text-xs text-muted-foreground">
-                        Tenant is currently in active stay. When the tenant submits a 30-day move-out notice, record it here.
+                        Tenant is currently in active stay. When the tenant submits a 30-day move-out notice, record it here to schedule checkout.
                       </p>
                     </div>
                     <Button
@@ -1390,6 +1674,138 @@ export default function TenantDetailPage() {
                 Save Changes
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* RECORD MANUAL PAYMENT MODAL */}
+        <Dialog open={recordPaymentOpen} onOpenChange={setRecordPaymentOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <IndianRupee className="h-5 w-5 text-teal-600" />
+                Collect Rent / Mark Payment Done
+              </DialogTitle>
+              <DialogDescription className="text-xs">
+                Record offline or direct payment received from {name} (Room {roomNo}, Bed {bedNo}).
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleRecordManualPayment} className="space-y-4 pt-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Amount Paid (₹) *</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  placeholder="Enter amount"
+                  value={paymentForm.amountPaid || ""}
+                  onChange={(e) => setPaymentForm((p) => ({ ...p, amountPaid: Number(e.target.value) }))}
+                  required
+                  className="font-bold text-base"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Payment Method</Label>
+                  <Select
+                    value={paymentForm.paymentMethod}
+                    onValueChange={(val) => setPaymentForm((p) => ({ ...p, paymentMethod: val }))}
+                  >
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue placeholder="Select mode" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="upi">UPI (GPay / PhonePe / Paytm)</SelectItem>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="bank_transfer">Net Banking / IMPS / NEFT</SelectItem>
+                      <SelectItem value="cheque">Cheque</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Billing Period</Label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <Select
+                      value={String(paymentForm.periodMonth)}
+                      onValueChange={(val) => setPaymentForm((p) => ({ ...p, periodMonth: Number(val) }))}
+                    >
+                      <SelectTrigger className="h-9 text-xs px-2">
+                        <SelectValue placeholder="Month" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                          <SelectItem key={m} value={String(m)}>
+                            {new Date(2026, m - 1).toLocaleString("default", { month: "short" })}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Select
+                      value={String(paymentForm.periodYear)}
+                      onValueChange={(val) => setPaymentForm((p) => ({ ...p, periodYear: Number(val) }))}
+                    >
+                      <SelectTrigger className="h-9 text-xs px-2">
+                        <SelectValue placeholder="Year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[2025, 2026, 2027].map((y) => (
+                          <SelectItem key={y} value={String(y)}>
+                            {y}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Reference / Transaction ID (Optional)</Label>
+                <Input
+                  placeholder="e.g. UPI Ref / Bank UTR / Cheque No"
+                  value={paymentForm.reference}
+                  onChange={(e) => setPaymentForm((p) => ({ ...p, reference: e.target.value }))}
+                  className="text-xs"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Remarks / Notes (Optional)</Label>
+                <Input
+                  placeholder="e.g. Received via cash at desk"
+                  value={paymentForm.notes}
+                  onChange={(e) => setPaymentForm((p) => ({ ...p, notes: e.target.value }))}
+                  className="text-xs"
+                />
+              </div>
+
+              <DialogFooter className="pt-3 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRecordPaymentOpen(false)}
+                  disabled={postManualRentMut.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5"
+                  disabled={postManualRentMut.isPending}
+                >
+                  {postManualRentMut.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4 mr-1" />
+                  )}
+                  Confirm Payment
+                </Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
 

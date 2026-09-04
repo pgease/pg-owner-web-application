@@ -84,7 +84,7 @@ const navItems: NavItem[] = [
       { title: "Leads & Visits", url: "/leads", permissionKey: "tenant_view", featureKey: "LEAD_CRM" },
       { title: "Add tenant", url: "/tenants/add", permissionKey: "tenant_add" },
       { title: "Tenant KYC", url: "/tenants/kyc", permissionKey: "kyc_view", featureKey: "AADHAAR_KYC" },
-      { title: "Notice Period", url: "/tenants/onboarding", permissionKey: "tenant_view" },
+      { title: "Notice Period", url: "/tenants/notice-period", permissionKey: "tenant_view" },
       { title: "Guest Log & Requests", url: "/tenants/guests", permissionKey: "guest_log" },
       { title: "Team List", url: "/team", permissionKey: "team_view_members" },
       { title: "Attendance", url: "/attendance", permissionKey: "attend_view" },
@@ -122,7 +122,7 @@ const navItems: NavItem[] = [
     icon: Settings,
     children: [
       { title: "Plans & Pricing", url: "/plans" },
-      { title: "Activity Audit Logs", url: "/settings?tab=activity" },
+      { title: "Activity Audit Logs", url: "/activity-logs" },
       { title: "Profile Settings", url: "/settings" },
       { title: "Support Help", url: "/support" },
       { title: "API Catalog", url: "/reference/apis" },
