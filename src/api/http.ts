@@ -1,4 +1,5 @@
-const API_BASE_URL = "http://localhost:3001/api";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "https://pg-ease-nest.vercel.app/api";
 
 /** Spec alias for PermissionContext — same value as access token after login */
 export const PGEASE_TOKEN_KEY = "pgease_token";
