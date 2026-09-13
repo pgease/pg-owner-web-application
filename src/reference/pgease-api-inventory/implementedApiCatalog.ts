@@ -68,6 +68,7 @@ export const IMPLEMENTED_API_CATALOG: ImplementedApiRow[] = [
     auth: false,
     useCase: "Send an OTP to tenant's mobile via WhatsApp or SMS (pass channel: 'whatsapp' or 'sms').",
     flowPhase: "Tenant auth",
+    appRoute: "/login",
     steps: [
       "Enter tenant mobile number.",
       "Request OTP — calls `requestTenantOtp(phone, channel)` with channel 'whatsapp' or 'sms'.",

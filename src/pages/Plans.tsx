@@ -76,7 +76,11 @@ export default function Plans() {
   const { data: plansData, isLoading: isPlansLoading } = usePlansList();
   const { data: currentPlanData, isLoading: isCurrentPlanLoading, refetch: refetchCurrentPlan } = useCurrentPlan();
   const subAccess = useSubscriptionAccess();
-  const { selectedPgId, selectedPg } = useApp();
+  const { selectedPgId, properties } = useApp();
+  const selectedPg = useMemo(
+    () => properties.find((p) => p.id === selectedPgId),
+    [properties, selectedPgId]
+  );
 
   // Query rooms to count beds in selected PG
   const roomsQuery = useAllRoomsAndCounts(selectedPgId);

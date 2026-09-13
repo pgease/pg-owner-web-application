@@ -25,6 +25,7 @@ import {
   Crown,
   Phone,
   Sliders,
+  Sparkles,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,7 +48,6 @@ import { CelebrationDialog } from "@/components/CelebrationDialog";
 import { useSubscriptionAccess } from "@/hooks/useSubscriptionAccess";
 import { FirstLoginTrialModal } from "@/components/common/FirstLoginTrialModal";
 import { TrialExpiredGateModal } from "@/components/common/TrialExpiredGateModal";
-import { Sparkles, Lock } from "lucide-react";
 
 const manageItems = [
   { title: "Staff Management", desc: "Manage your team", icon: Users, path: "/staff" },
