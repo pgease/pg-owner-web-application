@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useCurrentPlan, useMyFeaturesQuery } from "./usePropertyOwnerQueries";
 import { authStorage } from "@/api/http";
 
@@ -24,11 +24,44 @@ export interface SubscriptionAccessInfo {
   hasDedicatedAccountManager: boolean;
   subdomainUrl: string;
   isLoading: boolean;
+  setDemoPlan: (mode: "trial" | "expired" | "pro" | "reset") => void;
 }
 
 export function useSubscriptionAccess(): SubscriptionAccessInfo {
   const { data: currentPlanData, isLoading: isPlanLoading } = useCurrentPlan();
   const { data: featuresData, isLoading: isFeaturesLoading } = useMyFeaturesQuery();
+
+  const [demoState, setDemoState] = useState<string | null>(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.has("expired") || sp.get("plan_status") === "expired") return "expired";
+      if (sp.has("trial")) return "trial";
+      if (sp.has("pro")) return "pro";
+      return localStorage.getItem("pgease_demo_plan");
+    } catch {
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    const handleDemoChange = (e: any) => {
+      setDemoState(e.detail !== undefined ? e.detail : localStorage.getItem("pgease_demo_plan"));
+    };
+    window.addEventListener("pgease-demo-plan-change", handleDemoChange);
+    return () => window.removeEventListener("pgease-demo-plan-change", handleDemoChange);
+  }, []);
+
+  const setDemoPlan = useCallback((mode: "trial" | "expired" | "pro" | "reset") => {
+    if (mode === "reset") {
+      localStorage.removeItem("pgease_demo_plan");
+      setDemoState(null);
+      window.dispatchEvent(new CustomEvent("pgease-demo-plan-change", { detail: null }));
+    } else {
+      localStorage.setItem("pgease_demo_plan", mode);
+      setDemoState(mode);
+      window.dispatchEvent(new CustomEvent("pgease-demo-plan-change", { detail: mode }));
+    }
+  }, []);
 
   const owner = authStorage.getPropertyOwner();
 
@@ -86,20 +119,36 @@ export function useSubscriptionAccess(): SubscriptionAccessInfo {
       }
     }
 
-    const currentPlan: PlanType = isPaidPro
+    // Apply demo simulation overrides if active
+    if (demoState === "expired") {
+      isExpired = true;
+      isTrial = false;
+      trialDaysRemaining = 0;
+    } else if (demoState === "trial") {
+      isExpired = false;
+      isTrial = true;
+      trialDaysRemaining = 18;
+      trialExpiresAt = new Date(Date.now() + 18 * 24 * 60 * 60 * 1000);
+    } else if (demoState === "pro") {
+      isExpired = false;
+      isTrial = false;
+      trialDaysRemaining = 0;
+    }
+
+    const currentPlan: PlanType = (demoState === "pro" || isPaidPro)
       ? "PRO"
-      : isPaidLite
+      : (demoState === "trial" || isPaidLite || (!isExpired && !demoState))
       ? "LITE"
-      : !isExpired
-      ? "LITE" // Trial grants Lite features
       : null;
 
-    const planDisplayName = isPaidPro
+    const planDisplayName = currentPlan === "PRO"
       ? "Pro Plan"
+      : isExpired
+      ? "Trial Expired"
+      : isTrial || demoState === "trial"
+      ? `Lite Plan (${trialDaysRemaining}-Day Trial)`
       : isPaidLite
       ? "Lite Plan"
-      : isTrial
-      ? "Lite Plan (45-Day Trial)"
       : "Trial Expired";
 
     // Feature permission rules - if trial expired, all operations are restricted
@@ -147,6 +196,7 @@ export function useSubscriptionAccess(): SubscriptionAccessInfo {
       hasDedicatedAccountManager,
       subdomainUrl,
       isLoading: isPlanLoading || isFeaturesLoading,
+      setDemoPlan,
     };
-  }, [currentPlanData, featuresData, owner, isPlanLoading, isFeaturesLoading]);
+  }, [currentPlanData, featuresData, owner, isPlanLoading, isFeaturesLoading, demoState, setDemoPlan]);
 }

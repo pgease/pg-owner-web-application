@@ -24,6 +24,7 @@ import {
   Lock,
   Crown,
   Phone,
+  Sliders,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -198,7 +199,12 @@ const Dashboard = () => {
             <Button
               size="sm"
               variant="outline"
-              className="gap-2 border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50"
+              className={cn(
+                "gap-2 rounded-xl transition-all",
+                !subAccess.canPerformOperations
+                  ? "border-amber-300 text-amber-700 bg-amber-50/50 hover:bg-amber-100/50 dark:bg-amber-950/20 dark:text-amber-300 dark:border-amber-700"
+                  : "border-slate-200 text-slate-600 hover:bg-slate-50"
+              )}
               onClick={() => {
                 if (!subAccess.canPerformOperations) {
                   setGateFeature("Import Excel");
@@ -206,13 +212,22 @@ const Dashboard = () => {
                 }
               }}
             >
-              <FileSpreadsheet className="h-4 w-4" />
+              {!subAccess.canPerformOperations ? (
+                <Lock className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+              ) : (
+                <FileSpreadsheet className="h-4 w-4" />
+              )}
               <span className="hidden sm:inline">Import</span> Excel
             </Button>
             <Button
               size="sm"
               variant="outline"
-              className="gap-2 border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50"
+              className={cn(
+                "gap-2 rounded-xl transition-all",
+                !subAccess.canPerformOperations
+                  ? "border-amber-300 text-amber-700 bg-amber-50/50 hover:bg-amber-100/50 dark:bg-amber-950/20 dark:text-amber-300 dark:border-amber-700"
+                  : "border-slate-200 text-slate-600 hover:bg-slate-50"
+              )}
               onClick={() => {
                 if (!subAccess.canPerformOperations) {
                   setGateFeature("Send Invite");
@@ -220,13 +235,22 @@ const Dashboard = () => {
                 }
               }}
             >
-              <Send className="h-4 w-4" />
+              {!subAccess.canPerformOperations ? (
+                <Lock className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
               <span className="hidden sm:inline">Send</span> Invite
             </Button>
             <CanAccess permission="tenant_add">
               <Button
                 size="sm"
-                className="gap-2 bg-brand-600 text-white rounded-xl hover:bg-brand-700 shadow-sm shadow-brand-600/10"
+                className={cn(
+                  "gap-2 rounded-xl transition-all shadow-sm",
+                  !subAccess.canAddTenant
+                    ? "bg-destructive hover:bg-destructive/90 text-white"
+                    : "bg-brand-600 text-white hover:bg-brand-700 shadow-brand-600/10"
+                )}
                 onClick={() => {
                   if (!subAccess.canAddTenant) {
                     setGateFeature("Add Tenant");
@@ -236,7 +260,12 @@ const Dashboard = () => {
                   }
                 }}
               >
-                <UserPlus className="h-4 w-4" /> Add Tenant
+                {!subAccess.canAddTenant ? (
+                  <Lock className="h-4 w-4 shrink-0" />
+                ) : (
+                  <UserPlus className="h-4 w-4 shrink-0" />
+                )}
+                Add Tenant
               </Button>
             </CanAccess>
           </div>
@@ -717,6 +746,59 @@ const Dashboard = () => {
             </section>
           </>
         )}
+
+        {/* Plan Status Simulation Toolbar */}
+        <div className="p-3.5 rounded-2xl bg-slate-900 text-white shadow-lg border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center font-bold">
+              <Sliders className="h-4 w-4" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-slate-200 block">Plan Simulator Demo Toolbar:</span>
+              <span className="text-[11px] text-slate-400 block">Switch live preview to expired subscription or active trial</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Button
+              size="sm"
+              variant="outline"
+              className={`h-7 text-[11px] rounded-lg border-amber-500/40 text-amber-300 hover:bg-amber-950/50 ${
+                subAccess.isTrial ? "bg-amber-500/20 ring-1 ring-amber-400" : "bg-transparent"
+              }`}
+              onClick={() => subAccess.setDemoPlan("trial")}
+            >
+              🟢 45-Day Trial
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className={`h-7 text-[11px] rounded-lg border-red-500/40 text-red-300 hover:bg-red-950/50 ${
+                subAccess.isExpired ? "bg-red-500/20 ring-1 ring-red-400" : "bg-transparent"
+              }`}
+              onClick={() => subAccess.setDemoPlan("expired")}
+            >
+              🔴 Expired Plan ⚠️
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className={`h-7 text-[11px] rounded-lg border-teal-500/40 text-teal-300 hover:bg-teal-950/50 ${
+                subAccess.currentPlan === "PRO" && !subAccess.isExpired ? "bg-teal-500/20 ring-1 ring-teal-400" : "bg-transparent"
+              }`}
+              onClick={() => subAccess.setDemoPlan("pro")}
+            >
+              👑 Pro Active
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-[11px] text-slate-400 hover:text-white rounded-lg"
+              onClick={() => subAccess.setDemoPlan("reset")}
+            >
+              Reset (Live API)
+            </Button>
+          </div>
+        </div>
 
         <CelebrationDialog
           open={celebrationOpen}

@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Check,
   X,
@@ -13,10 +14,22 @@ import {
   Users,
   Clock,
   ShieldCheck,
+  BedDouble,
+  Sliders,
+  Phone,
+  MessageCircle,
+  AlertTriangle,
+  Minus,
+  Plus,
+  Info,
+  Building2,
+  Calculator,
+  ArrowRight,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -26,9 +39,11 @@ import {
   useCurrentPlan,
   useCreatePlanCheckoutOrderMutation,
   useVerifyPlanPaymentMutation,
+  useAllRoomsAndCounts,
 } from "@/hooks/usePropertyOwnerQueries";
 import { buildFeatureKeySet, userHasFeatureForRow, type PlanTierKey } from "@/lib/planFeatures";
 import { useSubscriptionAccess } from "@/hooks/useSubscriptionAccess";
+import { useApp } from "@/context/AppContext";
 import { toast } from "@/components/ui/use-toast";
 
 declare global {
@@ -55,11 +70,30 @@ const features = [
 ];
 
 export default function Plans() {
+  const navigate = useNavigate();
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
   const { data: featuresData, isLoading: isFeaturesLoading } = useMyFeaturesQuery();
   const { data: plansData, isLoading: isPlansLoading } = usePlansList();
   const { data: currentPlanData, isLoading: isCurrentPlanLoading, refetch: refetchCurrentPlan } = useCurrentPlan();
   const subAccess = useSubscriptionAccess();
+  const { selectedPgId, selectedPg } = useApp();
+
+  // Query rooms to count beds in selected PG
+  const roomsQuery = useAllRoomsAndCounts(selectedPgId);
+  const detectedBeds = useMemo(() => {
+    const rooms = roomsQuery.data ?? [];
+    return rooms.reduce((sum, r) => sum + (r.totalBeds ?? 0), 0);
+  }, [roomsQuery.data]);
+
+  // Selected bed capacity for billing (min 10)
+  const [selectedBeds, setSelectedBeds] = useState<number>(25);
+
+  // Sync detected beds when loaded
+  useEffect(() => {
+    if (detectedBeds > 0) {
+      setSelectedBeds(Math.max(10, detectedBeds));
+    }
+  }, [detectedBeds]);
 
   const createOrderMut = useCreatePlanCheckoutOrderMutation();
   const verifyPaymentMut = useVerifyPlanPaymentMutation();
@@ -169,7 +203,11 @@ export default function Plans() {
 
   const handleUpgradeCheckout = async (planId: string) => {
     try {
-      const order = await createOrderMut.mutateAsync({ planId, billingCycle });
+      const order = await createOrderMut.mutateAsync({
+        planId,
+        billingCycle,
+        numberOfBeds: selectedBeds,
+      });
       if (!window.Razorpay) {
         const script = document.createElement("script");
         script.src = "https://checkout.razorpay.com/v1/checkout.js";
@@ -182,7 +220,7 @@ export default function Plans() {
         amount: order.amount,
         currency: order.currency || "INR",
         name: "PG Ease",
-        description: `Upgrade to ${planId} Plan (${billingCycle})`,
+        description: `Upgrade to ${planId} Plan (${selectedBeds} beds, ${billingCycle})`,
         order_id: order.orderId,
         handler: async (response: any) => {
           try {
@@ -192,10 +230,11 @@ export default function Plans() {
               razorpaySignature: response.razorpay_signature,
               planId,
               billingCycle,
+              numberOfBeds: selectedBeds,
             });
             toast({
               title: "Subscription Activated! 👑",
-              description: "Your account has been upgraded successfully.",
+              description: `Your account has been upgraded successfully for ${selectedBeds} beds.`,
             });
             refetchCurrentPlan();
           } catch (err: any) {
@@ -226,6 +265,48 @@ export default function Plans() {
         title="Plans & Billing"
         description="Choose the ideal plan to scale your PG living management and operations."
       />
+
+      {/* EXPIRED SUBSCRIPTION WARNING ALERT */}
+      {subAccess.isExpired && (
+        <Card className="border-2 border-destructive/40 bg-gradient-to-r from-destructive/10 via-destructive/5 to-amber-500/5 shadow-md">
+          <CardContent className="p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="h-12 w-12 rounded-2xl bg-destructive/15 border border-destructive/30 flex items-center justify-center text-destructive shrink-0 font-black">
+                <AlertTriangle className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-base font-black text-destructive">
+                    Subscription Over • Operations Restricted
+                  </h4>
+                  <Badge className="bg-destructive/20 text-destructive text-[10px] font-bold">
+                    ACTION REQUIRED
+                  </Badge>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-xl leading-relaxed">
+                  Your 45-day free trial has concluded. Adding tenants, updating room structures, tracking notices, and rent collections are paused. Subscribe to Lite (₹29/bed) or Pro (₹49/bed) below to restore operations immediately.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+              <a
+                href="tel:+919876543210"
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <Phone className="h-3.5 w-3.5 text-teal-600" /> Call Rahul
+              </a>
+              <a
+                href="https://wa.me/919876543210?text=Hi%20Rahul,%20my%20PG%20Ease%20trial%20has%20expired%20and%20I%20want%20to%20reactivate%20my%20subscription."
+                target="_blank"
+                rel="noreferrer"
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-colors"
+              >
+                <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* CURRENT SUBSCRIPTION BANNER */}
       <Card className="border-teal-200 dark:border-teal-900 bg-gradient-flow backdrop-blur-md shadow-sm">
@@ -291,6 +372,143 @@ export default function Plans() {
         </CardContent>
       </Card>
 
+      {/* STEP 1: BED CAPACITY & PRICING CALCULATOR */}
+      <Card className="border-teal-300/60 dark:border-teal-800 bg-card shadow-sm rounded-2xl overflow-hidden">
+        <CardHeader className="bg-muted/10 border-b pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-xl bg-teal-500/10 text-teal-600 flex items-center justify-center font-bold">
+                <BedDouble className="h-4 w-4" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-bold">Configure Bed Capacity & Quota</CardTitle>
+                <CardDescription className="text-xs">
+                  Pricing is dynamic per bed (₹29/bed Lite, ₹49/bed Pro). Select your property bed size.
+                </CardDescription>
+              </div>
+            </div>
+            {detectedBeds > 0 ? (
+              <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-xs">
+                ✓ Detected: {detectedBeds} beds in PG
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-amber-700 dark:text-amber-400 border-amber-400 text-xs bg-amber-50 dark:bg-amber-950/30">
+                0 Beds Configured Yet
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="p-5 space-y-4">
+          {/* Zero Beds Guidance Banner */}
+          {detectedBeds === 0 ? (
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 font-bold text-sm text-amber-900 dark:text-amber-200">
+                  <Info className="h-4 w-4 text-amber-600 shrink-0" />
+                  Haven't added rooms or beds yet?
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 max-w-xl">
+                  Select your expected total bed capacity below to preview plan costs and subscribe, or configure your PG rooms and floors first to calculate your exact count automatically.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="shrink-0 border-amber-400 text-amber-900 dark:text-amber-100 hover:bg-amber-100 dark:hover:bg-amber-950 font-semibold text-xs gap-1.5 rounded-xl"
+                onClick={() => navigate("/my-pgs/structure")}
+              >
+                <Building className="h-3.5 w-3.5 text-teal-600" />
+                Set Up Rooms First
+              </Button>
+            </div>
+          ) : (
+            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-xs font-semibold text-emerald-900 dark:text-emerald-200">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span>
+                  Detected <strong>{detectedBeds} beds</strong> in <strong>{selectedPg?.name || "your PG"}</strong>.
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 h-7 px-2"
+                onClick={() => setSelectedBeds(Math.max(10, detectedBeds))}
+              >
+                Reset to {detectedBeds} beds
+              </Button>
+            </div>
+          )}
+
+          {/* Quick Presets & Stepper */}
+          <div className="space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <Calculator className="h-3.5 w-3.5 text-teal-600" />
+                Select Total Bed Quota:
+              </label>
+              <span className="text-xs text-muted-foreground">
+                Minimum 10 beds • Current Selection: <strong className="text-teal-600 font-bold">{selectedBeds} beds</strong>
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {[15, 25, 50, 100, 150, 200].map((preset) => (
+                <Button
+                  key={preset}
+                  type="button"
+                  size="sm"
+                  variant={selectedBeds === preset ? "default" : "outline"}
+                  className={`rounded-xl text-xs font-semibold h-8 px-3 ${
+                    selectedBeds === preset
+                      ? "bg-teal-600 hover:bg-teal-700 text-white shadow-sm"
+                      : "border-slate-200 dark:border-slate-800 hover:border-teal-400"
+                  }`}
+                  onClick={() => setSelectedBeds(preset)}
+                >
+                  {preset} Beds
+                </Button>
+              ))}
+
+              {/* Stepper / Input */}
+              <div className="flex items-center gap-1.5 ml-auto">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="h-8 w-8 rounded-lg"
+                  disabled={selectedBeds <= 10}
+                  onClick={() => setSelectedBeds((b) => Math.max(10, b - 5))}
+                >
+                  <Minus className="h-3.5 w-3.5" />
+                </Button>
+                <Input
+                  type="number"
+                  min={10}
+                  max={1000}
+                  value={selectedBeds}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val)) setSelectedBeds(Math.max(10, val));
+                  }}
+                  className="h-8 w-20 text-center font-bold text-xs rounded-lg"
+                />
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="h-8 w-8 rounded-lg"
+                  disabled={selectedBeds >= 1000}
+                  onClick={() => setSelectedBeds((b) => Math.min(1000, b + 5))}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* ACTIVE FEATURES GRID */}
       {activeFeaturesToShow.length > 0 && (
         <Card className="border-teal-200 dark:border-teal-900 bg-gradient-flow shadow-sm">
@@ -337,14 +555,15 @@ export default function Plans() {
         </Tabs>
       </div>
 
-      {/* PRICING CARDS - ONLY 2 PLANS */}
+      {/* PRICING CARDS - DYNAMICALLY CALCULATED FOR SELECTED BEDS */}
       <div className="grid gap-6 max-w-4xl mx-auto sm:grid-cols-2 w-full">
         {planCards.map((plan: any) => {
           const isPro = plan.isPro ?? (plan.name || plan.displayName || "").toLowerCase().includes("pro");
-          const isCurrent = (isPro && currentPlanKey === "PRO") || (!isPro && currentPlanKey === "LITE" && !subAccess.isTrial);
+          const isCurrent = (isPro && currentPlanKey === "PRO") || (!isPro && currentPlanKey === "LITE" && !subAccess.isTrial && !subAccess.isExpired);
           const baseMonthly = Number(plan.priceMonthly ?? plan.price ?? (isPro ? 49 : 29)) || (isPro ? 49 : 29);
           const baseAnnual = Number(plan.priceAnnual ?? baseMonthly * 10) || baseMonthly * 10;
-          const price = billingCycle === "annual" ? baseAnnual : baseMonthly;
+          const unitRate = billingCycle === "annual" ? baseAnnual : baseMonthly;
+          const totalBilling = unitRate * selectedBeds;
           const planTitle = plan.displayName || plan.name || (isPro ? "Pro Plan" : "Lite Plan");
 
           return (
@@ -387,14 +606,22 @@ export default function Plans() {
                   )}
                 </div>
                 <CardTitle className="text-2xl font-black">{planTitle}</CardTitle>
-                <div className="mt-2 flex items-baseline justify-center">
-                  <span className="text-4xl font-black text-foreground">
-                    ₹{(price ?? 0).toLocaleString("en-IN")}
-                  </span>
-                  <span className="text-xs text-muted-foreground ml-1.5 font-medium">
-                    / bed / {billingCycle === "annual" ? "year" : "month"}
-                  </span>
+                
+                {/* DYNAMIC TOTAL PRICING */}
+                <div className="mt-3 flex flex-col items-center justify-center">
+                  <div className="flex items-baseline justify-center">
+                    <span className="text-4xl font-black text-foreground">
+                      ₹{totalBilling.toLocaleString("en-IN")}
+                    </span>
+                    <span className="text-xs text-muted-foreground ml-1.5 font-medium">
+                      / {billingCycle === "annual" ? "year" : "month"}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-teal-700 dark:text-teal-400 font-semibold bg-teal-50 dark:bg-teal-950/60 px-2.5 py-0.5 rounded-full border border-teal-200 dark:border-teal-900">
+                    <span>₹{unitRate.toLocaleString("en-IN")}/bed × {selectedBeds} beds</span>
+                  </div>
                 </div>
+
                 <CardDescription className="text-xs mt-2 max-w-xs mx-auto">
                   {plan.description || (isPro
                     ? "Full payment automation, automated T+2 bank settlement & dedicated PG website."
@@ -432,7 +659,7 @@ export default function Plans() {
                   ) : isCurrent ? (
                     "Active Plan"
                   ) : (
-                    `Upgrade to ${plan.name}`
+                    `Subscribe (${selectedBeds} beds • ₹${totalBilling.toLocaleString("en-IN")})`
                   )}
                 </Button>
               </CardContent>
@@ -499,6 +726,60 @@ export default function Plans() {
           </div>
         </CardContent>
       </Card>
+
+      {/* PLAN STATUS SIMULATION TOOLBAR */}
+      <div className="mt-8 p-3.5 rounded-2xl bg-slate-900 text-white shadow-lg border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center font-bold">
+            <Sliders className="h-4 w-4" />
+          </div>
+          <div>
+            <span className="text-xs font-bold text-slate-200 block">Plan Simulator Demo Toolbar:</span>
+            <span className="text-[11px] text-slate-400 block">Test expired subscription, active trial, or pro plan UI</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Button
+            size="sm"
+            variant="outline"
+            className={`h-7 text-[11px] rounded-lg border-amber-500/40 text-amber-300 hover:bg-amber-950/50 ${
+              subAccess.isTrial ? "bg-amber-500/20 ring-1 ring-amber-400" : "bg-transparent"
+            }`}
+            onClick={() => subAccess.setDemoPlan("trial")}
+          >
+            🟢 45-Day Trial
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className={`h-7 text-[11px] rounded-lg border-red-500/40 text-red-300 hover:bg-red-950/50 ${
+              subAccess.isExpired ? "bg-red-500/20 ring-1 ring-red-400" : "bg-transparent"
+            }`}
+            onClick={() => subAccess.setDemoPlan("expired")}
+          >
+            🔴 Expired Plan ⚠️
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className={`h-7 text-[11px] rounded-lg border-teal-500/40 text-teal-300 hover:bg-teal-950/50 ${
+              subAccess.currentPlan === "PRO" && !subAccess.isExpired ? "bg-teal-500/20 ring-1 ring-teal-400" : "bg-transparent"
+            }`}
+            onClick={() => subAccess.setDemoPlan("pro")}
+          >
+            👑 Pro Active
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-[11px] text-slate-400 hover:text-white rounded-lg"
+            onClick={() => subAccess.setDemoPlan("reset")}
+          >
+            Reset (Live API)
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
+
