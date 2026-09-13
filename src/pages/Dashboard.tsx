@@ -21,7 +21,6 @@ import {
   DoorOpen,
   X,
   MapPin,
-  Lock,
   Crown,
   Phone,
 } from "lucide-react";
