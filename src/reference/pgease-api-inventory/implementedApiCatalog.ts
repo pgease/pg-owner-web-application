@@ -51,13 +51,26 @@ export const IMPLEMENTED_API_CATALOG: ImplementedApiRow[] = [
     method: "POST",
     path: "/property-owners/otp/request",
     auth: false,
-    useCase: "Send an OTP SMS to the owner’s mobile.",
+    useCase: "Send an OTP to owner’s mobile via WhatsApp or SMS (pass channel: 'whatsapp' or 'sms').",
     flowPhase: "Login & session",
     appRoute: "/login",
     steps: [
       "Open `/login` (or `/` when logged out).",
       "Enter your mobile number.",
-      "Request OTP — this calls `requestOtp`.",
+      "Select WhatsApp or SMS channel.",
+      "Request OTP — this calls `requestOtp(phone, channel)`.",
+    ],
+  },
+  {
+    clientExport: "requestTenantOtp",
+    method: "POST",
+    path: "/tenants/otp/request",
+    auth: false,
+    useCase: "Send an OTP to tenant's mobile via WhatsApp or SMS (pass channel: 'whatsapp' or 'sms').",
+    flowPhase: "Tenant auth",
+    steps: [
+      "Enter tenant mobile number.",
+      "Request OTP — calls `requestTenantOtp(phone, channel)` with channel 'whatsapp' or 'sms'.",
     ],
   },
   {

@@ -1,17 +1,19 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AddTenantForm } from "@/components/tenants/AddTenantForm";
 import { CanAccessPage } from "@/components/PermissionGuard";
 import { queryKeys } from "@/hooks/usePropertyOwnerQueries";
 import { useApp } from "@/context/AppContext";
+import { useSubscriptionAccess } from "@/hooks/useSubscriptionAccess";
 
 export default function AddTenantPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { selectedPgId } = useApp();
+  const subAccess = useSubscriptionAccess();
 
   const handleSuccess = () => {
     if (selectedPgId) {
@@ -36,7 +38,25 @@ export default function AddTenantPage() {
           </div>
         </div>
 
-        {!selectedPgId ? (
+        {!subAccess.canAddTenant ? (
+          <Card className="border-destructive/30 bg-destructive/[0.02] shadow-sm max-w-xl mx-auto text-center p-8 rounded-2xl">
+            <div className="h-12 w-12 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center mx-auto mb-4">
+              <Lock className="h-6 w-6" />
+            </div>
+            <CardTitle className="text-xl font-bold text-foreground">Trial Expired: Tenant Addition Restricted</CardTitle>
+            <CardDescription className="text-sm mt-2 max-w-md mx-auto">
+              Your 45-day free trial has expired. To add new tenants, manage allocations, and keep your property organized, please subscribe to Lite (₹29/bed) or Pro (₹49/bed).
+            </CardDescription>
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Button onClick={() => navigate("/plans")} className="bg-brand-600 hover:bg-brand-700 text-white rounded-xl">
+                View Subscription Plans
+              </Button>
+              <Button variant="outline" onClick={() => navigate("/tenants")} className="rounded-xl">
+                Back to Tenants
+              </Button>
+            </div>
+          </Card>
+        ) : !selectedPgId ? (
           <Card className="border-dashed">
             <CardHeader>
               <CardTitle>Select a PG</CardTitle>

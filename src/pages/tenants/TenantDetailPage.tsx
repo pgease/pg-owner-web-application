@@ -82,6 +82,8 @@ import {
   useMoveTenantMutation,
   useRoomsList,
 } from "@/hooks/usePropertyOwnerQueries";
+import { useSubscriptionAccess } from "@/hooks/useSubscriptionAccess";
+import { TrialExpiredGateModal } from "@/components/common/TrialExpiredGateModal";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
@@ -110,6 +112,7 @@ export default function TenantDetailPage() {
   const { tenantId } = useParams<{ tenantId: string }>();
   const { selectedPgId: currentPropertyId } = useApp();
   const queryClient = useQueryClient();
+  const subAccess = useSubscriptionAccess();
 
   const { data: tenant, isLoading } = usePropertyTenantDetail(currentPropertyId, tenantId);
 
@@ -135,6 +138,8 @@ export default function TenantDetailPage() {
   const { properties } = useApp();
   const propertyList = Array.isArray(properties) ? properties : [];
   const [moveModalOpen, setMoveModalOpen] = useState(false);
+  const [gateModalOpen, setGateModalOpen] = useState(false);
+  const [gateFeature, setGateFeature] = useState("Notice Period Tracking");
   const [targetPropertyId, setTargetPropertyId] = useState<string>("");
   const [targetRoomId, setTargetRoomId] = useState<string>("");
   const [targetBedNumber, setTargetBedNumber] = useState<number>(1);
@@ -426,6 +431,11 @@ export default function TenantDetailPage() {
   };
 
   const handleSetNotice = async () => {
+    if (!subAccess.canTrackNotice) {
+      setGateFeature("Notice Period Tracking");
+      setGateModalOpen(true);
+      return;
+    }
     try {
       await setNoticeMut.mutateAsync({
         roomTenantId,
@@ -446,6 +456,11 @@ export default function TenantDetailPage() {
   };
 
   const handleClearNotice = async () => {
+    if (!subAccess.canTrackNotice) {
+      setGateFeature("Notice Period Tracking");
+      setGateModalOpen(true);
+      return;
+    }
     try {
       await clearNoticeMut.mutateAsync(roomTenantId);
       toast({ title: "Notice Period Cancelled", description: "Tenant status reset to active residency." });
@@ -469,7 +484,14 @@ export default function TenantDetailPage() {
               variant="outline"
               size="sm"
               className="gap-1.5 border-teal-300 text-teal-700 font-bold hover:bg-teal-50 shadow-xs"
-              onClick={() => setMoveModalOpen(true)}
+              onClick={() => {
+                if (!subAccess.canPerformOperations) {
+                  setGateFeature("Tenant Relocation");
+                  setGateModalOpen(true);
+                } else {
+                  setMoveModalOpen(true);
+                }
+              }}
             >
               <ArrowRightLeft className="h-4 w-4" /> Move Tenant
             </Button>
@@ -484,9 +506,17 @@ export default function TenantDetailPage() {
                 <DropdownMenuItem onClick={() => setEditing(true)} className="cursor-pointer gap-2">
                   <Pencil className="h-3.5 w-3.5" /> Edit profile
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => {
-                  toast({ title: "Delete action triggered", description: "This tenant will be removed." });
-                }} className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer gap-2">
+                <DropdownMenuItem
+                  onClick={() => {
+                    if (!subAccess.canDeleteTenant) {
+                      setGateFeature("Delete Tenant");
+                      setGateModalOpen(true);
+                      return;
+                    }
+                    toast({ title: "Delete action triggered", description: "This tenant will be removed." });
+                  }}
+                  className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer gap-2"
+                >
                   <Trash2 className="h-3.5 w-3.5" /> Delete user
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -903,7 +933,14 @@ export default function TenantDetailPage() {
                     <Button
                       size="sm"
                       className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5 shrink-0"
-                      onClick={() => setNoticeOpen(true)}
+                      onClick={() => {
+                        if (!subAccess.canTrackNotice) {
+                          setGateFeature("Notice Period Tracking");
+                          setGateModalOpen(true);
+                        } else {
+                          setNoticeOpen(true);
+                        }
+                      }}
                     >
                       <Calendar className="h-3.5 w-3.5" /> Set Move-Out Notice
                     </Button>
@@ -1503,6 +1540,12 @@ export default function TenantDetailPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <TrialExpiredGateModal
+          open={gateModalOpen}
+          onOpenChange={setGateModalOpen}
+          featureName={gateFeature}
+        />
       </div>
     </CanAccessPage>
   );

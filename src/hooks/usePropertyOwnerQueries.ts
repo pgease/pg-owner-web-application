@@ -695,10 +695,12 @@ export function usePostManualRentMutation(propertyId?: string | null) {
   });
 }
 
-export function useAnalyticsPgGrowth() {
+export function useAnalyticsPgGrowth(propertyId?: string | null) {
   return useQuery({
-    queryKey: ["analytics-pg-growth"],
-    queryFn: getAnalyticsPgGrowth,
+    queryKey: ["analytics-pg-growth", propertyId],
+    queryFn: () => getAnalyticsPgGrowth(propertyId || undefined),
+    retry: false,
+    staleTime: 60_000,
   });
 }
 

@@ -39,6 +39,7 @@ import PropertyNoticesPage from "./pages/property/PropertyNoticesPage";
 import GuestRequestsPage from "./pages/operations/GuestRequestsPage";
 import NightOutRequestsPage from "./pages/operations/NightOutRequestsPage";
 import FoodDiningPage from "./pages/food/FoodDiningPage";
+import { EaseBuddyAI } from "./components/common/EaseBuddyAI";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -140,6 +141,7 @@ const App = () => (
                         />
                         <Route path="*" element={<NotFound />} />
                       </Routes>
+                      <EaseBuddyAI />
                     </AppLayout>
                   </PermissionProvider>
                 </AppProvider>

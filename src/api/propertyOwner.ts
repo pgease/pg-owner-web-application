@@ -1,6 +1,7 @@
 import { authStorage, httpRequest } from "./http";
 
 const PROPERTY_OWNER_BASE = "/property-owners";
+const TENANT_BASE = "/tenants";
 
 /**
  * Property id is **only** in the URL path (not repeated in the body).
@@ -8,6 +9,13 @@ const PROPERTY_OWNER_BASE = "/property-owners";
  */
 function propertyOwnerAddTenantPath(propertyId: string): string {
   return `${PROPERTY_OWNER_BASE}/add-tenant/${propertyId}`;
+}
+
+export type OtpChannel = "whatsapp" | "sms";
+
+export interface RequestOtpPayload {
+  mobileNumber: string;
+  channel?: OtpChannel;
 }
 
 export interface RequestOtpResponse {
@@ -37,10 +45,59 @@ export interface VerifyOtpResponse {
   propertyCount: number;
 }
 
-export async function requestOtp(mobileNumber: string) {
+export async function requestOtp(
+  mobileOrPayload: string | RequestOtpPayload,
+  channel?: OtpChannel
+) {
+  let mobileNumber: string;
+  let ch: OtpChannel | undefined = channel;
+
+  if (typeof mobileOrPayload === "string") {
+    mobileNumber = mobileOrPayload;
+  } else {
+    mobileNumber = mobileOrPayload.mobileNumber;
+    ch = mobileOrPayload.channel ?? channel;
+  }
+
+  const body: RequestOtpPayload = { mobileNumber };
+  if (ch === "whatsapp") {
+    body.channel = "whatsapp";
+  } else if (ch === "sms") {
+    body.channel = "sms";
+  }
+
   return httpRequest<RequestOtpResponse>(`${PROPERTY_OWNER_BASE}/otp/request`, {
     method: "POST",
-    body: { mobileNumber },
+    body,
+  });
+}
+
+export const requestOwnerOtp = requestOtp;
+
+export async function requestTenantOtp(
+  mobileOrPayload: string | RequestOtpPayload,
+  channel?: OtpChannel
+) {
+  let mobileNumber: string;
+  let ch: OtpChannel | undefined = channel;
+
+  if (typeof mobileOrPayload === "string") {
+    mobileNumber = mobileOrPayload;
+  } else {
+    mobileNumber = mobileOrPayload.mobileNumber;
+    ch = mobileOrPayload.channel ?? channel;
+  }
+
+  const body: RequestOtpPayload = { mobileNumber };
+  if (ch === "whatsapp") {
+    body.channel = "whatsapp";
+  } else if (ch === "sms") {
+    body.channel = "sms";
+  }
+
+  return httpRequest<RequestOtpResponse>(`${TENANT_BASE}/otp/request`, {
+    method: "POST",
+    body,
   });
 }
 
@@ -1224,8 +1281,11 @@ export async function getRentCollectionDashboard(
 
 // ─── Analytics ──────────────────────────────────────────────────────────────
 
-export async function getAnalyticsPgGrowth() {
-  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/analytics/pg-growth`, {
+export async function getAnalyticsPgGrowth(propertyId?: string) {
+  const url = propertyId
+    ? `${PROPERTY_OWNER_BASE}/analytics/pg-growth?propertyId=${encodeURIComponent(propertyId)}`
+    : `${PROPERTY_OWNER_BASE}/analytics/pg-growth`;
+  return httpRequest<unknown>(url, {
     method: "GET",
     auth: true,
   });

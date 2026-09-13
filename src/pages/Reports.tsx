@@ -40,7 +40,7 @@ function JsonBlock({ title, data }: { title: string; data: unknown }) {
 
 const Reports = () => {
   const { selectedPgId, properties, setSelectedPgId } = useApp();
-  const pgGrowth = useAnalyticsPgGrowth();
+  const pgGrowth = useAnalyticsPgGrowth(selectedPgId);
   const revenue = useAnalyticsRevenue(selectedPgId);
   const occupancy = useAnalyticsOccupancy(selectedPgId);
 

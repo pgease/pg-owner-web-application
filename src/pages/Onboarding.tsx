@@ -18,6 +18,8 @@ import {
   type PropertyType,
   DEFAULT_PROPERTY_TYPE_ID,
 } from "@/api/propertyOwner";
+import { useSubscriptionAccess } from "@/hooks/useSubscriptionAccess";
+import { TrialExpiredGateModal } from "@/components/common/TrialExpiredGateModal";
 
 type FlowStep = 1 | 2 | 3;
 type Lang = "en" | "hi";
@@ -204,6 +206,8 @@ const Onboarding = () => {
   const navState = location.state as { forceShowForm?: boolean } | null;
   const { properties, setSelectedPgId, refreshProperties, language, setLanguage } = useApp();
   const lang: Lang = language === "hi-IN" ? "hi" : "en";
+  const subAccess = useSubscriptionAccess();
+  const [gateModalOpen, setGateModalOpen] = useState(false);
   const [step, setStep] = useState<FlowStep>(2);
   const [showForm, setShowForm] = useState(navState?.forceShowForm ?? false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -282,6 +286,11 @@ const Onboarding = () => {
 
   const handlePropertyContinue = async () => {
     if (!canSubmitStep2) return;
+
+    if (properties && properties.length > 0 && subAccess.isExpired) {
+      setGateModalOpen(true);
+      return;
+    }
 
     let lat = latitude;
     let lng = longitude;
@@ -412,7 +421,13 @@ const Onboarding = () => {
                 </div>
 
                 <button
-                  onClick={() => setShowForm(true)}
+                  onClick={() => {
+                    if (subAccess.isExpired) {
+                      setGateModalOpen(true);
+                    } else {
+                      setShowForm(true);
+                    }
+                  }}
                   className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-dashed border-white/20 hover:border-white/40 hover:bg-white/[0.02] text-xs font-bold text-white/70 hover:text-white transition-all mt-4"
                 >
                   <Plus className="h-4 w-4" />
@@ -552,6 +567,12 @@ const Onboarding = () => {
             )}
           </CardContent>
         </Card>
+
+        <TrialExpiredGateModal
+          open={gateModalOpen}
+          onOpenChange={setGateModalOpen}
+          featureName="Add New Property / Building"
+        />
       </div>
     </div>
   );

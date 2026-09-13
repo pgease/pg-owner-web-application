@@ -21,6 +21,9 @@ import {
   DoorOpen,
   X,
   MapPin,
+  Lock,
+  Crown,
+  Phone,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,11 +39,14 @@ import {
   useDashboardDetails,
   usePropertyTenants,
   useStaffList,
-  useAnalyticsPgGrowth,
   useAnalyticsRevenue,
   useAnalyticsOccupancy,
 } from "@/hooks/usePropertyOwnerQueries";
 import { CelebrationDialog } from "@/components/CelebrationDialog";
+import { useSubscriptionAccess } from "@/hooks/useSubscriptionAccess";
+import { FirstLoginTrialModal } from "@/components/common/FirstLoginTrialModal";
+import { TrialExpiredGateModal } from "@/components/common/TrialExpiredGateModal";
+import { Sparkles, Lock } from "lucide-react";
 
 const manageItems = [
   { title: "Staff Management", desc: "Manage your team", icon: Users, path: "/staff" },
@@ -56,6 +62,9 @@ const Dashboard = () => {
   const selectedPg = list.find((p) => p.id === selectedPgId);
   const [celebrationOpen, setCelebrationOpen] = useState(false);
   const [celebrationPgName, setCelebrationPgName] = useState("");
+  const subAccess = useSubscriptionAccess();
+  const [gateModalOpen, setGateModalOpen] = useState(false);
+  const [gateFeature, setGateFeature] = useState("this feature");
 
   const isKpiPage = false;
 
@@ -70,6 +79,18 @@ const Dashboard = () => {
     }
   }, [location.state]);
 
+  // Prompt gate modal when trial is expired
+  useEffect(() => {
+    if (subAccess.isExpired) {
+      const alreadyShown = sessionStorage.getItem("trial_expired_gate_prompted");
+      if (!alreadyShown) {
+        setGateFeature("PG Management");
+        setGateModalOpen(true);
+        sessionStorage.setItem("trial_expired_gate_prompted", "true");
+      }
+    }
+  }, [subAccess.isExpired]);
+
   const roomsQuery = useAllRoomsAndCounts(selectedPgId);
   const complaintsQuery = useComplaints(selectedPgId);
   const staffQuery = useStaffList(selectedPgId);
@@ -77,7 +98,6 @@ const Dashboard = () => {
   const tenantsQuery = usePropertyTenants(selectedPgId);
   const blocksQuery = useBlocks(selectedPgId);
   
-  const pgGrowthQuery = useAnalyticsPgGrowth();
   const revenueQuery = useAnalyticsRevenue(selectedPgId);
   const occupancyQuery = useAnalyticsOccupancy(selectedPgId);
 
@@ -106,6 +126,12 @@ const Dashboard = () => {
     };
   }, [complaintsQuery.data]);
 
+  const quickActions = [
+    { title: "Tenants", desc: "View all active & checked out tenants", icon: Users, path: "/tenants" },
+    { title: "Complaints", desc: "Manage tenants issues", icon: AlertTriangle, path: "/complaints" },
+    { title: "Announcement", desc: "Broadcast updates to all tenants", icon: Megaphone, path: "/support" },
+  ];
+
   const staffCount = (staffQuery.data ?? []).length;
 
   const handleRetry = () => {
@@ -113,7 +139,6 @@ const Dashboard = () => {
     if (complaintsQuery.isError) complaintsQuery.refetch();
     if (staffQuery.isError) staffQuery.refetch();
     if (dashboardDetailsQuery.isError) dashboardDetailsQuery.refetch();
-    if (pgGrowthQuery.isError) pgGrowthQuery.refetch();
     if (revenueQuery.isError) revenueQuery.refetch();
     if (occupancyQuery.isError) occupancyQuery.refetch();
   };
@@ -143,55 +168,157 @@ const Dashboard = () => {
 
 
   return (
-    <CanAccessPage permission="dashboard_access">
-      <div className="space-y-6 animate-fade-in pb-10">
-        
-        {/* Rentok-style Header with Integrated Property/City Filters */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-slate-100">
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-800">Dashboard</h1>
-            <div className="flex items-center gap-4 mt-2">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Properties</span>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs font-semibold text-slate-700">
-                  <Building2 className="h-3.5 w-3.5 text-brand-600" />
-                  <span>{selectedPg ? selectedPg.name : "Saksham Pg"}</span>
-                  <button className="text-slate-400 hover:text-slate-600 ml-1">
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
+    <CanAccessPage permission="dashboard_view">
+      <div className="space-y-6 pb-12">
+        {/* Top bar with PG selector & actions */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-2xl bg-brand-50 border border-brand-200/60 flex items-center justify-center text-brand-600 shadow-sm shrink-0">
+              <Building2 className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                  {selectedPg ? selectedPg.name : "PG Operations"}
+                </h1>
+                {subAccess.currentPlan === "PRO" && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-600 border border-amber-500/30">
+                    PRO
+                  </span>
+                )}
               </div>
-
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">City</span>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl shadow-sm text-xs font-semibold text-slate-700">
-                  <MapPin className="h-3.5 w-3.5 text-brand-600" />
-                  <span>{selectedPg?.address ? (selectedPg.address.split(",").slice(-2, -1)[0]?.trim() || "Ghaziabad") : "Ghaziabad"}</span>
-                  <button className="text-slate-400 hover:text-slate-600 ml-1">
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Real-time operational dashboard & property occupancy overview
+              </p>
             </div>
           </div>
 
           {/* Quick Action Buttons */}
           <div className="flex flex-wrap gap-2 self-end">
-            <Button size="sm" variant="outline" className="gap-2 border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2 border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50"
+              onClick={() => {
+                if (!subAccess.canPerformOperations) {
+                  setGateFeature("Import Excel");
+                  setGateModalOpen(true);
+                }
+              }}
+            >
               <FileSpreadsheet className="h-4 w-4" />
               <span className="hidden sm:inline">Import</span> Excel
             </Button>
-            <Button size="sm" variant="outline" className="gap-2 border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2 border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50"
+              onClick={() => {
+                if (!subAccess.canPerformOperations) {
+                  setGateFeature("Send Invite");
+                  setGateModalOpen(true);
+                }
+              }}
+            >
               <Send className="h-4 w-4" />
               <span className="hidden sm:inline">Send</span> Invite
             </Button>
             <CanAccess permission="tenant_add">
-              <Button size="sm" className="gap-2 bg-brand-600 text-white rounded-xl hover:bg-brand-700 shadow-sm shadow-brand-600/10" onClick={() => navigate("/tenants/add")}>
+              <Button
+                size="sm"
+                className="gap-2 bg-brand-600 text-white rounded-xl hover:bg-brand-700 shadow-sm shadow-brand-600/10"
+                onClick={() => {
+                  if (!subAccess.canAddTenant) {
+                    setGateFeature("Add Tenant");
+                    setGateModalOpen(true);
+                  } else {
+                    navigate("/tenants/add");
+                  }
+                }}
+              >
                 <UserPlus className="h-4 w-4" /> Add Tenant
               </Button>
             </CanAccess>
           </div>
         </div>
+
+        {/* Trial Status Banner */}
+        {subAccess.isTrial && (
+          <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-300/50 dark:border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-amber-500/15 flex items-center justify-center text-amber-600 shrink-0 font-black">
+                <Clock className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-800 dark:text-slate-100 text-sm">
+                    Lite Plan 45-Day Free Trial
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                    {subAccess.trialDaysRemaining} days remaining
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Direct UPI collection (0% fee), manual verify & Dedicated Account Manager are active.
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold gap-1.5 shrink-0 shadow-sm"
+              onClick={() => navigate("/plans")}
+            >
+              <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+              Upgrade to Pro (₹49/bed)
+            </Button>
+          </div>
+        )}
+
+        {/* Subscription Expired Alert Banner */}
+        {subAccess.isExpired && (
+          <div className="bg-gradient-to-r from-red-500/15 via-rose-500/10 to-amber-500/10 border-2 border-red-500/30 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md">
+            <div className="flex items-center gap-3.5">
+              <div className="h-12 w-12 rounded-2xl bg-destructive/15 border border-destructive/30 flex items-center justify-center text-red-500 shrink-0 font-black">
+                <Lock className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-red-600 dark:text-red-400 text-sm sm:text-base">
+                    Your Subscription is Over
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-destructive/20 text-destructive border border-destructive/30 uppercase tracking-wider">
+                    All Operations Locked
+                  </span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-xl leading-relaxed">
+                  Your 45-day free trial has concluded. Adding tenants, building creation, notice period tracking, and rent collections are restricted. Contact support or buy a plan to reactivate operations.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5 shrink-0 self-stretch sm:self-center">
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1 sm:flex-initial border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl text-xs font-bold gap-1.5"
+                onClick={() => {
+                  setGateFeature("Account Operations");
+                  setGateModalOpen(true);
+                }}
+              >
+                <Phone className="h-3.5 w-3.5 text-teal-600" />
+                Contact Support
+              </Button>
+              <Button
+                size="sm"
+                className="flex-1 sm:flex-initial bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold gap-1.5 shadow-md shadow-brand-600/20"
+                onClick={() => navigate("/plans")}
+              >
+                <Crown className="h-3.5 w-3.5 text-amber-300" />
+                Buy Plan (₹29/₹49)
+              </Button>
+            </div>
+          </div>
+        )}
 
         {isLoading && (
           <div className="space-y-6 animate-fade-in">
@@ -312,7 +439,21 @@ const Dashboard = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
                 {/* Revenue Analytics Card */}
-                <Card className="bg-white border border-slate-100 shadow-sm rounded-2xl p-5 hover:shadow-md transition-shadow">
+                <Card className="bg-white border border-slate-100 shadow-sm rounded-2xl p-5 hover:shadow-md transition-shadow relative overflow-hidden">
+                  {!subAccess.canViewRentAnalytics && (
+                    <div className="absolute inset-0 bg-white/85 dark:bg-slate-900/85 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center text-center p-4">
+                      <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-950/60 flex items-center justify-center text-amber-600 mb-2">
+                        <Lock className="h-5 w-5" />
+                      </div>
+                      <p className="font-bold text-slate-800 dark:text-slate-100 text-sm">Rent Analytics Locked</p>
+                      <p className="text-xs text-slate-500 max-w-xs mt-1 mb-3">
+                        Your 45-day free trial has ended. Subscribe to Lite (₹29/bed) or Pro (₹49/bed) to unlock revenue analytics.
+                      </p>
+                      <Button size="sm" className="bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs shadow-sm" onClick={() => navigate("/plans")}>
+                        View Subscription Plans
+                      </Button>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center mb-4">
                     <div>
                       <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
@@ -581,6 +722,14 @@ const Dashboard = () => {
           open={celebrationOpen}
           onClose={() => setCelebrationOpen(false)}
           pgName={celebrationPgName}
+        />
+
+        <FirstLoginTrialModal />
+
+        <TrialExpiredGateModal
+          open={gateModalOpen}
+          onOpenChange={setGateModalOpen}
+          featureName={gateFeature}
         />
       </div>
     </CanAccessPage>

@@ -6,8 +6,7 @@ export type PlanTier = "FREE" | "LITE" | "PRO";
 function normalizePlanTier(planName?: string, planDisplayName?: string): PlanTier {
   const raw = (planDisplayName || planName || "").toUpperCase();
   if (raw.includes("PRO") || raw.includes("STANDARD") || raw.includes("49")) return "PRO";
-  if (raw.includes("LITE") || raw.includes("PREMIUM") || raw.includes("29")) return "LITE";
-  return "FREE";
+  return "LITE";
 }
 
 function tierRank(t: PlanTier): number {
@@ -19,11 +18,14 @@ function tierRank(t: PlanTier): number {
 /** When GET /property-owners/my-features returns no `features` array, gate nav by minimum plan tier. */
 const NAV_FEATURE_MIN_TIER: Partial<Record<string, PlanTier>> = {
   MULTI_PG: "LITE",
-  WHATSAPP_REMINDERS: "FREE",
+  WHATSAPP_REMINDERS: "PRO",
   UPI_INTENT_DIRECT: "LITE",
-  AADHAAR_KYC: "FREE",
-  DIGITAL_AGREEMENT: "FREE",
+  MANUAL_PAYMENT_VERIFY: "LITE",
+  DEDICATED_ACCOUNT_MANAGER: "LITE",
+  AADHAAR_KYC: "LITE",
+  DIGITAL_AGREEMENT: "PRO",
   PAYMENT_GATEWAY_AUTO: "PRO",
+  AUTOMATED_SETTLEMENT: "PRO",
   AUTO_RECEIPTS: "PRO",
   LATE_FEES: "PRO",
   PG_WEBSITE: "PRO",
