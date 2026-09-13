@@ -16,6 +16,7 @@ import {
   Phone,
   MessageCircle,
   ArrowRightLeft,
+  Layers,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +57,7 @@ import {
   tenantRentDueLabel,
   tenantRoomNo,
   tenantVerificationLabel,
+  tenantBlock,
   tenantFloor,
   tenantBedNo,
 } from "@/lib/tenantDisplay";
@@ -112,6 +114,8 @@ const Tenants = () => {
   const [kycFilter, setKycFilter] = useState<"all" | "verified" | "pending">("all");
   const [selectedBlockId, setSelectedBlockId] = useState<string>("");
   const [selectedFloorId, setSelectedFloorId] = useState<string>("");
+  const [selectedRoomId, setSelectedRoomId] = useState<string>("");
+  const [groupBy, setGroupBy] = useState<"block" | "floor" | "none">("block");
 
   // Move Tenant State
   const [moveModalOpen, setMoveModalOpen] = useState(false);
@@ -178,6 +182,10 @@ const Tenants = () => {
   });
   const rooms = roomsQuery.data ?? [];
 
+  // All rooms in current PG for the filter dropdown
+  const allPropertyRoomsQuery = useRoomsList(selectedPgId, undefined, undefined, { requireBlockAndFloor: false });
+  const allPropertyRooms = allPropertyRoomsQuery.data ?? [];
+
   const isVacantRoomsPage = location.pathname === "/tenants/vacant-rooms";
   const tenantsQuery = usePropertyTenants(isVacantRoomsPage ? null : selectedPgId);
 
@@ -195,10 +203,26 @@ const Tenants = () => {
   const filteredTenants = useMemo(() => {
     const rows = tenantsQuery.data ?? [];
     let next = rows;
+
+    if (selectedBlockId && selectedBlockId !== "all") {
+      next = next.filter((t) => (t.block?.id ?? "") === selectedBlockId);
+    }
+    if (selectedFloorId && selectedFloorId !== "all") {
+      next = next.filter((t) => (t.floor?.id ?? "") === selectedFloorId);
+    }
+    if (selectedRoomId && selectedRoomId !== "all") {
+      next = next.filter((t) => (t.room?.id ?? "") === selectedRoomId);
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       next = next.filter((row) => {
-        const blob = [tenantDisplayName(row), tenantPhone(row), tenantRoomNo(row)].join(" ").toLowerCase();
+        const blob = [
+          tenantDisplayName(row),
+          tenantPhone(row),
+          tenantRoomNo(row),
+          tenantFloor(row),
+          tenantBlock(row),
+        ].join(" ").toLowerCase();
         return blob.includes(q);
       });
     }
@@ -208,7 +232,85 @@ const Tenants = () => {
       next = next.filter((t) => tenantVerificationLabel(t) !== "verified");
     }
     return next;
-  }, [tenantsQuery.data, searchQuery, kycFilter]);
+  }, [tenantsQuery.data, searchQuery, kycFilter, selectedBlockId, selectedFloorId, selectedRoomId]);
+
+  const groupedByBlockTenants = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        blockName: string;
+        displayOrder: number;
+        floors: Map<string, { floorName: string; displayOrder: number; tenants: PropertyTenant[] }>;
+      }
+    >();
+
+    for (const t of filteredTenants) {
+      const bKey = t.block?.id || "unassigned";
+      const bName = t.block?.name || "Main Building";
+      const bOrder = t.block?.displayOrder ?? 999;
+
+      if (!map.has(bKey)) {
+        map.set(bKey, { blockName: bName, displayOrder: bOrder, floors: new Map() });
+      }
+      const bObj = map.get(bKey)!;
+
+      const fKey = t.floor?.id || "unassigned";
+      const fName = t.floor?.name || "General Floor";
+      const fOrder = t.floor?.displayOrder ?? 999;
+
+      if (!bObj.floors.has(fKey)) {
+        bObj.floors.set(fKey, { floorName: fName, displayOrder: fOrder, tenants: [] });
+      }
+      bObj.floors.get(fKey)!.tenants.push(t);
+    }
+
+    return Array.from(map.entries())
+      .map(([blockId, b]) => ({
+        blockId,
+        blockName: b.blockName,
+        displayOrder: b.displayOrder,
+        totalTenants: Array.from(b.floors.values()).reduce((sum, f) => sum + f.tenants.length, 0),
+        floors: Array.from(b.floors.entries())
+          .map(([floorId, f]) => ({
+            floorId,
+            floorName: f.floorName,
+            displayOrder: f.displayOrder,
+            tenants: f.tenants,
+          }))
+          .sort((a, b) => a.displayOrder - b.displayOrder || a.floorName.localeCompare(b.floorName)),
+      }))
+      .sort((a, b) => a.displayOrder - b.displayOrder || a.blockName.localeCompare(b.blockName));
+  }, [filteredTenants]);
+
+  const groupedByFloorTenants = useMemo(() => {
+    const map = new Map<
+      string,
+      { floorName: string; blockName: string; displayOrder: number; tenants: PropertyTenant[] }
+    >();
+
+    for (const t of filteredTenants) {
+      const fKey = t.floor?.id || "unassigned";
+      const fName = t.floor?.name || "General Floor";
+      const bName = t.block?.name || "Main Building";
+      const fOrder = t.floor?.displayOrder ?? 999;
+
+      if (!map.has(fKey)) {
+        map.set(fKey, { floorName: fName, blockName: bName, displayOrder: fOrder, tenants: [] });
+      }
+      map.get(fKey)!.tenants.push(t);
+    }
+
+    return Array.from(map.entries())
+      .map(([floorId, f]) => ({
+        floorId,
+        floorName: f.floorName,
+        blockName: f.blockName,
+        displayOrder: f.displayOrder,
+        totalTenants: f.tenants.length,
+        tenants: f.tenants,
+      }))
+      .sort((a, b) => a.displayOrder - b.displayOrder || a.floorName.localeCompare(b.floorName));
+  }, [filteredTenants]);
 
   const kpi = useMemo(() => {
     const rows = tenantsQuery.data ?? [];
@@ -408,6 +510,95 @@ const Tenants = () => {
     return "KYC pending";
   };
 
+  const renderTenantCard = (row: PropertyTenant) => {
+    const wa = row.phone ? waLink(row.phone) : null;
+    const isVerified = tenantVerificationLabel(row) === "verified";
+    const initial = tenantInitials(row);
+    return (
+      <Card
+        key={row.id}
+        className="cursor-pointer hover:shadow-md transition-shadow duration-200 border-border/60 overflow-hidden bg-card"
+        onClick={() => navigate(`/tenants/${row.id}`)}
+      >
+        <CardContent className="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          {/* Left Details block */}
+          <div className="flex items-center gap-4 min-w-0 flex-1">
+            <Avatar className="h-12 w-12 border shrink-0">
+              <AvatarFallback className="text-sm font-semibold bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-300">
+                {initial}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-base text-foreground truncate">
+                  {tenantDisplayName(row)}
+                </h3>
+                {isVerified ? (
+                  <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-50 text-[10px] py-0 px-2 font-medium">
+                    Aadhar verified
+                  </Badge>
+                ) : (
+                  <Badge className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-50 text-[10px] py-0 px-2 font-medium">
+                    Pending verification
+                  </Badge>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center text-xs text-muted-foreground gap-x-2 mt-1">
+                <span className="font-semibold text-foreground">Block: {tenantBlock(row)}</span>
+                <span className="text-border">|</span>
+                <span className="font-semibold text-foreground">Floor: {tenantFloor(row)}</span>
+                <span className="text-border">|</span>
+                <span className="font-semibold text-foreground">Room: {tenantRoomNo(row)}</span>
+                <span className="text-border">|</span>
+                <span className="font-semibold text-foreground">Bed: {tenantBedNo(row)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Middle Info block (Rent & Dues) */}
+          <div className="flex items-center gap-4 text-xs shrink-0 flex-wrap md:flex-nowrap md:mx-6">
+            <div className="flex flex-col">
+              <span className="text-[10px] text-muted-foreground uppercase font-semibold">Rent</span>
+              <span className="font-bold text-sm text-foreground">{tenantRentAmount(row)}/mo</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] text-muted-foreground uppercase font-semibold">Due Status</span>
+              <span className="text-xs text-orange-600 dark:text-orange-400 font-bold bg-orange-50 dark:bg-orange-950/20 px-2 py-0.5 rounded mt-0.5">
+                Rent due: {tenantRentDueLabel(row)}
+              </span>
+            </div>
+          </div>
+
+          {/* Right Quick actions block */}
+          <div className="flex items-center gap-2 shrink-0 justify-end" onClick={(e) => e.stopPropagation()}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5 rounded-lg border-teal-600/30 text-teal-700 hover:bg-teal-50 font-bold"
+              onClick={() => handleOpenMoveModal(row)}
+            >
+              <ArrowRightLeft className="h-3.5 w-3.5" /> Move
+            </Button>
+            {tenantPhone(row) !== "—" && (
+              <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-lg border-teal-600/30 text-teal-600 hover:bg-teal-50" asChild>
+                <a href={`tel:${phoneDigits(row.phone ?? "")}`}>
+                  <Phone className="h-3.5 w-3.5" /> Call
+                </a>
+              </Button>
+            )}
+            {wa && (
+              <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-lg border-emerald-600/30 text-emerald-600 hover:bg-emerald-50" asChild>
+                <a href={wa} target="_blank" rel="noreferrer">
+                  <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                </a>
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   const tenantTableSection = (
     <div className="space-y-4">
       {!selectedPgId ? (
@@ -443,104 +634,74 @@ const Tenants = () => {
           </CardContent>
         </Card>
       ) : (
-        <Card className="overflow-hidden border-border/80 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/30 px-4 py-3">
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
             <p className="text-sm font-semibold text-foreground">
-              <span className="tabular-nums">{filteredTenants.length}</span> result{filteredTenants.length === 1 ? "" : "s"}
+              <span className="tabular-nums">{filteredTenants.length}</span> tenant{filteredTenants.length === 1 ? "" : "s"} found
             </p>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span className="hidden sm:inline">KYC credits are managed in Plans when enabled.</span>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span>View:</span>
+              <span className="font-medium text-foreground uppercase">{groupBy === "block" ? "Grouped by Block" : groupBy === "floor" ? "Grouped by Floor" : "Flat List"}</span>
             </div>
           </div>
-          <div className="flex flex-col gap-3 p-4">
-            {filteredTenants.map((row) => {
-              const wa = row.phone ? waLink(row.phone) : null;
-              const isVerified = tenantVerificationLabel(row) === "verified";
-              const initial = tenantInitials(row);
-              return (
-                <Card
-                  key={row.id}
-                  className="cursor-pointer hover:shadow-md transition-shadow duration-200 border-border/60 overflow-hidden"
-                  onClick={() => navigate(`/tenants/${row.id}`)}
-                >
-                  <CardContent className="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    {/* Left Details block */}
-                    <div className="flex items-center gap-4 min-w-0 flex-1">
-                      <Avatar className="h-12 w-12 border shrink-0">
-                        <AvatarFallback className="text-sm font-semibold bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-300">
-                          {initial}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-bold text-base text-foreground truncate">
-                            {tenantDisplayName(row)}
-                          </h3>
-                          {isVerified ? (
-                            <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-50 text-[10px] py-0 px-2 font-medium">
-                              Aadhar verified
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-50 text-[10px] py-0 px-2 font-medium">
-                              Pending verification
-                            </Badge>
-                          )}
+
+          {groupBy === "block" ? (
+            <div className="space-y-6">
+              {groupedByBlockTenants.map((block) => (
+                <div key={block.blockId} className="border border-border/80 rounded-xl bg-card overflow-hidden shadow-xs">
+                  <div className="bg-muted/40 px-4 py-3 border-b flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-5 w-5 text-teal-600" />
+                      <h2 className="font-bold text-base text-foreground">{block.blockName}</h2>
+                    </div>
+                    <Badge variant="secondary" className="font-semibold text-xs">
+                      {block.totalTenants} {block.totalTenants === 1 ? "Tenant" : "Tenants"}
+                    </Badge>
+                  </div>
+
+                  <div className="p-4 space-y-5">
+                    {block.floors.map((floor) => (
+                      <div key={floor.floorId} className="space-y-3">
+                        <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">
+                          <Layers className="h-3.5 w-3.5 text-emerald-600" />
+                          {floor.floorName} ({floor.tenants.length})
                         </div>
-                        <div className="flex flex-wrap items-center text-xs text-muted-foreground gap-x-2 mt-1">
-                          <span className="font-semibold text-foreground">floor: {tenantFloor(row)}</span>
-                          <span className="text-border">|</span>
-                          <span className="font-semibold text-foreground">Room no: {tenantRoomNo(row)}</span>
-                          <span className="text-border">|</span>
-                          <span className="font-semibold text-foreground">Bed no: {tenantBedNo(row)}</span>
+                        <div className="flex flex-col gap-3">
+                          {floor.tenants.map((row) => renderTenantCard(row))}
                         </div>
                       </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : groupBy === "floor" ? (
+            <div className="space-y-6">
+              {groupedByFloorTenants.map((floor) => (
+                <div key={floor.floorId} className="border border-border/80 rounded-xl bg-card overflow-hidden shadow-xs">
+                  <div className="bg-muted/40 px-4 py-3 border-b flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Layers className="h-5 w-5 text-emerald-600" />
+                      <h2 className="font-bold text-base text-foreground">{floor.floorName}</h2>
+                      {floor.blockName && <span className="text-xs text-muted-foreground font-normal">({floor.blockName})</span>}
                     </div>
+                    <Badge variant="secondary" className="font-semibold text-xs">
+                      {floor.totalTenants} {floor.totalTenants === 1 ? "Tenant" : "Tenants"}
+                    </Badge>
+                  </div>
 
-                    {/* Middle Info block (Rent & Dues) */}
-                    <div className="flex items-center gap-4 text-xs shrink-0 flex-wrap md:flex-nowrap md:mx-6">
-                      <div className="flex flex-col">
-                        <span className="text-[10px] text-muted-foreground uppercase font-semibold">Rent</span>
-                        <span className="font-bold text-sm text-foreground">{tenantRentAmount(row)}/mo</span>
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[10px] text-muted-foreground uppercase font-semibold">Due Status</span>
-                        <span className="text-xs text-orange-600 dark:text-orange-400 font-bold bg-orange-50 dark:bg-orange-950/20 px-2 py-0.5 rounded mt-0.5">
-                          Rent due: {tenantRentDueLabel(row)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Right Quick actions block */}
-                    <div className="flex items-center gap-2 shrink-0 justify-end" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-9 gap-1.5 rounded-lg border-teal-600/30 text-teal-700 hover:bg-teal-50 font-bold"
-                        onClick={() => handleOpenMoveModal(row)}
-                      >
-                        <ArrowRightLeft className="h-3.5 w-3.5" /> Move Tenant
-                      </Button>
-                      {tenantPhone(row) !== "—" && (
-                        <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-lg border-teal-600/30 text-teal-600 hover:bg-teal-50" asChild>
-                          <a href={`tel:${phoneDigits(row.phone ?? "")}`}>
-                            <Phone className="h-3.5 w-3.5" /> Call
-                          </a>
-                        </Button>
-                      )}
-                      {wa && (
-                        <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-lg border-emerald-600/30 text-emerald-600 hover:bg-emerald-50" asChild>
-                          <a href={wa} target="_blank" rel="noreferrer">
-                            <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
-                          </a>
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </Card>
+                  <div className="p-4 flex flex-col gap-3">
+                    {floor.tenants.map((row) => renderTenantCard(row))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {filteredTenants.map((row) => renderTenantCard(row))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -556,7 +717,7 @@ const Tenants = () => {
             <p className="mt-1 text-sm text-muted-foreground">
               {isVacantRoomsPage
                 ? "Rooms with free beds for quick allocation"
-                : "Search, filter, and open a tenant profile"}
+                : "Search, filter block/floor/room wise, and open tenant profile"}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -601,17 +762,84 @@ const Tenants = () => {
             </div>
 
             <FilterBar>
-              <div className="relative min-w-0 flex-1 max-w-lg">
+              <div className="relative min-w-0 flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Search your tenants…"
+                  placeholder="Search name, phone, room…"
                   className="pl-9"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
+
+              {/* Block Filter */}
+              <Select
+                value={selectedBlockId || "all"}
+                onValueChange={(v) => {
+                  setSelectedBlockId(v === "all" ? "" : v);
+                  setSelectedFloorId("");
+                  setSelectedRoomId("");
+                }}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="All Blocks" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Blocks</SelectItem>
+                  {blocks.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Floor Filter */}
+              <Select
+                value={selectedFloorId || "all"}
+                onValueChange={(v) => {
+                  setSelectedFloorId(v === "all" ? "" : v);
+                  setSelectedRoomId("");
+                }}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="All Floors" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Floors</SelectItem>
+                  {floors
+                    .filter((f) => !selectedBlockId || selectedBlockId === "all" || f.blockId === selectedBlockId)
+                    .map((f) => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {f.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+
+              {/* Room Filter */}
+              <Select
+                value={selectedRoomId || "all"}
+                onValueChange={(v) => setSelectedRoomId(v === "all" ? "" : v)}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="All Rooms" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Rooms</SelectItem>
+                  {allPropertyRooms
+                    .filter((r) => !selectedFloorId || selectedFloorId === "all" || r.floorId === selectedFloorId)
+                    .map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        Room {r.roomNumber}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+
+              {/* KYC Status Filter */}
               <Select value={kycFilter} onValueChange={(v) => setKycFilter(v as typeof kycFilter)}>
-                <SelectTrigger className="w-[160px]">
+                <SelectTrigger className="w-[130px]">
                   <SelectValue placeholder="KYC status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -620,6 +848,44 @@ const Tenants = () => {
                   <SelectItem value="pending">Pending</SelectItem>
                 </SelectContent>
               </Select>
+
+              {/* Group By Mode Toggle */}
+              <div className="flex bg-muted p-0.5 rounded-lg border">
+                <Button
+                  type="button"
+                  variant={groupBy === "block" ? "default" : "ghost"}
+                  size="sm"
+                  className={`h-7 px-2.5 text-xs font-semibold ${
+                    groupBy === "block" ? "bg-teal-600 text-white shadow-xs" : "text-muted-foreground"
+                  }`}
+                  onClick={() => setGroupBy("block")}
+                >
+                  By Block
+                </Button>
+                <Button
+                  type="button"
+                  variant={groupBy === "floor" ? "default" : "ghost"}
+                  size="sm"
+                  className={`h-7 px-2.5 text-xs font-semibold ${
+                    groupBy === "floor" ? "bg-teal-600 text-white shadow-xs" : "text-muted-foreground"
+                  }`}
+                  onClick={() => setGroupBy("floor")}
+                >
+                  By Floor
+                </Button>
+                <Button
+                  type="button"
+                  variant={groupBy === "none" ? "default" : "ghost"}
+                  size="sm"
+                  className={`h-7 px-2.5 text-xs font-semibold ${
+                    groupBy === "none" ? "bg-teal-600 text-white shadow-xs" : "text-muted-foreground"
+                  }`}
+                  onClick={() => setGroupBy("none")}
+                >
+                  Flat
+                </Button>
+              </div>
+
               <Button variant="outline" size="sm" asChild>
                 <Link to="/tenants/vacant-rooms">Vacant rooms</Link>
               </Button>

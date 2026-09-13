@@ -398,6 +398,12 @@ export function usePropertyTenantDetail(propertyId?: string | null, tenantId?: s
     queryKey: queryKeys.tenantDetail(propertyId, tenantId),
     queryFn: async () => {
       if (!propertyId || !tenantId) return null;
+      try {
+        const detail = await getPropertyTenantById(propertyId, tenantId);
+        if (detail) return detail;
+      } catch (e) {
+        console.warn("Could not fetch tenant detail by ID, falling back to list", e);
+      }
       const list = await getPropertyTenants(propertyId);
       const found = list.find((t) => (t.roomTenant?.id ?? t.id) === tenantId || t.id === tenantId);
       if (!found) {
@@ -886,8 +892,18 @@ export function useCurrentPlan() {
 
 export function useCreatePlanCheckoutOrderMutation() {
   return useMutation({
-    mutationFn: ({ planId, billingCycle }: { planId: string; billingCycle?: 'monthly' | 'annual' }) =>
-      createPlanCheckoutOrder(planId, billingCycle),
+    mutationFn: ({
+      planId,
+      numberOfBeds,
+      durationMonths,
+      billingCycle,
+    }: {
+      planId: string;
+      numberOfBeds?: number;
+      durationMonths?: number;
+      billingCycle?: 'monthly' | 'annual';
+    }) =>
+      createPlanCheckoutOrder(planId, { numberOfBeds, durationMonths, billingCycle }),
   });
 }
 
@@ -949,6 +965,8 @@ export function useSetTenantNoticeMutation(propertyId: string | null | undefined
       setTenantNotice(propertyId!, roomTenantId, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['propertyTenants'] });
+      queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      queryClient.invalidateQueries({ queryKey: ['tenantDetail'] });
     },
   });
 }
@@ -959,6 +977,8 @@ export function useClearTenantNoticeMutation(propertyId: string | null | undefin
     mutationFn: (roomTenantId: string) => clearTenantNotice(propertyId!, roomTenantId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['propertyTenants'] });
+      queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      queryClient.invalidateQueries({ queryKey: ['tenantDetail'] });
     },
   });
 }

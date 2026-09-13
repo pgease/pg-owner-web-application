@@ -14,6 +14,7 @@ import { useApp } from "@/context/AppContext";
 import { getNightOutRequests, updateNightOutRequestStatus, createNightOutRequest } from "@/api/propertyOwner";
 import { usePropertyTenants } from "@/hooks/usePropertyOwnerQueries";
 import { CanAccessPage } from "@/components/PermissionGuard";
+import { toast } from "@/components/ui/use-toast";
 
 export default function NightOutRequestsPage() {
   const { selectedPgId, properties } = useApp();

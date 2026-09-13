@@ -1,4 +1,5 @@
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2, Upload } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,14 @@ import { toast } from "@/components/ui/use-toast";
 
 const SettingsPage = () => {
   const { language, setLanguage } = useApp();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get("tab") === "activity") {
+      navigate("/activity-logs", { replace: true });
+    }
+  }, [searchParams, navigate]);
   const fileRef = useRef<HTMLInputElement>(null);
   const uploadMut = useUploadPhotoMutation();
   const meQuery = useQuery({
