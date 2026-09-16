@@ -15,7 +15,7 @@ import {
   MessageSquareWarning,
   LogOut,
   X,
-  UtensilsCrossed,
+  Wrench,
   Moon,
   ClipboardCheck,
   UserMinus,
@@ -23,6 +23,7 @@ import {
   LifeBuoy,
   BookOpen,
   Home,
+  FileSpreadsheet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -56,41 +57,6 @@ const navItems: NavItem[] = [
     permissionKey: "dashboard_access",
   },
   {
-    title: "Complaints",
-    url: "/complaints",
-    icon: MessageSquareWarning,
-    permissionKey: "complaint_view_all",
-  },
-  {
-    title: "Money",
-    url: "/rent-payments",
-    icon: IndianRupee,
-    permissionKey: "account_view_dues",
-    children: [
-      { title: "Rent Collection", url: "/rent-payments", permissionKey: "account_view_dues" },
-      { title: "Payment History", url: "/rent-payments/history", permissionKey: "account_view_dues" },
-      { title: "Dues & Pending", url: "/rent-payments/dues", permissionKey: "account_view_dues" },
-      { title: "Expenses Ledger", url: "/expenses", permissionKey: "expense_view" },
-      { title: "Refunds", url: "/refunds", permissionKey: "refund_add" },
-    ],
-  },
-  {
-    title: "People",
-    url: "/tenants",
-    icon: Users,
-    permissionKey: "tenant_view",
-    children: [
-      { title: "Tenant List", url: "/tenants", permissionKey: "tenant_view" },
-      { title: "Leads & Visits", url: "/leads", permissionKey: "tenant_view", featureKey: "LEAD_CRM" },
-      { title: "Add tenant", url: "/tenants/add", permissionKey: "tenant_add" },
-      { title: "Tenant KYC", url: "/tenants/kyc", permissionKey: "kyc_view", featureKey: "AADHAAR_KYC" },
-      { title: "Notice Period", url: "/tenants/notice-period", permissionKey: "tenant_view" },
-      { title: "Guest Log & Requests", url: "/tenants/guests", permissionKey: "guest_log" },
-      { title: "Team List", url: "/team", permissionKey: "team_view_members" },
-      { title: "Attendance", url: "/attendance", permissionKey: "attend_view" },
-    ],
-  },
-  {
     title: "Property",
     url: "/my-pgs",
     icon: Building2,
@@ -106,9 +72,43 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    title: "People",
+    url: "/tenants",
+    icon: Users,
+    permissionKey: "tenant_view",
+    children: [
+      { title: "Tenant List", url: "/tenants", permissionKey: "tenant_view" },
+      { title: "Leads & Visits", url: "/leads", permissionKey: "tenant_view", featureKey: "LEAD_CRM" },
+      { title: "Add tenant", url: "/tenants/add", permissionKey: "tenant_add" },
+      { title: "Tenant KYC", url: "/tenants/kyc", permissionKey: "kyc_view", featureKey: "AADHAAR_KYC" },
+      { title: "Notice Period", url: "/tenants/notice-period", permissionKey: "tenant_view" },
+      { title: "Guest Log & Requests", url: "/tenants/guests", permissionKey: "guest_log" },
+      { title: "Team List", url: "/team", permissionKey: "team_view_members" },
+    ],
+  },
+  {
+    title: "Money",
+    url: "/rent-payments",
+    icon: IndianRupee,
+    permissionKey: "account_view_dues",
+    children: [
+      { title: "Rent Collection", url: "/rent-payments", permissionKey: "account_view_dues" },
+      { title: "Payment History", url: "/rent-payments/history", permissionKey: "account_view_dues" },
+      { title: "Dues & Pending", url: "/rent-payments/dues", permissionKey: "account_view_dues" },
+      { title: "Expenses Ledger", url: "/expenses", permissionKey: "expense_view" },
+      { title: "Refunds", url: "/refunds", permissionKey: "refund_add" },
+    ],
+  },
+  {
+    title: "Reports",
+    url: "/reports",
+    icon: BarChart3,
+    permissionKey: "account_view_dues",
+  },
+  {
     title: "Operations",
     url: "/complaints",
-    icon: UtensilsCrossed,
+    icon: Wrench,
     children: [
       { title: "Complaints Desk", url: "/complaints", permissionKey: "complaint_view_all" },
       { title: "Food & Dining", url: "/food", permissionKey: "food_view_edit" },
@@ -125,7 +125,6 @@ const navItems: NavItem[] = [
       { title: "Activity Audit Logs", url: "/activity-logs" },
       { title: "Profile Settings", url: "/settings" },
       { title: "Support Help", url: "/support" },
-      { title: "API Catalog", url: "/reference/apis" },
     ],
   },
 ];
@@ -155,12 +154,12 @@ const AppSidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }: AppSideb
   };
 
   const toggleGroup = (title: string) => {
-    setOpenGroups((prev) => ({ ...prev, [title]: !prev[title] }));
+    setOpenGroups((prev) => ({ ...prev, [title]: !(openGroups[title] !== undefined ? openGroups[title] : true) }));
   };
 
   const isGroupOpen = (item: NavItem) => {
     if (openGroups[item.title] !== undefined) return openGroups[item.title];
-    return isChildActive(item);
+    return true; // Default open for all groups, matching RentOK and user reference
   };
 
   const isLockedByPermission = (permissionKey?: string) => {

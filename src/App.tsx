@@ -32,7 +32,6 @@ import TeamIndex from "./pages/team/TeamIndex";
 import AddStaff from "./pages/team/AddStaff";
 import EditStaffPermissions from "./pages/team/EditStaffPermissions";
 import { FeaturePlaceholder } from "./pages/FeaturePlaceholder";
-import ApiCatalogPage from "./pages/reference/ApiCatalogPage";
 import LeadsPage from "./pages/tenants/LeadsPage";
 import WifiManagementPage from "./pages/property/WifiManagementPage";
 import PropertyNoticesPage from "./pages/property/PropertyNoticesPage";
@@ -42,6 +41,9 @@ import FoodDiningPage from "./pages/food/FoodDiningPage";
 import { EaseBuddyAI } from "./components/common/EaseBuddyAI";
 import ActivityLogsPage from "./pages/ActivityLogsPage";
 import NoticePeriodPage from "./pages/tenants/NoticePeriodPage";
+import BankAccountPage from "./pages/property/BankAccountPage";
+import AmenitiesPage from "./pages/property/AmenitiesPage";
+import RestrictionsPage from "./pages/property/RestrictionsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -102,12 +104,13 @@ const App = () => (
                         <Route path="/leads" element={<LeadsPage />} />
                         <Route path="/my-pgs" element={<MyPGs />} />
                         <Route path="/my-pgs/structure" element={<Structure />} />
-                        <Route path="/my-pgs/amenities" element={<MyPGs />} />
-                        <Route path="/my-pgs/restrictions" element={<MyPGs />} />
+                        <Route path="/my-pgs/amenities" element={<AmenitiesPage />} />
+                        <Route path="/my-pgs/restrictions" element={<RestrictionsPage />} />
                         <Route path="/my-pgs/wifi" element={<WifiManagementPage />} />
                         <Route path="/my-pgs/notices" element={<PropertyNoticesPage />} />
-                        <Route path="/my-pgs/rooms" element={<MyPGs />} />
-                        <Route path="/my-pgs/bank" element={<MyPGs />} />
+                        <Route path="/my-pgs/rooms" element={<Structure />} />
+                        <Route path="/my-pgs/bank" element={<BankAccountPage />} />
+                        <Route path="/bank" element={<BankAccountPage />} />
                         <Route path="/rent-payments" element={<RentPayments />} />
                         <Route path="/rent-payments/history" element={<RentPayments />} />
                         <Route path="/rent-payments/dues" element={<RentPayments />} />
@@ -130,7 +133,6 @@ const App = () => (
                         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
                         <Route path="/terms-and-conditions" element={<TermsConditionsPage />} />
                         <Route path="/contact-us" element={<ContactUsPage />} />
-                        <Route path="/reference/apis" element={<ApiCatalogPage />} />
                         <Route path="/team" element={<TeamIndex />} />
                         <Route path="/team/add-staff" element={<AddStaff />} />
                         <Route path="/team/:staffId/permissions" element={<EditStaffPermissions />} />

@@ -1,7 +1,7 @@
 import { authStorage, httpRequest } from "./http";
 
-const PROPERTY_OWNER_BASE = "/property-owners";
-const TENANT_BASE = "/tenants";
+export const PROPERTY_OWNER_BASE = "/property-owners";
+export const TENANT_BASE = "/tenants";
 
 /**
  * Property id is **only** in the URL path (not repeated in the body).
@@ -227,6 +227,26 @@ export async function getMe() {
   return httpRequest<PropertyOwner>(`${PROPERTY_OWNER_BASE}/me`, {
     method: "GET",
     auth: true,
+  });
+}
+
+export interface UpdatePropertyOwnerPayload {
+  name?: string;
+  email?: string;
+  mobileContactNumber?: string;
+  phone?: string;
+  countryCode?: string;
+  language?: "en-US" | "hi-IN";
+  bankDetails?: Record<string, unknown>;
+  kycInfo?: Record<string, unknown>;
+}
+
+// Update Current User Profile (Me)
+export async function updateMe(payload: UpdatePropertyOwnerPayload) {
+  return httpRequest<PropertyOwner>(`${PROPERTY_OWNER_BASE}/me`, {
+    method: "PUT",
+    auth: true,
+    body: payload,
   });
 }
 

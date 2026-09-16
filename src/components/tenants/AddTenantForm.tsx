@@ -65,7 +65,6 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
   const [selectedFloorId, setSelectedFloorId] = useState<string>("");
   const [selectedRoomId, setSelectedRoomId] = useState<string>("");
   const [bedNumber, setBedNumber] = useState("1");
-  const [isTempBed, setIsTempBed] = useState(false);
   const [bookedBy, setBookedBy] = useState("");
   const [referredBy, setReferredBy] = useState("");
   const [sendWhatsappReminder, setSendWhatsappReminder] = useState(true);
@@ -130,6 +129,10 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
   const [ifscCode, setIfscCode] = useState("");
   const [upiId, setUpiId] = useState("");
 
+  // Stay timing
+  const [checkinTime, setCheckinTime] = useState("12:00 PM");
+  const [checkoutTime, setCheckoutTime] = useState("11:00 AM");
+
   // --- STEP 2: Stay Details State ---
   const [stayType, setStayType] = useState("Long Stay");
   const [moveInDate, setMoveInDate] = useState(new Date().toISOString().split("T")[0]);
@@ -137,10 +140,10 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
   const [lockInPeriod, setLockInPeriod] = useState("0");
   const [noticePeriod, setNoticePeriod] = useState("30");
   const [agreementPeriod, setAgreementPeriod] = useState("11 Months");
-  const [fixedRent, setFixedRent] = useState("0");
+  const [fixedRent, setFixedRent] = useState("");
   const [rentalFrequency, setRentalFrequency] = useState("Monthly");
   const [rentDueDate, setRentDueDate] = useState("1st");
-  const [securityDeposit, setSecurityDeposit] = useState("0");
+  const [securityDeposit, setSecurityDeposit] = useState("");
   const [electricityMeter, setElectricityMeter] = useState(false);
 
   // --- STEP 3: Payment Details State ---
@@ -406,24 +409,45 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
 
   // Sync Fixed Rent & Deposit to Payment details dues on change
   useEffect(() => {
-    setRentDueAmt(fixedRent);
-    setDepositDueAmt(securityDeposit);
+    setRentDueAmt(fixedRent || "0");
+    setDepositDueAmt(securityDeposit || "0");
   }, [fixedRent, securityDeposit]);
 
   const getStepOneError = (): string | null => {
-    if (!selectedPgId) return "Select a PG from the header.";
-    if (!name.trim()) return "Enter tenant name.";
+    if (!selectedPgId) return "Select a PG property from the header.";
+    if (!name.trim()) return "Enter tenant full name.";
     const digits = phone.replace(/\D/g, "");
-    if (digits.length < 10) return "Enter valid 10-digit mobile contact.";
-    if (!hasSelectValue(effectiveRoomId)) return "Select room for allocation.";
+    if (digits.length !== 10) return "Enter a valid 10-digit contact number.";
+    if (!gender) return "Select tenant gender.";
+    if (!hasSelectValue(effectiveRoomId)) return "Select a room for allocation.";
+    if (!bedNumber) return "Select an available bed for allocation.";
+    return null;
+  };
+
+  const getStepTwoError = (): string | null => {
+    if (!moveInDate) return "Enter move-in / joining date.";
+    if (lockInPeriod === undefined || lockInPeriod === null || lockInPeriod === "") {
+      return "Select lock-in period duration.";
+    }
+    if (!noticePeriod) return "Select notice period duration.";
+    const rentNum = parseInt(fixedRent, 10);
+    if (isNaN(rentNum) || rentNum <= 0) return "Enter monthly fixed rent amount (must be greater than 0).";
+    if (securityDeposit.trim() === "") return "Enter security deposit amount (enter 0 if none).";
+    const depNum = parseInt(securityDeposit, 10);
+    if (isNaN(depNum) || depNum < 0) return "Enter valid security deposit amount (enter 0 if none).";
     return null;
   };
 
   const stepOneError = getStepOneError();
+  const stepTwoError = getStepTwoError();
 
   const goNext = () => {
     if (step === 1 && stepOneError) {
-      toast({ title: "Let's finish this step first", description: stepOneError, variant: "destructive" });
+      toast({ title: "Incomplete Tenant Details", description: stepOneError, variant: "destructive" });
+      return;
+    }
+    if (step === 2 && stepTwoError) {
+      toast({ title: "Incomplete Stay Details", description: stepTwoError, variant: "destructive" });
       return;
     }
     setStep((s) => (Math.min(3, s + 1) as 1 | 2 | 3));
@@ -432,10 +456,16 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
   const goBack = () => setStep((s) => (Math.max(1, s - 1) as 1 | 2 | 3));
 
   const handleInviteTenant = async () => {
-    const err = getStepOneError();
-    if (err) {
+    const err1 = getStepOneError();
+    if (err1) {
       setStep(1);
-      toast({ title: "Cannot Add Tenant", description: err, variant: "destructive" });
+      toast({ title: "Cannot Add Tenant", description: err1, variant: "destructive" });
+      return;
+    }
+    const err2 = getStepTwoError();
+    if (err2) {
+      setStep(2);
+      toast({ title: "Cannot Add Tenant", description: err2, variant: "destructive" });
       return;
     }
 
@@ -453,7 +483,6 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
           floorId: idStr(effectiveFloorId),
           roomId: idStr(effectiveRoomId),
           bedNumber: parseInt(bedNumber, 10) || 1,
-          isTempBed,
           bookedBy: bookedBy.trim() || null,
           referredBy: referredBy.trim() || null,
         },
@@ -589,9 +618,11 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
           accountNumber: accountNumber.trim() || undefined,
           ifscCode: ifscCode.trim() || undefined,
           upiId: upiId.trim() || undefined,
+          checkinTime: checkinTime || undefined,
+          checkoutTime: checkoutTime || undefined,
           emergencyContact: bookedBy.trim() || undefined,
           workAddress: referredBy.trim() || undefined,
-        });
+        } as any);
       }
 
       console.log("Full RentOK-Style Onboarding Form Payload Submitted to Client Hooks:", fullPayload);
@@ -664,15 +695,19 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
           <CardContent className="p-5 space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Name</Label>
+                <Label>
+                  Tenant Full Name <span className="text-destructive font-bold">*</span>
+                </Label>
                 <Input
-                  placeholder="Add your name"
+                  placeholder="Enter tenant full name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Contact Number</Label>
+                <Label>
+                  Contact Number <span className="text-destructive font-bold">*</span>
+                </Label>
                 <div className="flex gap-2">
                   <span className="flex items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">
                     +91
@@ -699,18 +734,36 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Tenant Type</Label>
-              <Select value={tenantType} onValueChange={setTenantType}>
-                <SelectTrigger className="md:w-64">
-                  <SelectValue placeholder="Select Tenant Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Student">Student</SelectItem>
-                  <SelectItem value="Working Professional">Working Professional</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Tenant Type</Label>
+                <Select value={tenantType} onValueChange={setTenantType}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Tenant Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Student">Student</SelectItem>
+                    <SelectItem value="Working Professional">Working Professional</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>
+                  Gender <span className="text-destructive font-bold">*</span>
+                </Label>
+                <Select value={gender} onValueChange={setGender}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select Gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Male">Male</SelectItem>
+                    <SelectItem value="Female">Female</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
@@ -778,7 +831,9 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
               </div>
 
               <div className="space-y-2">
-                <Label>Room Selection</Label>
+                <Label>
+                  Room Selection <span className="text-destructive font-bold">*</span>
+                </Label>
                 <Select
                   value={hasSelectValue(effectiveRoomId) ? effectiveRoomId : "none"}
                   onValueChange={(v) => {
@@ -836,9 +891,20 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                 </div>
 
                 <div>
-                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 block mb-3">
-                    BED OCCUPANCY & ALLOCATION
-                  </span>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 block">
+                      BED OCCUPANCY & ALLOCATION <span className="text-destructive font-bold">*</span>
+                    </span>
+                    {!bedNumber ? (
+                      <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded border border-amber-200">
+                        Bed selection required *
+                      </span>
+                    ) : (
+                      <span className="text-xs font-bold text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded border border-teal-200">
+                        Bed {bedNumber} Selected
+                      </span>
+                    )}
+                  </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
                     {bedOptions.map((b) => {
@@ -931,25 +997,11 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
               </div>
             )}
 
-            <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/20">
-              <div className="space-y-0.5">
-                <Label className="text-sm font-medium">Is this a temp bed?</Label>
-                <p className="text-xs text-muted-foreground">Turn on if this is a temporary bed</p>
+            {!selectedRoomObj && (
+              <div className="rounded-xl border border-dashed border-muted-foreground/30 p-4 text-center text-xs text-muted-foreground bg-muted/10">
+                Please select a room above to view and allocate available beds.
               </div>
-              <button
-                type="button"
-                onClick={() => setIsTempBed(!isTempBed)}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  isTempBed ? "bg-teal-600" : "bg-input"
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-background shadow ring-0 transition duration-200 ease-in-out ${
-                    isTempBed ? "translate-x-5" : "translate-x-0"
-                  }`}
-                />
-              </button>
-            </div>
+            )}
 
             {/* Optional extra info, collapsed behind a single select drawer so the base form stays short */}
             <div className="border-t pt-4">
@@ -1023,17 +1075,6 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                             value={dob}
                             onChange={(e) => setDob(e.target.value)}
                           />
-                        </div>
-                        <div className="space-y-1">
-                          <Label>Gender</Label>
-                          <Select value={gender} onValueChange={setGender}>
-                            <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Male">Male</SelectItem>
-                              <SelectItem value="Female">Female</SelectItem>
-                              <SelectItem value="Other">Other</SelectItem>
-                            </SelectContent>
-                          </Select>
                         </div>
                         <div className="space-y-1">
                           <Label>Blood Group</Label>
@@ -1297,7 +1338,9 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-2">
-                  <Label>Move-in</Label>
+                  <Label>
+                    Move-in Date <span className="text-destructive font-bold">*</span>
+                  </Label>
                   <Input type="date" value={moveInDate} onChange={(e) => setMoveInDate(e.target.value)} />
                 </div>
                 <div className="space-y-2">
@@ -1309,7 +1352,9 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
               <div className="space-y-2">
-                <Label>Lock-in Period</Label>
+                <Label>
+                  Lock-in Period <span className="text-destructive font-bold">*</span>
+                </Label>
                 <Select value={lockInPeriod} onValueChange={setLockInPeriod}>
                   <SelectTrigger>
                     <SelectValue placeholder="Lock-in Period" />
@@ -1324,7 +1369,9 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Notice Period</Label>
+                <Label>
+                  Notice Period <span className="text-destructive font-bold">*</span>
+                </Label>
                 <Select value={noticePeriod} onValueChange={setNoticePeriod}>
                   <SelectTrigger>
                     <SelectValue placeholder="Notice Period" />
@@ -1357,12 +1404,20 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
               <h4 className="text-sm font-bold text-foreground">Rental Terms</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Fixed Rent</Label>
+                  <Label>
+                    Monthly Fixed Rent <span className="text-destructive font-bold">*</span>
+                  </Label>
                   <div className="flex gap-2">
                     <span className="flex items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">
                       ₹
                     </span>
-                    <Input type="number" min={0} placeholder="0" value={fixedRent} onChange={(e) => setFixedRent(e.target.value)} />
+                    <Input
+                      type="number"
+                      min={1}
+                      placeholder="e.g. 8000"
+                      value={fixedRent}
+                      onChange={(e) => setFixedRent(e.target.value)}
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -1395,12 +1450,20 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Regular Security Deposit</Label>
+                  <Label>
+                    Regular Security Deposit <span className="text-destructive font-bold">*</span>
+                  </Label>
                   <div className="flex gap-2">
                     <span className="flex items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">
                       ₹
                     </span>
-                    <Input type="number" min={0} placeholder="0" value={securityDeposit} onChange={(e) => setSecurityDeposit(e.target.value)} />
+                    <Input
+                      type="number"
+                      min={0}
+                      placeholder="e.g. 5000 (enter 0 if none)"
+                      value={securityDeposit}
+                      onChange={(e) => setSecurityDeposit(e.target.value)}
+                    />
                   </div>
                 </div>
               </div>
@@ -1565,7 +1628,14 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
       )}
 
       {step === 1 && stepOneError && (
-        <p className="text-xs text-amber-700 dark:text-amber-400 font-semibold">⚠️ {stepOneError}</p>
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-300 text-xs font-semibold">
+          <span>⚠️ {stepOneError}</span>
+        </div>
+      )}
+      {step === 2 && stepTwoError && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-300 text-xs font-semibold">
+          <span>⚠️ {stepTwoError}</span>
+        </div>
       )}
 
       {/* WIZARD NAVIGATION */}
@@ -1586,7 +1656,12 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
           </div>
 
           {step < 3 ? (
-            <Button type="button" className="bg-teal-600 hover:bg-teal-700 text-white min-w-32" onClick={goNext}>
+            <Button
+              type="button"
+              className="bg-teal-600 hover:bg-teal-700 text-white min-w-32"
+              onClick={goNext}
+              disabled={step === 1 ? !!stepOneError : !!stepTwoError}
+            >
               Continue <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           ) : (
@@ -1594,7 +1669,7 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
               type="button"
               className="bg-teal-600 hover:bg-teal-700 text-white min-w-32"
               onClick={handleInviteTenant}
-              disabled={submitting || !!stepOneError}
+              disabled={submitting || !!stepOneError || !!stepTwoError}
             >
               {submitting ? "Adding…" : "Add Tenant"}
             </Button>

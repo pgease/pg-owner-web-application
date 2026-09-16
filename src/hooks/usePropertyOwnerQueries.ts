@@ -41,6 +41,8 @@ import {
   updateProperty,
   updateStaffPermissions,
   uploadPhoto,
+  updateMe,
+  type UpdatePropertyOwnerPayload,
   createBlock,
   updateBlock,
   deleteBlock,
@@ -816,6 +818,16 @@ export function useUploadPhotoMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (file: File) => uploadPhoto(file),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["property-owner", "me"] });
+    },
+  });
+}
+
+export function useUpdateMeMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: UpdatePropertyOwnerPayload) => updateMe(payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["property-owner", "me"] });
     },

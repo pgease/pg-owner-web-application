@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   History,
@@ -16,7 +16,13 @@ import {
   ArrowLeft,
   ArrowRight,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  IndianRupee,
+  UserPlus,
+  Home,
+  MessageSquare,
+  FileCheck,
+  ChevronDown,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,9 +42,119 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { PageHeader } from "@/components/common/PageHeader";
 import { useApp } from "@/context/AppContext";
 import { getActivityLogs, type ActivityLogItem } from "@/api/propertyOwner";
+import { cn } from "@/lib/utils";
+
+// Translate technical routes or endpoints into natural, friendly language
+function getFriendlyActionDescription(log: ActivityLogItem): {
+  title: string;
+  categoryLabel: string;
+  icon: any;
+  colorClass: string;
+} {
+  const method = (log.httpMethod || "GET").toUpperCase();
+  const route = (log.routePattern || "").toLowerCase();
+  const summary = (log.summary || "").toLowerCase();
+  const category = (log.category || "").toLowerCase();
+
+  if (category === "payment" || route.includes("rent") || route.includes("payment")) {
+    return {
+      title: method === "POST" ? "Recorded rent payment" : "Updated rent billing record",
+      categoryLabel: "Rent & Payments",
+      icon: IndianRupee,
+      colorClass: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300",
+    };
+  }
+
+  if (category === "tenant_management" || route.includes("tenant")) {
+    if (method === "POST" || route.includes("add")) {
+      return {
+        title: "Added new tenant to PG",
+        categoryLabel: "Tenant Onboarding",
+        icon: UserPlus,
+        colorClass: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300",
+      };
+    }
+    if (route.includes("notice") || summary.includes("notice")) {
+      return {
+        title: "Updated notice period / checkout",
+        categoryLabel: "Notice & Vacating",
+        icon: Clock,
+        colorClass: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300",
+      };
+    }
+    return {
+      title: "Updated tenant profile details",
+      categoryLabel: "Tenant Management",
+      icon: User,
+      colorClass: "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300",
+    };
+  }
+
+  if (category === "kyc" || route.includes("kyc") || route.includes("aadhaar")) {
+    return {
+      title: "Verified tenant KYC documents",
+      categoryLabel: "KYC Verification",
+      icon: FileCheck,
+      colorClass: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300",
+    };
+  }
+
+  if (category === "support" || route.includes("complaint")) {
+    return {
+      title: "Updated tenant complaint ticket",
+      categoryLabel: "Complaints & Help",
+      icon: MessageSquare,
+      colorClass: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300",
+    };
+  }
+
+  if (route.includes("room") || route.includes("block") || route.includes("floor") || category === "property_settings") {
+    return {
+      title: "Modified property structure or rooms",
+      categoryLabel: "Property & Rooms",
+      icon: Home,
+      colorClass: "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300",
+    };
+  }
+
+  // Fallback friendly description
+  const cleanSummary = log.summary && !log.summary.startsWith("/") ? log.summary : "System operational update";
+  return {
+    title: cleanSummary,
+    categoryLabel: "General Activity",
+    icon: History,
+    colorClass: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300",
+  };
+}
+
+function formatRelativeTime(dateString: string): string {
+  try {
+    const d = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 2) return "Just now";
+    if (diffMins < 60) return `${diffMins} mins ago`;
+    if (diffHours < 24) return `${diffHours} hrs ago`;
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  } catch {
+    return dateString;
+  }
+}
 
 export default function ActivityLogsPage() {
   const { properties, selectedPgId } = useApp();
@@ -46,13 +162,12 @@ export default function ActivityLogsPage() {
   const [propertyId, setPropertyId] = useState<string>(selectedPgId || "all");
   const [category, setCategory] = useState<string>("all");
   const [actorType, setActorType] = useState<string>("all");
-  const [httpMethod, setHttpMethod] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [page, setPage] = useState<number>(1);
   const [selectedLog, setSelectedLog] = useState<ActivityLogItem | null>(null);
 
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["activityLogs", { page, propertyId, category, actorType, httpMethod }],
+    queryKey: ["activityLogs", { page, propertyId, category, actorType }],
     queryFn: () =>
       getActivityLogs({
         page,
@@ -60,7 +175,6 @@ export default function ActivityLogsPage() {
         propertyId: propertyId === "all" ? undefined : propertyId,
         category: category === "all" ? undefined : category,
         actorType: actorType === "all" ? undefined : actorType,
-        httpMethod: httpMethod === "all" ? undefined : httpMethod,
       }),
   });
 
@@ -68,93 +182,66 @@ export default function ActivityLogsPage() {
   const totalPages = data?.totalPages || 1;
   const total = data?.total || 0;
 
-  // Filter logs locally by search term if provided
-  const filteredLogs = logs.filter((log) => {
-    if (!searchTerm.trim()) return true;
-    const term = searchTerm.toLowerCase();
+  // Filter logs locally by search term
+  const filteredLogs = useMemo(() => {
+    return logs.filter((log) => {
+      if (!searchTerm.trim()) return true;
+      const term = searchTerm.toLowerCase();
+      const meta = JSON.stringify(log.metadata || {}).toLowerCase();
+      const actorName = String(log.actorSnapshot?.name || "").toLowerCase();
+      const summary = (log.summary || "").toLowerCase();
+      return actorName.includes(term) || summary.includes(term) || meta.includes(term);
+    });
+  }, [logs, searchTerm]);
+
+  const getActorDisplay = (type: string, snapshot: any) => {
+    const name = snapshot?.name || (type === "property_owner" ? "Property Owner" : type === "staff" ? "Staff Member" : "Tenant");
+    const role = snapshot?.role || (type === "property_owner" ? "Owner" : type === "staff" ? "Manager / Staff" : "PG Resident");
+
     return (
-      (log.summary && log.summary.toLowerCase().includes(term)) ||
-      (log.routePattern && log.routePattern.toLowerCase().includes(term)) ||
-      (log.category && log.category.toLowerCase().includes(term)) ||
-      (log.actorSnapshot?.name && String(log.actorSnapshot.name).toLowerCase().includes(term)) ||
-      (log.actorSnapshot?.email && String(log.actorSnapshot.email).toLowerCase().includes(term))
+      <div className="flex items-center gap-2.5">
+        <span
+          className={cn(
+            "h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
+            type === "property_owner"
+              ? "bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300"
+              : type === "staff"
+              ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+              : "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300"
+          )}
+        >
+          {name.charAt(0).toUpperCase()}
+        </span>
+        <div className="text-left leading-tight">
+          <p className="text-xs font-bold text-foreground">{name}</p>
+          <span className="text-[10px] text-muted-foreground font-medium">{role}</span>
+        </div>
+      </div>
     );
-  });
-
-  const getMethodBadge = (method: string) => {
-    switch (method?.toUpperCase()) {
-      case "POST":
-        return <Badge className="bg-emerald-600 text-white font-mono text-[10px]">POST</Badge>;
-      case "PUT":
-        return <Badge className="bg-amber-600 text-white font-mono text-[10px]">PUT</Badge>;
-      case "PATCH":
-        return <Badge className="bg-blue-600 text-white font-mono text-[10px]">PATCH</Badge>;
-      case "DELETE":
-        return <Badge className="bg-rose-600 text-white font-mono text-[10px]">DELETE</Badge>;
-      default:
-        return <Badge variant="outline" className="font-mono text-[10px]">{method || "GET"}</Badge>;
-    }
-  };
-
-  const getActorBadge = (type: string, snapshot: any) => {
-    switch (type) {
-      case "property_owner":
-        return (
-          <div className="flex items-center gap-1.5">
-            <span className="h-6 w-6 rounded-full bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300 flex items-center justify-center shrink-0">
-              <Shield className="h-3.5 w-3.5" />
-            </span>
-            <div className="text-left">
-              <div className="text-xs font-semibold leading-none">{snapshot?.name || "Owner"}</div>
-              <div className="text-[10px] text-muted-foreground">Property Owner</div>
-            </div>
-          </div>
-        );
-      case "staff":
-        return (
-          <div className="flex items-center gap-1.5">
-            <span className="h-6 w-6 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 flex items-center justify-center shrink-0">
-              <User className="h-3.5 w-3.5" />
-            </span>
-            <div className="text-left">
-              <div className="text-xs font-semibold leading-none">{snapshot?.name || "Staff Member"}</div>
-              <div className="text-[10px] text-muted-foreground">{snapshot?.role || "Staff"}</div>
-            </div>
-          </div>
-        );
-      case "tenant":
-        return (
-          <div className="flex items-center gap-1.5">
-            <span className="h-6 w-6 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 flex items-center justify-center shrink-0">
-              <Smartphone className="h-3.5 w-3.5" />
-            </span>
-            <div className="text-left">
-              <div className="text-xs font-semibold leading-none">{snapshot?.name || "Tenant"}</div>
-              <div className="text-[10px] text-muted-foreground">{snapshot?.phone || "Tenant Mobile"}</div>
-            </div>
-          </div>
-        );
-      default:
-        return <Badge variant="secondary" className="text-xs">{type || "System"}</Badge>;
-    }
   };
 
   return (
     <div className="space-y-6 max-w-7xl animate-fade-in">
       <PageHeader
-        title="Activity Audit Logs"
-        description="Immutable audit trail of actions taken across properties, tenants, rent, and settings."
+        title="Activity Log & Operations Timeline"
+        description="Clear, real-time record of rent entries, tenant check-ins, complaints, and changes made across your properties."
       />
 
-      {/* FILTER CONTROLS BAR */}
-      <Card className="border-border/60 shadow-sm">
+      {/* FILTER & SEARCH TOOLBAR */}
+      <Card className="rounded-2xl border-border/80 shadow-xs">
         <CardContent className="p-4 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {/* Property Filter */}
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">Property</label>
-              <Select value={propertyId} onValueChange={(val) => { setPropertyId(val); setPage(1); }}>
-                <SelectTrigger className="h-9 text-xs">
+              <Select
+                value={propertyId}
+                onValueChange={(val) => {
+                  setPropertyId(val);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="h-9 text-xs rounded-xl">
                   <SelectValue placeholder="All Properties" />
                 </SelectTrigger>
                 <SelectContent>
@@ -170,54 +257,47 @@ export default function ActivityLogsPage() {
 
             {/* Category Filter */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Category</label>
-              <Select value={category} onValueChange={(val) => { setCategory(val); setPage(1); }}>
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder="All Categories" />
+              <label className="text-xs font-medium text-muted-foreground">Activity Type</label>
+              <Select
+                value={category}
+                onValueChange={(val) => {
+                  setCategory(val);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="h-9 text-xs rounded-xl">
+                  <SelectValue placeholder="All Activities" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="tenant_management">Tenant Management</SelectItem>
-                  <SelectItem value="payment">Payments & Rent</SelectItem>
-                  <SelectItem value="kyc">KYC & Verification</SelectItem>
-                  <SelectItem value="support">Support & Complaints</SelectItem>
-                  <SelectItem value="property_settings">Property Settings</SelectItem>
-                  <SelectItem value="staff_management">Staff Management</SelectItem>
-                  <SelectItem value="reporting">Reporting</SelectItem>
-                  <SelectItem value="uncategorized">General / Uncategorized</SelectItem>
+                  <SelectItem value="all">All Operations</SelectItem>
+                  <SelectItem value="payment">Rent & Payments</SelectItem>
+                  <SelectItem value="tenant_management">Tenants & Check-ins</SelectItem>
+                  <SelectItem value="kyc">KYC & Verifications</SelectItem>
+                  <SelectItem value="support">Complaints & Requests</SelectItem>
+                  <SelectItem value="property_settings">Property & Rooms</SelectItem>
+                  <SelectItem value="staff_management">Staff & Permissions</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Actor Type */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Actor</label>
-              <Select value={actorType} onValueChange={(val) => { setActorType(val); setPage(1); }}>
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder="All Actors" />
+              <label className="text-xs font-medium text-muted-foreground">Performed By</label>
+              <Select
+                value={actorType}
+                onValueChange={(val) => {
+                  setActorType(val);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="h-9 text-xs rounded-xl">
+                  <SelectValue placeholder="Everyone" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Actors</SelectItem>
-                  <SelectItem value="property_owner">Property Owner</SelectItem>
-                  <SelectItem value="staff">Staff Members</SelectItem>
-                  <SelectItem value="tenant">Tenants</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* HTTP Method */}
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Action Type</label>
-              <Select value={httpMethod} onValueChange={(val) => { setHttpMethod(val); setPage(1); }}>
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder="All Methods" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Operations</SelectItem>
-                  <SelectItem value="POST">Create / Add (POST)</SelectItem>
-                  <SelectItem value="PUT">Update (PUT)</SelectItem>
-                  <SelectItem value="PATCH">Modify (PATCH)</SelectItem>
-                  <SelectItem value="DELETE">Delete (DELETE)</SelectItem>
+                  <SelectItem value="all">Everyone</SelectItem>
+                  <SelectItem value="property_owner">PG Owner</SelectItem>
+                  <SelectItem value="staff">Staff / Manager</SelectItem>
+                  <SelectItem value="tenant">Tenant</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -227,24 +307,24 @@ export default function ActivityLogsPage() {
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search audit trail..."
+                placeholder="Search by person name or note..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-9 pl-9 text-xs"
+                className="h-9 pl-9 text-xs rounded-xl"
               />
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-              <Badge variant="outline" className="text-xs text-muted-foreground">
-                Total: <strong className="text-foreground ml-1">{total}</strong> entries
+              <Badge variant="outline" className="text-xs text-muted-foreground rounded-lg py-1 px-2.5">
+                Total Events: <strong className="text-foreground ml-1">{total}</strong>
               </Badge>
               <Button
                 variant="outline"
                 size="sm"
-                className="h-9 gap-1.5 text-xs"
+                className="h-9 gap-1.5 text-xs rounded-xl"
                 onClick={() => refetch()}
                 disabled={isFetching}
               >
-                <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+                <RefreshCw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
                 Refresh
               </Button>
             </div>
@@ -252,20 +332,20 @@ export default function ActivityLogsPage() {
         </CardContent>
       </Card>
 
-      {/* AUDIT LOGS TABLE */}
-      <Card className="border-border/60 shadow-sm overflow-hidden">
+      {/* HUMAN-FRIENDLY ACTIVITY FEED TABLE */}
+      <Card className="rounded-2xl border-border/80 shadow-xs overflow-hidden">
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="p-12 text-center space-y-3">
+            <div className="p-16 text-center space-y-3">
               <RefreshCw className="h-6 w-6 animate-spin mx-auto text-teal-600" />
-              <p className="text-xs text-muted-foreground">Loading audit records...</p>
+              <p className="text-xs text-muted-foreground">Loading operations history...</p>
             </div>
           ) : filteredLogs.length === 0 ? (
-            <div className="p-12 text-center space-y-3">
+            <div className="p-16 text-center space-y-3">
               <History className="h-10 w-10 text-muted-foreground/40 mx-auto" />
-              <h4 className="text-sm font-semibold">No activity logs found</h4>
+              <h4 className="text-sm font-semibold">No activity records found</h4>
               <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                No recorded operations match your current search and filter settings.
+                No recorded operations match your current filter settings.
               </p>
             </div>
           ) : (
@@ -273,70 +353,69 @@ export default function ActivityLogsPage() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-muted/40 border-b text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                   <tr>
-                    <th className="py-3 px-4">Timestamp</th>
-                    <th className="py-3 px-4">Actor</th>
-                    <th className="py-3 px-4">Action & Route</th>
-                    <th className="py-3 px-4">Category</th>
-                    <th className="py-3 px-4">Method</th>
-                    <th className="py-3 px-4 text-right">Details</th>
+                    <th className="py-3.5 px-4">When</th>
+                    <th className="py-3.5 px-4">Performed By</th>
+                    <th className="py-3.5 px-4">Action Summary</th>
+                    <th className="py-3.5 px-4">Category</th>
+                    <th className="py-3.5 px-4 text-right">View</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
-                  {filteredLogs.map((item) => (
-                    <tr key={item.id} className="hover:bg-muted/10 transition-colors">
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <div className="font-medium text-foreground">
-                          {new Date(item.createdAt).toLocaleDateString("en-IN", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {new Date(item.createdAt).toLocaleTimeString("en-IN", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            second: "2-digit",
-                          })}
-                        </div>
-                      </td>
+                  {filteredLogs.map((item) => {
+                    const parsedAction = getFriendlyActionDescription(item);
+                    const ActionIcon = parsedAction.icon;
 
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        {getActorBadge(item.actorType, item.actorSnapshot)}
-                      </td>
+                    return (
+                      <tr key={item.id} className="hover:bg-muted/10 transition-colors">
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className="font-bold text-foreground block">
+                            {formatRelativeTime(item.createdAt)}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {new Date(item.createdAt).toLocaleTimeString("en-IN", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </td>
 
-                      <td className="py-3 px-4 max-w-xs">
-                        <div className="font-semibold text-foreground truncate">
-                          {item.summary || item.routePattern}
-                        </div>
-                        <div className="text-[10px] font-mono text-muted-foreground truncate">
-                          {item.routePattern}
-                        </div>
-                      </td>
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          {getActorDisplay(item.actorType, item.actorSnapshot)}
+                        </td>
 
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <Badge variant="secondary" className="text-[10px] font-medium capitalize">
-                          {(item.category || "General").replace(/_/g, " ")}
-                        </Badge>
-                      </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1.5 rounded-lg bg-muted/60 text-foreground shrink-0">
+                              <ActionIcon className="h-3.5 w-3.5 text-teal-600" />
+                            </div>
+                            <span className="font-semibold text-foreground text-xs leading-snug">
+                              {parsedAction.title}
+                            </span>
+                          </div>
+                        </td>
 
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        {getMethodBadge(item.httpMethod)}
-                      </td>
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <Badge
+                            variant="secondary"
+                            className={cn("text-[10px] font-semibold px-2 py-0.5 border", parsedAction.colorClass)}
+                          >
+                            {parsedAction.categoryLabel}
+                          </Badge>
+                        </td>
 
-                      <td className="py-3 px-4 text-right whitespace-nowrap">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 px-2 text-teal-600 hover:text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-950/40"
-                          onClick={() => setSelectedLog(item)}
-                        >
-                          <Eye className="h-3.5 w-3.5 mr-1" /> View
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
+                        <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2.5 rounded-lg text-teal-600 hover:text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-950/40 text-xs font-semibold"
+                            onClick={() => setSelectedLog(item)}
+                          >
+                            <Eye className="h-3.5 w-3.5 mr-1" /> Details
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -353,7 +432,7 @@ export default function ActivityLogsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs gap-1"
+                  className="h-8 text-xs gap-1 rounded-xl"
                   disabled={page <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                 >
@@ -362,7 +441,7 @@ export default function ActivityLogsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs gap-1"
+                  className="h-8 text-xs gap-1 rounded-xl"
                   disabled={page >= totalPages}
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 >
@@ -374,56 +453,98 @@ export default function ActivityLogsPage() {
         </CardContent>
       </Card>
 
-      {/* DETAIL DIALOG */}
+      {/* HUMAN-FRIENDLY DETAIL MODAL (No Raw JSON) */}
       <Dialog open={Boolean(selectedLog)} onOpenChange={(open) => !open && setSelectedLog(null)}>
-        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-base flex items-center gap-2">
-              <History className="h-4 w-4 text-teal-600" /> Audit Log Details
+              <History className="h-5 w-5 text-teal-600" /> Operation Details
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Recorded at {selectedLog && new Date(selectedLog.createdAt).toLocaleString("en-IN")}
+              Recorded on{" "}
+              {selectedLog &&
+                new Date(selectedLog.createdAt).toLocaleString("en-IN", {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}
             </DialogDescription>
           </DialogHeader>
 
           {selectedLog && (
             <div className="space-y-4 pt-2 text-xs">
-              <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-muted/40 border">
-                <div>
-                  <span className="text-muted-foreground block text-[10px]">Actor Type</span>
-                  <span className="font-semibold capitalize">{selectedLog.actorType.replace(/_/g, " ")}</span>
+              {/* Structured Event Overview Card */}
+              <div className="p-4 rounded-2xl bg-muted/30 border border-border/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Action Summary</span>
+                  <span className="font-bold text-foreground text-sm">
+                    {getFriendlyActionDescription(selectedLog).title}
+                  </span>
                 </div>
-                <div>
-                  <span className="text-muted-foreground block text-[10px]">Action Category</span>
-                  <span className="font-semibold capitalize">{selectedLog.category.replace(/_/g, " ")}</span>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Performed By</span>
+                  <span className="font-semibold text-foreground">
+                    {selectedLog.actorSnapshot?.name || selectedLog.actorType} (
+                    {selectedLog.actorSnapshot?.role || selectedLog.actorType})
+                  </span>
                 </div>
-                <div>
-                  <span className="text-muted-foreground block text-[10px]">HTTP Operation</span>
-                  <div className="mt-0.5">{getMethodBadge(selectedLog.httpMethod)}</div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Activity Category</span>
+                  <Badge variant="secondary" className="text-[10px] font-semibold">
+                    {getFriendlyActionDescription(selectedLog).categoryLabel}
+                  </Badge>
                 </div>
-                <div>
-                  <span className="text-muted-foreground block text-[10px]">Route Pattern</span>
-                  <span className="font-mono text-[11px] block truncate">{selectedLog.routePattern}</span>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Status</span>
+                  <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white text-[10px] font-bold">
+                    Completed Successfully
+                  </Badge>
                 </div>
               </div>
 
-              {selectedLog.actorSnapshot && (
-                <div className="space-y-1">
-                  <span className="text-xs font-semibold text-foreground">Actor Snapshot</span>
-                  <pre className="p-3 rounded-lg bg-muted/60 text-[11px] font-mono overflow-x-auto border">
-                    {JSON.stringify(selectedLog.actorSnapshot, null, 2)}
-                  </pre>
+              {/* Event Context & Key Values (Readable Format) */}
+              {selectedLog.metadata && Object.keys(selectedLog.metadata).length > 0 && (
+                <div className="p-4 rounded-2xl border border-border/80 space-y-2">
+                  <h4 className="font-bold text-foreground text-xs mb-2">Event Information</h4>
+                  {Object.entries(selectedLog.metadata)
+                    .filter(([key]) => !["headers", "tokens", "password"].includes(key.toLowerCase()))
+                    .slice(0, 6)
+                    .map(([key, val]) => (
+                      <div key={key} className="flex justify-between py-1 border-b border-border/40 last:border-0">
+                        <span className="text-muted-foreground capitalize">
+                          {key.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}
+                        </span>
+                        <span className="font-semibold text-foreground text-right max-w-[200px] truncate">
+                          {typeof val === "object" ? JSON.stringify(val) : String(val)}
+                        </span>
+                      </div>
+                    ))}
                 </div>
               )}
 
-              {selectedLog.metadata && (
-                <div className="space-y-1">
-                  <span className="text-xs font-semibold text-foreground">Request Context & Metadata</span>
-                  <pre className="p-3 rounded-lg bg-muted/60 text-[11px] font-mono overflow-x-auto border">
-                    {JSON.stringify(selectedLog.metadata, null, 2)}
-                  </pre>
-                </div>
-              )}
+              {/* Developer Technical Info (Collapsed by default so owners never see raw JSON) */}
+              <Accordion type="single" collapsible className="w-full text-xs">
+                <AccordionItem value="tech-info" className="border rounded-xl px-3 border-border/60">
+                  <AccordionTrigger className="text-[11px] text-muted-foreground hover:no-underline py-2">
+                    Advanced developer info (collapsed)
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-2 text-[10px] space-y-2 font-mono">
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>HTTP Method: {selectedLog.httpMethod}</span>
+                      <span>Route: {selectedLog.routePattern}</span>
+                    </div>
+                    <pre className="p-2 rounded-lg bg-muted/60 overflow-x-auto text-[10px] border">
+                      {JSON.stringify(
+                        { actor: selectedLog.actorSnapshot, metadata: selectedLog.metadata },
+                        null,
+                        2
+                      )}
+                    </pre>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </div>
           )}
         </DialogContent>

@@ -17,6 +17,9 @@ import {
   MessageCircle,
   ArrowRightLeft,
   Layers,
+  UserMinus,
+  AlertCircle,
+  Calendar,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -45,7 +48,14 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useApp } from "@/context/AppContext";
 import type { PropertyTenant } from "@/api/propertyOwner";
 import { roomHasVacancyForAllocation } from "@/api/propertyOwner";
-import { useBlocks, useFloors, usePropertyTenants, useRoomsList, useMoveTenantMutation } from "@/hooks/usePropertyOwnerQueries";
+import {
+  useBlocks,
+  useFloors,
+  usePropertyTenants,
+  useRoomsList,
+  useMoveTenantMutation,
+  useSetTenantNoticeMutation,
+} from "@/hooks/usePropertyOwnerQueries";
 import { FilterBar } from "@/components/common/FilterBar";
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
 import { toast } from "@/components/ui/use-toast";
@@ -115,7 +125,7 @@ const Tenants = () => {
   const [selectedBlockId, setSelectedBlockId] = useState<string>("");
   const [selectedFloorId, setSelectedFloorId] = useState<string>("");
   const [selectedRoomId, setSelectedRoomId] = useState<string>("");
-  const [groupBy, setGroupBy] = useState<"block" | "floor" | "none">("block");
+  const [groupBy, setGroupBy] = useState<"block" | "floor" | "none">("none");
 
   // Move Tenant State
   const [moveModalOpen, setMoveModalOpen] = useState(false);
@@ -129,7 +139,14 @@ const Tenants = () => {
   const [transferDeposit, setTransferDeposit] = useState<boolean>(true);
   const [moveRemarks, setMoveRemarks] = useState<string>("");
 
+  // Vacate / Move Out State
+  const [vacateModalOpen, setVacateModalOpen] = useState(false);
+  const [selectedTenantForVacate, setSelectedTenantForVacate] = useState<PropertyTenant | null>(null);
+  const [vacateDate, setVacateDate] = useState<string>("");
+  const [vacateReason, setVacateReason] = useState<string>("");
+
   const moveMutation = useMoveTenantMutation(selectedPgId);
+  const setNoticeMutation = useSetTenantNoticeMutation(selectedPgId);
 
   const effectiveTargetPropertyId = targetPropertyId || selectedPgId || "";
   const targetRoomsQuery = useRoomsList(effectiveTargetPropertyId, undefined, undefined, { requireBlockAndFloor: false });
@@ -167,6 +184,40 @@ const Tenants = () => {
       setSelectedTenantForMove(null);
     } catch (e: any) {
       toast({ title: "Could not move tenant", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  const handleOpenVacateModal = (tenant: PropertyTenant) => {
+    setSelectedTenantForVacate(tenant);
+    setVacateDate(new Date().toISOString().split("T")[0]);
+    setVacateReason("");
+    setVacateModalOpen(true);
+  };
+
+  const handleConfirmVacate = async () => {
+    if (!selectedTenantForVacate) return;
+    const roomTenantId = selectedTenantForVacate.roomTenant?.id || selectedTenantForVacate.id;
+    try {
+      await setNoticeMutation.mutateAsync({
+        roomTenantId,
+        body: {
+          vacateOn: vacateDate || new Date().toISOString().split("T")[0],
+          reason: vacateReason.trim() || "Tenant moved out / checkout",
+        },
+      });
+      toast({
+        title: "Tenant Vacate Processed",
+        description: `${tenantDisplayName(selectedTenantForVacate)} has been marked for move out. Bed will be updated.`,
+      });
+      setVacateModalOpen(false);
+      setSelectedTenantForVacate(null);
+      tenantsQuery.refetch();
+    } catch (e: any) {
+      toast({
+        title: "Failed to process vacate",
+        description: e?.message || "Unable to update tenant stay status",
+        variant: "destructive",
+      });
     }
   };
 
@@ -245,8 +296,11 @@ const Tenants = () => {
     >();
 
     for (const t of filteredTenants) {
-      const bKey = t.block?.id || "unassigned";
-      const bName = t.block?.name || "Main Building";
+      const roomId = t.room?.id || (t as any).roomId || t.roomTenant?.roomId;
+      const roomObj = allPropertyRooms.find((r) => r.id === roomId);
+
+      const bKey = t.block?.id || roomObj?.blockId || (roomId ? "main-block" : "unassigned");
+      const bName = t.block?.name || roomObj?.block || blocks.find((b) => b.id === (roomObj?.blockId || t.block?.id))?.name || (roomId ? "Main Building" : "Unassigned");
       const bOrder = t.block?.displayOrder ?? 999;
 
       if (!map.has(bKey)) {
@@ -254,8 +308,8 @@ const Tenants = () => {
       }
       const bObj = map.get(bKey)!;
 
-      const fKey = t.floor?.id || "unassigned";
-      const fName = t.floor?.name || "General Floor";
+      const fKey = t.floor?.id || roomObj?.floorId || (roomId ? "main-floor" : "unassigned");
+      const fName = t.floor?.name || roomObj?.floor || floors.find((f) => f.id === (roomObj?.floorId || t.floor?.id))?.name || (roomId ? "Ground Floor" : "Unassigned");
       const fOrder = t.floor?.displayOrder ?? 999;
 
       if (!bObj.floors.has(fKey)) {
@@ -280,7 +334,7 @@ const Tenants = () => {
           .sort((a, b) => a.displayOrder - b.displayOrder || a.floorName.localeCompare(b.floorName)),
       }))
       .sort((a, b) => a.displayOrder - b.displayOrder || a.blockName.localeCompare(b.blockName));
-  }, [filteredTenants]);
+  }, [filteredTenants, allPropertyRooms, blocks, floors]);
 
   const groupedByFloorTenants = useMemo(() => {
     const map = new Map<
@@ -289,9 +343,12 @@ const Tenants = () => {
     >();
 
     for (const t of filteredTenants) {
-      const fKey = t.floor?.id || "unassigned";
-      const fName = t.floor?.name || "General Floor";
-      const bName = t.block?.name || "Main Building";
+      const roomId = t.room?.id || (t as any).roomId || t.roomTenant?.roomId;
+      const roomObj = allPropertyRooms.find((r) => r.id === roomId);
+
+      const fKey = t.floor?.id || roomObj?.floorId || (roomId ? "main-floor" : "unassigned");
+      const fName = t.floor?.name || roomObj?.floor || floors.find((f) => f.id === (roomObj?.floorId || t.floor?.id))?.name || (roomId ? "Ground Floor" : "Unassigned");
+      const bName = t.block?.name || roomObj?.block || blocks.find((b) => b.id === (roomObj?.blockId || t.block?.id))?.name || (roomId ? "Main Building" : "Unassigned");
       const fOrder = t.floor?.displayOrder ?? 999;
 
       if (!map.has(fKey)) {
@@ -310,7 +367,7 @@ const Tenants = () => {
         tenants: f.tenants,
       }))
       .sort((a, b) => a.displayOrder - b.displayOrder || a.floorName.localeCompare(b.floorName));
-  }, [filteredTenants]);
+  }, [filteredTenants, allPropertyRooms, blocks, floors]);
 
   const kpi = useMemo(() => {
     const rows = tenantsQuery.data ?? [];
@@ -514,6 +571,14 @@ const Tenants = () => {
     const wa = row.phone ? waLink(row.phone) : null;
     const isVerified = tenantVerificationLabel(row) === "verified";
     const initial = tenantInitials(row);
+
+    const roomId = row.room?.id || (row as any).roomId || row.roomTenant?.roomId;
+    const roomObj = allPropertyRooms.find((r) => r.id === roomId);
+    const roomNo = roomObj?.roomNumber || roomObj?.name || tenantRoomNo(row);
+    const floorName = roomObj?.floor || floors.find((f) => f.id === (roomObj?.floorId || row.floor?.id))?.name || tenantFloor(row);
+    const blockName = roomObj?.block || blocks.find((b) => b.id === (roomObj?.blockId || row.block?.id))?.name || tenantBlock(row);
+    const bedNo = tenantBedNo(row);
+
     return (
       <Card
         key={row.id}
@@ -544,13 +609,13 @@ const Tenants = () => {
                 )}
               </div>
               <div className="flex flex-wrap items-center text-xs text-muted-foreground gap-x-2 mt-1">
-                <span className="font-semibold text-foreground">Block: {tenantBlock(row)}</span>
+                <span className="font-semibold text-foreground">Block: {blockName}</span>
                 <span className="text-border">|</span>
-                <span className="font-semibold text-foreground">Floor: {tenantFloor(row)}</span>
+                <span className="font-semibold text-foreground">Floor: {floorName}</span>
                 <span className="text-border">|</span>
-                <span className="font-semibold text-foreground">Room: {tenantRoomNo(row)}</span>
+                <span className="font-semibold text-foreground">Room: {roomNo}</span>
                 <span className="text-border">|</span>
-                <span className="font-semibold text-foreground">Bed: {tenantBedNo(row)}</span>
+                <span className="font-semibold text-foreground">Bed: {bedNo}</span>
               </div>
             </div>
           </div>
@@ -559,7 +624,7 @@ const Tenants = () => {
           <div className="flex items-center gap-4 text-xs shrink-0 flex-wrap md:flex-nowrap md:mx-6">
             <div className="flex flex-col">
               <span className="text-[10px] text-muted-foreground uppercase font-semibold">Rent</span>
-              <span className="font-bold text-sm text-foreground">{tenantRentAmount(row)}/mo</span>
+              <span className="font-bold text-sm text-foreground">{tenantRentAmount(row)}</span>
             </div>
             <div className="flex flex-col">
               <span className="text-[10px] text-muted-foreground uppercase font-semibold">Due Status</span>
@@ -578,6 +643,14 @@ const Tenants = () => {
               onClick={() => handleOpenMoveModal(row)}
             >
               <ArrowRightLeft className="h-3.5 w-3.5" /> Move
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5 rounded-lg border-rose-200 text-rose-600 hover:bg-rose-50 font-bold"
+              onClick={() => handleOpenVacateModal(row)}
+            >
+              <UserMinus className="h-3.5 w-3.5" /> Vacate
             </Button>
             {tenantPhone(row) !== "—" && (
               <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-lg border-teal-600/30 text-teal-600 hover:bg-teal-50" asChild>
@@ -1021,6 +1094,67 @@ const Tenants = () => {
                 disabled={moveMutation.isPending || !selectedTenantForMove || !targetRoomId}
               >
                 {moveMutation.isPending ? "Relocating..." : "Confirm Tenant Relocation"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* MODAL 2: VACATE / MOVE-OUT TENANT MODAL */}
+        <Dialog open={vacateModalOpen} onOpenChange={setVacateModalOpen}>
+          <DialogContent className="max-w-md rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-base flex items-center gap-2 text-rose-600">
+                <UserMinus className="h-5 w-5" /> Vacate & Check Out Tenant
+              </DialogTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Release bed allocation and complete stay for{" "}
+                <strong className="text-foreground">
+                  {selectedTenantForVacate ? tenantDisplayName(selectedTenantForVacate) : "tenant"}
+                </strong>. All financial transaction history and ledgers will remain safely preserved.
+              </p>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2 text-xs">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold">Move Out / Vacate Date</Label>
+                <Input
+                  type="date"
+                  value={vacateDate}
+                  onChange={(e) => setVacateDate(e.target.value)}
+                  className="h-10 text-xs rounded-xl"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold">Checkout Reason / Exit Notes (Optional)</Label>
+                <Textarea
+                  value={vacateReason}
+                  onChange={(e) => setVacateReason(e.target.value)}
+                  placeholder="e.g. Job transfer, completed college exams, personal reasons"
+                  rows={2}
+                  className="text-xs rounded-xl"
+                />
+              </div>
+
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200/80 dark:border-amber-900/50 flex gap-2.5 items-start">
+                <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                  Vacating will immediately update the bed status to Available for new bookings, while archiving this tenant profile without deleting historical rent receipts.
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" size="sm" onClick={() => setVacateModalOpen(false)} className="rounded-xl text-xs">
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white gap-1.5 shadow-xs"
+                onClick={handleConfirmVacate}
+                disabled={setNoticeMutation.isPending}
+              >
+                {setNoticeMutation.isPending ? "Processing..." : "Confirm Vacate & Free Bed"}
               </Button>
             </DialogFooter>
           </DialogContent>

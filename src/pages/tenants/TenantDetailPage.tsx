@@ -25,7 +25,9 @@ import {
   MoreVertical,
   Building2,
   ArrowRightLeft,
+  History,
 } from "lucide-react";
+import { TenantActivityLogsDrawer } from "@/components/tenants/TenantActivityLogsDrawer";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -199,6 +201,7 @@ export default function TenantDetailPage() {
 
   // Dialog States
   const [editing, setEditing] = useState(false);
+  const [activityDrawerOpen, setActivityDrawerOpen] = useState(false);
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [noticeForm, setNoticeForm] = useState({
     noticeGivenAt: new Date().toISOString().split("T")[0],
@@ -602,6 +605,15 @@ export default function TenantDetailPage() {
               <ArrowRightLeft className="h-4 w-4" /> Move Tenant
             </Button>
 
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 border-blue-200 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 font-semibold"
+              onClick={() => setActivityDrawerOpen(true)}
+            >
+              <History className="h-4 w-4" /> Activity Log
+            </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted">
@@ -741,12 +753,12 @@ export default function TenantDetailPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                       <DetailRow label="Tenant Type" value={(tenant as any).tenantType || "—"} />
                       <DetailRow label="Gender" value={(tenant as any).gender || "—"} />
-                      <DetailRow label="Date Of Birth" value={(tenant as any).dob || "—"} />
+                      <DetailRow label="Date Of Birth" value={(tenant as any).dob ? new Date((tenant as any).dob).toLocaleDateString("en-GB") : "—"} />
                       <DetailRow label="Blood Group" value={(tenant as any).bloodGroup || "—"} />
+                      <DetailRow label="Nationality" value={(tenant as any).nationality || "Indian"} />
+                      <DetailRow label="Check-in / Out Time" value={`${(tenant as any).checkinTime || "12:00 PM"} / ${(tenant as any).checkoutTime || "11:00 AM"}`} />
+                      <DetailRow label="Food Preference" value={(tenant as any).foodPreference || (tenant as any).foodPreferences || "—"} />
                       <DetailRow label="Remarks" value={(tenant as any).remarks || "—"} />
-                      <DetailRow label="Food Preference" value={(tenant as any).foodPreference || "—"} />
-                      <DetailRow label="Nationality" value={(tenant as any).nationality || "—"} />
-                      <DetailRow label="Office / College Name" value={tenant.workAddress || "—"} />
                       <DetailRow label="Current Address" value={(tenant as any).currentAddress || "—"} />
                     </div>
                   </div>
@@ -834,6 +846,38 @@ export default function TenantDetailPage() {
                     </div>
                   </div>
                 </details>
+
+                {/* Profile Action Bar matching RentOK Screenshot 2 */}
+                <div className="flex items-center gap-2 p-3 rounded-2xl bg-card border border-border/80 shadow-xs">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 rounded-xl text-xs font-semibold gap-1.5"
+                    onClick={() =>
+                      toast({
+                        title: "Upload Documents",
+                        description: "Select KYC, Rental Agreement, or Police verification file to upload.",
+                      })
+                    }
+                  >
+                    <FileText className="h-3.5 w-3.5 text-teal-600" /> Add Docs
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 rounded-xl text-xs font-semibold gap-1.5"
+                    onClick={() => setEditing(true)}
+                  >
+                    <Pencil className="h-3.5 w-3.5 text-blue-600" /> Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1 rounded-xl text-xs font-bold gap-1.5 bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+                    onClick={() => setActivityDrawerOpen(true)}
+                  >
+                    <Clock className="h-3.5 w-3.5" /> Activity Log
+                  </Button>
+                </div>
               </div>
 
               {/* Right Column (Rent info & Payments) - Span 5 */}
@@ -1961,6 +2005,13 @@ export default function TenantDetailPage() {
           open={gateModalOpen}
           onOpenChange={setGateModalOpen}
           featureName={gateFeature}
+        />
+
+        <TenantActivityLogsDrawer
+          open={activityDrawerOpen}
+          onOpenChange={setActivityDrawerOpen}
+          tenant={tenant}
+          propertyId={currentPropertyId}
         />
       </div>
     </CanAccessPage>

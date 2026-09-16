@@ -13,14 +13,20 @@ export function parseRentTenantRow(
 }
 
 export function amountFromRow(row: RentDashboardTenantRow): number | undefined {
-  const n =
-    row.amountDue ??
-    row.amount_due ??
-    row.pendingAmount ??
-    row.amount ??
-    row.amountPaid ??
-    row.amount_paid;
-  return typeof n === "number" && Number.isFinite(n) ? n : undefined;
+  const raw =
+    (row as any).amountOutstanding ??
+    (row as any).amountDue ??
+    (row as any).amount_due ??
+    (row as any).pendingAmount ??
+    (row as any).rentAmount ??
+    (row as any).rent ??
+    (row as any).amountPaid ??
+    (row as any).amount_paid ??
+    (row as any).amount;
+
+  if (raw === undefined || raw === null || String(raw).trim() === "") return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
 }
 
 export function formatInr(n: number): string {
