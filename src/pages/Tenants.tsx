@@ -44,7 +44,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useApp } from "@/context/AppContext";
 import type { PropertyTenant } from "@/api/propertyOwner";
 import { roomHasVacancyForAllocation } from "@/api/propertyOwner";
@@ -578,6 +578,7 @@ const Tenants = () => {
     const floorName = roomObj?.floor || floors.find((f) => f.id === (roomObj?.floorId || row.floor?.id))?.name || tenantFloor(row);
     const blockName = roomObj?.block || blocks.find((b) => b.id === (roomObj?.blockId || row.block?.id))?.name || tenantBlock(row);
     const bedNo = tenantBedNo(row);
+    const tenantPhoto = (row as any).photoUrl || (row as any).imageUrl || (row as any).profilePhotoUrl;
 
     return (
       <Card
@@ -589,6 +590,9 @@ const Tenants = () => {
           {/* Left Details block */}
           <div className="flex items-center gap-4 min-w-0 flex-1">
             <Avatar className="h-12 w-12 border shrink-0">
+              {tenantPhoto ? (
+                <AvatarImage src={tenantPhoto} alt={tenantDisplayName(row)} className="object-cover" />
+              ) : null}
               <AvatarFallback className="text-sm font-semibold bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-300">
                 {initial}
               </AvatarFallback>

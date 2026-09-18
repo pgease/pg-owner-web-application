@@ -26,6 +26,7 @@ import {
   Building2,
   ArrowRightLeft,
   History,
+  MessageSquare,
 } from "lucide-react";
 import { TenantActivityLogsDrawer } from "@/components/tenants/TenantActivityLogsDrawer";
 import {
@@ -39,7 +40,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -55,7 +56,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/components/ui/use-toast";
 import type { PropertyTenant } from "@/api/propertyOwner";
-import { updatePropertyTenant } from "@/api/propertyOwner";
+import {
+  updatePropertyTenant,
+  sendWhatsAppRentReminder,
+  sendWhatsAppKycReminder,
+  sendWhatsAppAgreementReminder,
+} from "@/api/propertyOwner";
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
 import {
   tenantBedNo,
@@ -332,6 +338,7 @@ export default function TenantDetailPage() {
   const phone = tenantPhone(tenant);
   const name = tenantDisplayName(tenant);
   const initials = tenantInitials(tenant);
+  const photo = (tenant as any)?.photoUrl || (tenant as any)?.imageUrl || (tenant as any)?.profilePhotoUrl;
   const roomNo = tenantRoomNo(tenant);
   const bedNo = tenantBedNo(tenant);
   const floor = tenantFloor(tenant);
@@ -578,6 +585,31 @@ export default function TenantDetailPage() {
     }
   };
 
+  const handleSendWhatsAppReminder = async (type: "rent" | "kyc" | "agreement") => {
+    if (!currentPropertyId || !roomTenantId) {
+      toast({ title: "Tenant room assignment required", variant: "destructive" });
+      return;
+    }
+    try {
+      if (type === "rent") {
+        const res = await sendWhatsAppRentReminder(currentPropertyId, roomTenantId);
+        toast({ title: "WhatsApp Rent Reminder Sent 💬", description: res.message });
+      } else if (type === "kyc") {
+        const res = await sendWhatsAppKycReminder(currentPropertyId, roomTenantId);
+        toast({ title: "WhatsApp KYC Reminder Sent 🛡️", description: res.message });
+      } else if (type === "agreement") {
+        const res = await sendWhatsAppAgreementReminder(currentPropertyId, roomTenantId);
+        toast({ title: "WhatsApp Agreement Link Sent 📄", description: res.message });
+      }
+    } catch (err: any) {
+      toast({
+        title: "Failed to send WhatsApp reminder",
+        description: err?.message || "Could not dispatch WhatsApp message.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <CanAccessPage permission="tenant_view">
       <div className="space-y-6 pb-20 animate-fade-in">
@@ -589,6 +621,38 @@ export default function TenantDetailPage() {
             </Link>
           </Button>
           <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-emerald-300 text-emerald-700 dark:text-emerald-300 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950 font-bold shadow-xs"
+                >
+                  <MessageSquare className="h-4 w-4 text-emerald-600" /> WhatsApp
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem
+                  onClick={() => handleSendWhatsAppReminder("rent")}
+                  className="cursor-pointer gap-2"
+                >
+                  <IndianRupee className="h-3.5 w-3.5 text-emerald-600" /> Send Rent Due Reminder
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleSendWhatsAppReminder("kyc")}
+                  className="cursor-pointer gap-2"
+                >
+                  <ShieldCheck className="h-3.5 w-3.5 text-blue-600" /> Send Aadhaar KYC Link
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleSendWhatsAppReminder("agreement")}
+                  className="cursor-pointer gap-2"
+                >
+                  <FileText className="h-3.5 w-3.5 text-purple-600" /> Send Agreement Signing Link
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Button
               variant="outline"
               size="sm"
@@ -661,6 +725,7 @@ export default function TenantDetailPage() {
                 {/* Profile header block */}
                 <div className="flex items-center gap-4 p-4 rounded-xl border bg-muted/10">
                   <Avatar className="h-16 w-16 border-2 border-primary/20 text-lg font-bold">
+                    {photo ? <AvatarImage src={photo} alt={name} className="object-cover" /> : null}
                     <AvatarFallback className="bg-primary/10 text-primary">{initials}</AvatarFallback>
                   </Avatar>
                   <div className="space-y-1 min-w-0">

@@ -233,12 +233,7 @@ export default function SettingsPage() {
           {/* 4. My Website Details */}
           <Card
             className="rounded-2xl border-border/80 shadow-xs hover:shadow-md hover:border-blue-300 dark:hover:border-blue-800 transition-all cursor-pointer group bg-card"
-            onClick={() =>
-              toast({
-                title: "Public Website Active",
-                description: "Your PG website is live with online booking and virtual tour links.",
-              })
-            }
+            onClick={() => navigate("/my-pgs/public-listing")}
           >
             <CardContent className="p-5 flex items-center justify-between">
               <div className="flex items-center gap-3.5">

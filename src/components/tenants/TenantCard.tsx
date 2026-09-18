@@ -1,7 +1,7 @@
 import { Building2, DoorOpen, BedDouble, IndianRupee, Smartphone } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { PropertyTenant } from "@/api/propertyOwner";
 import {
   tenantBedNo,
@@ -24,6 +24,7 @@ interface TenantCardProps {
 
 export function TenantCard({ tenant, onOpen, className }: TenantCardProps) {
   const verified = tenantVerificationLabel(tenant) === "verified";
+  const photo = (tenant as any)?.photoUrl || (tenant as any)?.imageUrl || (tenant as any)?.profilePhotoUrl;
 
   return (
     <Card
@@ -44,6 +45,7 @@ export function TenantCard({ tenant, onOpen, className }: TenantCardProps) {
       <CardContent className="p-4">
         <div className="flex gap-3">
           <Avatar className="h-12 w-12 shrink-0 border">
+            {photo ? <AvatarImage src={photo} alt={tenantDisplayName(tenant)} className="object-cover" /> : null}
             <AvatarFallback className="text-sm font-medium bg-muted">{tenantInitials(tenant)}</AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1 space-y-2">

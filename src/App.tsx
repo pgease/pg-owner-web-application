@@ -44,6 +44,8 @@ import NoticePeriodPage from "./pages/tenants/NoticePeriodPage";
 import BankAccountPage from "./pages/property/BankAccountPage";
 import AmenitiesPage from "./pages/property/AmenitiesPage";
 import RestrictionsPage from "./pages/property/RestrictionsPage";
+import ReferralsPage from "./pages/ReferralsPage";
+import PublicListingPage from "./pages/property/PublicListingPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -124,6 +126,10 @@ const App = () => (
                         <Route path="/reports/payments" element={<Reports />} />
                         <Route path="/reports/export" element={<Reports />} />
                         <Route path="/plans" element={<Plans />} />
+                        <Route path="/referrals" element={<ReferralsPage />} />
+                        <Route path="/refer-and-earn" element={<ReferralsPage />} />
+                        <Route path="/my-pgs/public-listing" element={<PublicListingPage />} />
+                        <Route path="/public-listing" element={<PublicListingPage />} />
                         <Route path="/activity-logs" element={<ActivityLogsPage />} />
                         <Route path="/audit-logs" element={<ActivityLogsPage />} />
                         <Route path="/settings/activity-logs" element={<ActivityLogsPage />} />

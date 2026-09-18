@@ -17,8 +17,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { getActivityLogs, type ActivityLogItem } from "@/api/propertyOwner";
+import { getTenantActivityLogs, type TenantActivityLogItem } from "@/api/propertyOwner";
 import { tenantDisplayName, tenantRoomNo } from "@/lib/tenantDisplay";
+import { cn } from "@/lib/utils";
 
 export interface ActivityTimelineItem {
   id: string;
@@ -27,7 +28,7 @@ export interface ActivityTimelineItem {
   iconType: "payment" | "refund" | "profile" | "rent_added" | "onboarding" | "notice" | "kyc";
   message: string;
   fieldDiffs?: Array<{ field: string; oldVal?: string; newVal: string }>;
-  by: "Admin" | "Owner" | "Tenant" | "PG Ease Dues Manager" | string;
+  by: "Admin" | "Owner" | "Tenant" | "PG Ease Dues Manager" | "Staff" | string;
 }
 
 export interface TenantActivityLogsDrawerProps {
@@ -44,13 +45,30 @@ export function TenantActivityLogsDrawer({
   propertyId,
 }: TenantActivityLogsDrawerProps) {
   const tenantName = tenantDisplayName(tenant) || "Tenant";
-  const roomName = tenantRoomNo(tenant) || tenant?.roomNumber || "405";
+  const roomName = tenantRoomNo(tenant) || tenant?.roomNumber || "Room";
 
-  // Query backend logs
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedActor, setSelectedActor] = useState<string>("all");
+
+  const tenantId = tenant?.id || tenant?.tenantId || tenant?.roomTenantId;
+  const propId = propertyId || tenant?.propertyId;
+
+  // Query backend per-tenant activity audit logs
   const logsQuery = useQuery({
-    queryKey: ["property-owner", "activity-logs", propertyId, tenant?.id],
-    queryFn: () => getActivityLogs({ propertyId, limit: 50 }),
-    enabled: open,
+    queryKey: ["tenant-activity-logs", propId, tenantId, selectedCategory, selectedActor],
+    queryFn: async () => {
+      if (!propId || !tenantId) return { items: [], total: 0 };
+      try {
+        return await getTenantActivityLogs(propId, tenantId, {
+          category: selectedCategory !== "all" ? selectedCategory : undefined,
+          actorType: selectedActor !== "all" ? selectedActor : undefined,
+          limit: 50,
+        });
+      } catch {
+        return { items: [], total: 0 };
+      }
+    },
+    enabled: open && !!propId && !!tenantId,
   });
 
   // Format real or reference timeline items matching RentOK Image 2
@@ -272,6 +290,33 @@ export function TenantActivityLogsDrawer({
           >
             <X className="h-4 w-4" />
           </Button>
+        </div>
+
+        {/* CATEGORY FILTERS */}
+        <div className="px-5 py-2.5 border-b bg-muted/15 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+          {[
+            { id: "all", label: "All" },
+            { id: "rent", label: "Rent" },
+            { id: "room", label: "Room" },
+            { id: "kyc", label: "KYC" },
+            { id: "agreement", label: "Agreement" },
+            { id: "payment", label: "Payment" },
+            { id: "notice", label: "Notice" },
+            { id: "tenant", label: "Profile" },
+          ].map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors",
+                selectedCategory === cat.id
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "bg-background text-muted-foreground hover:bg-muted/40 border border-border/60"
+              )}
+            >
+              {cat.label}
+            </button>
+          ))}
         </div>
 
         {/* TIMELINE LIST */}

@@ -69,6 +69,7 @@ const navItems: NavItem[] = [
       { title: "WiFi Management", url: "/my-pgs/wifi", permissionKey: "room_view" },
       { title: "Property Notices", url: "/my-pgs/notices", permissionKey: "room_view" },
       { title: "Bank Account", url: "/my-pgs/bank", permissionKey: "room_view" },
+      { title: "Public Listing", url: "/my-pgs/public-listing", permissionKey: "room_view" },
     ],
   },
   {
@@ -122,6 +123,7 @@ const navItems: NavItem[] = [
     icon: Settings,
     children: [
       { title: "Plans & Pricing", url: "/plans" },
+      { title: "Refer & Earn (₹1,000)", url: "/referrals" },
       { title: "Activity Audit Logs", url: "/activity-logs" },
       { title: "Profile Settings", url: "/settings" },
       { title: "Support Help", url: "/support" },

@@ -2112,3 +2112,222 @@ export async function getActivityLogModules() {
   });
 }
 
+/* ─── Per-Tenant Activity & Audit Logs ─────────────────────────────────────── */
+
+export interface TenantActivityLogItem {
+  id: string;
+  category: "tenant" | "room" | "rent" | "kyc" | "agreement" | "payment" | "notice" | string;
+  action: string;
+  description: string;
+  actorType: "property_owner" | "staff" | "tenant" | string;
+  actorId?: string;
+  tenantId?: string;
+  roomTenantId?: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
+}
+
+export interface TenantActivityLogsResponse {
+  items: TenantActivityLogItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export async function getTenantActivityLogs(
+  propertyId: string,
+  tenantId: string,
+  params?: {
+    page?: number;
+    limit?: number;
+    category?: string;
+    actorType?: string;
+  }
+) {
+  const q = new URLSearchParams();
+  if (params?.page) q.set("page", String(params.page));
+  if (params?.limit) q.set("limit", String(params.limit));
+  if (params?.category && params.category !== "all") q.set("category", params.category);
+  if (params?.actorType && params.actorType !== "all") q.set("actorType", params.actorType);
+
+  const queryStr = q.toString() ? `?${q.toString()}` : "";
+  const res = await httpRequest<{ success?: boolean; data?: TenantActivityLogsResponse } | TenantActivityLogsResponse>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/tenants/${tenantId}/activity-logs${queryStr}`,
+    { auth: true }
+  );
+  if (res && "data" in res && res.data) {
+    return res.data;
+  }
+  return res as TenantActivityLogsResponse;
+}
+
+/* ─── Referral Program APIs ───────────────────────────────────────────────── */
+
+export interface ReferralCodeInfo {
+  referralCode: string;
+  shareUrl: string;
+  userType: string;
+  referredBy: string | null;
+}
+
+export interface ReferralStats {
+  totalReferees: number;
+  qualifiedReferees: number;
+  totalRewardAmount: number;
+  pendingRewardAmount: number;
+  referralCode: string;
+}
+
+export interface ReferralItem {
+  id: string;
+  refereeName: string;
+  refereePhone: string;
+  refereeType: string;
+  rewardAmount: number;
+  rewardStatus: "credited" | "pending" | string;
+  planName: string | null;
+  joinedAt: string;
+  creditedAt: string | null;
+}
+
+export interface ReferralsListResponse {
+  items: ReferralItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export async function getMyReferralCode() {
+  const res = await httpRequest<{ success?: boolean; data?: ReferralCodeInfo } | ReferralCodeInfo>(
+    `/referrals/my-code`,
+    { auth: true }
+  );
+  if (res && "data" in res && res.data) return res.data;
+  return res as ReferralCodeInfo;
+}
+
+export async function getReferralStats() {
+  const res = await httpRequest<{ success?: boolean; data?: ReferralStats } | ReferralStats>(
+    `/referrals/stats`,
+    { auth: true }
+  );
+  if (res && "data" in res && res.data) return res.data;
+  return res as ReferralStats;
+}
+
+export async function getReferralsList(params?: { page?: number; limit?: number }) {
+  const q = new URLSearchParams();
+  if (params?.page) q.set("page", String(params.page));
+  if (params?.limit) q.set("limit", String(params.limit));
+  const queryStr = q.toString() ? `?${q.toString()}` : "";
+
+  const res = await httpRequest<{ success?: boolean; data?: ReferralsListResponse } | ReferralsListResponse>(
+    `/referrals/list${queryStr}`,
+    { auth: true }
+  );
+  if (res && "data" in res && res.data) return res.data;
+  return res as ReferralsListResponse;
+}
+
+export async function applyReferralCode(referralCode: string) {
+  return httpRequest<{ success?: boolean; message?: string }>(`/referrals/apply`, {
+    method: "POST",
+    auth: true,
+    body: { referralCode },
+  });
+}
+
+/* ─── Post Your PG Public Listing APIs ─────────────────────────────────────── */
+
+export interface PublicListingPricingPlan {
+  withFood?: number;
+  withoutFood?: number;
+  withAc?: number;
+  withoutAc?: number;
+}
+
+export interface PublicListingDetails {
+  isPublished?: boolean;
+  description?: string;
+  photos?: string[];
+  videoUrls?: string[];
+  pricing?: {
+    single?: PublicListingPricingPlan;
+    double?: PublicListingPricingPlan;
+    triple?: PublicListingPricingPlan;
+    fourSharing?: PublicListingPricingPlan;
+  };
+  amenities?: string[];
+  houseRules?: string[];
+  noticePeriodDays?: number;
+  securityDepositMonths?: number;
+}
+
+export async function getPublicListing(propertyId: string) {
+  const res = await httpRequest<{ success?: boolean; data?: PublicListingDetails } | PublicListingDetails>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/public-listing`,
+    { auth: true }
+  );
+  if (res && "data" in res && res.data) return res.data;
+  return res as PublicListingDetails;
+}
+
+export async function updatePublicListing(propertyId: string, payload: PublicListingDetails) {
+  return httpRequest<{ success?: boolean; data?: unknown; message?: string }>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/public-listing`,
+    {
+      method: "PUT",
+      auth: true,
+      body: payload,
+    }
+  );
+}
+
+/* ─── Direct WhatsApp Reminders APIs ──────────────────────────────────────── */
+
+export async function sendWhatsAppRentReminder(
+  propertyId: string,
+  roomTenantId: string,
+  data?: { customAmount?: number; dueDate?: string }
+) {
+  return httpRequest<{ success: boolean; message: string }>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${roomTenantId}/reminders/rent`,
+    {
+      method: "POST",
+      auth: true,
+      body: data || {},
+    }
+  );
+}
+
+export async function sendWhatsAppKycReminder(
+  propertyId: string,
+  roomTenantId: string
+) {
+  return httpRequest<{ success: boolean; message: string }>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${roomTenantId}/reminders/kyc`,
+    {
+      method: "POST",
+      auth: true,
+      body: {},
+    }
+  );
+}
+
+export async function sendWhatsAppAgreementReminder(
+  propertyId: string,
+  roomTenantId: string
+) {
+  return httpRequest<{ success: boolean; message: string }>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${roomTenantId}/reminders/agreement`,
+    {
+      method: "POST",
+      auth: true,
+      body: {},
+    }
+  );
+}
+
+

@@ -58,7 +58,7 @@ import {
   usePropertyTenants,
 } from "@/hooks/usePropertyOwnerQueries";
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
-import type { RentDashboardTenantRow } from "@/api/propertyOwner";
+import { sendWhatsAppRentReminder, type RentDashboardTenantRow } from "@/api/propertyOwner";
 import { amountFromRow, formatInr, parseRentTenantRow } from "@/lib/rentDashboard";
 import { cn } from "@/lib/utils";
 
@@ -67,11 +67,13 @@ function TenantTable({
   emptyLabel,
   isUnpaid = false,
   onRecordPay,
+  propertyId,
 }: {
   rows: RentDashboardTenantRow[];
   emptyLabel: string;
   isUnpaid?: boolean;
   onRecordPay?: (row: RentDashboardTenantRow) => void;
+  propertyId?: string | null;
 }) {
   if (rows.length === 0) {
     return (
@@ -122,9 +124,22 @@ function TenantTable({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-7 text-[11px] px-2.5 rounded-lg border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 gap-1"
-                        onClick={(e) => {
+                        className="h-7 text-[11px] px-2.5 rounded-lg border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 gap-1 font-semibold"
+                        onClick={async (e) => {
                           e.stopPropagation();
+                          const targetRoomTenantId = parsed?.roomTenantId || (row as any).roomTenantId || (row as any).id;
+                          if (propertyId && targetRoomTenantId) {
+                            try {
+                              const res = await sendWhatsAppRentReminder(propertyId, targetRoomTenantId, amt ? { customAmount: amt } : undefined);
+                              toast({
+                                title: "WhatsApp Reminder Sent",
+                                description: res?.message || `Sent official rent reminder to ${tenantName}.`,
+                              });
+                              return;
+                            } catch (err: any) {
+                              console.warn("Backend reminder API failed, falling back to direct link", err);
+                            }
+                          }
                           const text = encodeURIComponent(
                             `Hi ${tenantName}, this is a gentle reminder that your PG rent of ${amt != null ? formatInr(amt) : "due amount"} is pending for this month. Please pay to avoid late fees. Thank you!`
                           );
@@ -578,6 +593,7 @@ const RentPayments = () => {
                 </div>
                 <TenantTable
                   rows={dashboard?.unpaidTenants ?? []}
+                  propertyId={selectedPgId}
                   emptyLabel="All active tenants have cleared rent for this period! 🎉"
                   isUnpaid={true}
                   onRecordPay={openManualForTenant}
@@ -817,10 +833,33 @@ const RentPayments = () => {
                   variant="default"
                   size="sm"
                   className="h-9 text-xs rounded-xl gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
-                  onClick={() => {
+                  onClick={async () => {
+                    if (!selectedPgId || filteredDues.length === 0) {
+                      toast({ title: "No Tenants", description: "No unpaid tenants found to remind." });
+                      return;
+                    }
+                    let sentCount = 0;
+                    for (const due of filteredDues) {
+                      const targetRoomTenantId =
+                        (due.rawRow as any)?.roomTenantId ||
+                        parseRentTenantRow(due.rawRow)?.roomTenantId ||
+                        (due.rawRow as any)?.id;
+                      if (targetRoomTenantId) {
+                        try {
+                          await sendWhatsAppRentReminder(
+                            selectedPgId,
+                            targetRoomTenantId,
+                            due.amount ? { customAmount: due.amount } : undefined
+                          );
+                          sentCount++;
+                        } catch {
+                          // Continue on partial failures
+                        }
+                      }
+                    }
                     toast({
-                      title: "Bulk WhatsApp Reminders Queued",
-                      description: `Queued reminders for ${filteredDues.length} tenants with pending rent.`,
+                      title: "WhatsApp Reminders Dispatched",
+                      description: `Sent official reminders to ${sentCount} out of ${filteredDues.length} tenants.`,
                     });
                   }}
                 >
@@ -901,7 +940,29 @@ const RentPayments = () => {
                                   size="sm"
                                   variant="outline"
                                   className="h-7 text-[11px] px-2.5 rounded-lg border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 gap-1 font-semibold"
-                                  onClick={() => {
+                                  onClick={async () => {
+                                    const raw = item.rawRow;
+                                    const targetRoomTenantId =
+                                      (raw as any)?.roomTenantId ||
+                                      parseRentTenantRow(raw)?.roomTenantId ||
+                                      (raw as any)?.id;
+
+                                    if (selectedPgId && targetRoomTenantId) {
+                                      try {
+                                        const res = await sendWhatsAppRentReminder(
+                                          selectedPgId,
+                                          targetRoomTenantId,
+                                          item.amount ? { customAmount: item.amount } : undefined
+                                        );
+                                        toast({
+                                          title: "WhatsApp Reminder Sent",
+                                          description: res?.message || `Sent official rent reminder to ${item.tenantName}.`,
+                                        });
+                                        return;
+                                      } catch (err: any) {
+                                        console.warn("Backend WhatsApp API failed, falling back to direct link", err);
+                                      }
+                                    }
                                     const text = encodeURIComponent(
                                       `Hi ${item.tenantName}, your PG rent of ${formatInr(item.amount)} for Room ${item.roomNumber} is overdue by ${item.overdueDays} days. Please clear it immediately to avoid penalties. You can pay via UPI to our registered PG account. Thank you!`
                                     );

@@ -413,6 +413,31 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
     setDepositDueAmt(securityDeposit || "0");
   }, [fixedRent, securityDeposit]);
 
+  // Dynamically compute rent due label (e.g. "Sep Rent") and cycle date range based on move-in date
+  const { rentDueType, rentDueFor } = useMemo(() => {
+    try {
+      const parts = (moveInDate || new Date().toISOString().split("T")[0]).split("-");
+      const y = parseInt(parts[0], 10) || new Date().getFullYear();
+      const m = (parseInt(parts[1], 10) || (new Date().getMonth() + 1)) - 1;
+      const d = parseInt(parts[2], 10) || new Date().getDate();
+
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const monthShort = monthNames[m] || "Sep";
+      const yearShort = String(y).slice(-2);
+      const lastDay = new Date(y, m + 1, 0).getDate();
+
+      return {
+        rentDueType: `${monthShort} Rent`,
+        rentDueFor: `${String(d).padStart(2, "0")} ${monthShort}' ${yearShort} - ${String(lastDay).padStart(2, "0")} ${monthShort}' ${yearShort}`,
+      };
+    } catch {
+      return {
+        rentDueType: "Rent",
+        rentDueFor: "Current Month Cycle",
+      };
+    }
+  }, [moveInDate]);
+
   const getStepOneError = (): string | null => {
     if (!selectedPgId) return "Select a PG property from the header.";
     if (!name.trim()) return "Enter tenant full name.";
@@ -503,7 +528,7 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
         },
         paymentDetails: {
           openingBalance: [
-            { dueType: "Aug Rent", dueFor: "31 Aug' 26 - 31 Aug' 26", dueAmount: parseInt(rentDueAmt, 10) || 0, collection: parseInt(rentCollAmt, 10) || 0 },
+            { dueType: rentDueType, dueFor: rentDueFor, dueAmount: parseInt(rentDueAmt, 10) || 0, collection: parseInt(rentCollAmt, 10) || 0 },
             { dueType: "Security Deposit", dueFor: "One Time", dueAmount: parseInt(depositDueAmt, 10) || 0, collection: parseInt(depositCollAmt, 10) || 0 },
             { dueType: "Joining Fee", dueFor: "One Time", dueAmount: parseInt(joiningDueAmt, 10) || 0, collection: parseInt(joiningCollAmt, 10) || 0 },
           ],
@@ -571,7 +596,7 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
         collectOnlinePayments: true,
         paymentDetails: {
           openingBalance: [
-            { dueType: "Aug Rent", dueFor: "31 Aug' 26 - 31 Aug' 26", dueAmount: parseInt(rentDueAmt, 10) || 0, collection: parseInt(rentCollAmt, 10) || 0 },
+            { dueType: rentDueType, dueFor: rentDueFor, dueAmount: parseInt(rentDueAmt, 10) || 0, collection: parseInt(rentCollAmt, 10) || 0 },
             { dueType: "Security Deposit", dueFor: "One Time", dueAmount: parseInt(depositDueAmt, 10) || 0, collection: parseInt(depositCollAmt, 10) || 0 },
             { dueType: "Joining Fee", dueFor: "One Time", dueAmount: parseInt(joiningDueAmt, 10) || 0, collection: parseInt(joiningCollAmt, 10) || 0 },
           ],
@@ -630,11 +655,24 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
       queryClient.invalidateQueries({ queryKey: ["property", propertyId, "tenants"] });
       onSuccess?.();
     } catch (e: unknown) {
-      toast({
-        title: "Could not add tenant",
-        description: e instanceof Error ? e.message : "Something went wrong",
-        variant: "destructive",
-      });
+      const err = e as { status?: number; message?: string };
+      const isDuplicatePhone =
+        (err?.status === 400 || (e instanceof Error && e.message.toLowerCase().includes("mobile number already exists"))) &&
+        (err?.message?.toLowerCase().includes("active tenant") || err?.message?.toLowerCase().includes("mobile number already exists"));
+
+      if (isDuplicatePhone) {
+        toast({
+          title: "Duplicate Mobile Number",
+          description: "Tenant with this phone number is already actively residing in this PG.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Could not add tenant",
+          description: e instanceof Error ? e.message : "Something went wrong",
+          variant: "destructive",
+        });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -1513,8 +1551,8 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                   </thead>
                   <tbody className="divide-y">
                     <tr>
-                      <td className="p-3 font-medium text-foreground">Aug Rent</td>
-                      <td className="p-3 text-muted-foreground text-xs">31 Aug' 26 - 31 Aug' 26</td>
+                      <td className="p-3 font-medium text-foreground">{rentDueType}</td>
+                      <td className="p-3 text-muted-foreground text-xs">{rentDueFor}</td>
                       <td className="p-2">
                         <Input type="number" className="w-28 h-8 text-sm" value={rentDueAmt} onChange={(e) => setRentDueAmt(e.target.value)} />
                       </td>
