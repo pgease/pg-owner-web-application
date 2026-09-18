@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Building2,
+  Gift,
   Building,
   CreditCard,
   Globe,
@@ -252,6 +253,33 @@ export default function SettingsPage() {
               <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
             </CardContent>
           </Card>
+
+          {/* 5. Referral Program & Partner Rewards */}
+          <Card
+            className="rounded-2xl border-border/80 shadow-xs hover:shadow-md hover:border-amber-300 dark:hover:border-amber-800 transition-all cursor-pointer group bg-card"
+            onClick={() => navigate("/referrals")}
+          >
+            <CardContent className="p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3.5">
+                <div className="h-10 w-10 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-300 flex items-center justify-center font-bold shrink-0">
+                  <Gift className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground group-hover:text-amber-600 transition-colors flex items-center gap-2">
+                    Referral Program & Rewards
+                    <Badge className="bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 text-[10px] font-bold border-amber-200">
+                      Earn ₹1,000
+                    </Badge>
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Invite PG owners with your referral link and track your direct bank cash rewards ledger
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+            </CardContent>
+          </Card>
+
         </div>
       </div>
 

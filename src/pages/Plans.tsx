@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Check,
+  Gift,
   X,
   Crown,
   Zap,
@@ -546,6 +547,38 @@ export default function Plans() {
           </CardContent>
         </Card>
       )}
+
+      {/* REFERRAL CASH INCENTIVE BANNER */}
+      <Card className="rounded-2xl border border-indigo-200 dark:border-indigo-900/60 bg-gradient-to-r from-indigo-950 via-blue-900 to-slate-950 text-white shadow-md">
+        <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="h-12 w-12 rounded-2xl bg-amber-400/20 text-amber-300 border border-amber-400/30 flex items-center justify-center font-black shrink-0">
+              <Gift className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm sm:text-base font-extrabold text-white">
+                  Get Your Subscription Reimbursed via Referrals
+                </h4>
+                <Badge className="bg-amber-400 text-slate-950 font-black text-[10px] px-2 py-0">
+                  Earn ₹1,000 / PG Owner
+                </Badge>
+              </div>
+              <p className="text-xs text-blue-100/80 mt-0.5 max-w-xl">
+                Refer other PG & hostel owners. When they subscribe, ₹500 - ₹1,000 cash is deposited straight to your registered settlement bank account.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => navigate("/referrals")}
+            className="rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/30 text-xs font-bold gap-1.5 h-9 shrink-0"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+            Invite PG Owners
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* BILLING TOGGLE */}
       <div className="flex justify-center pt-2">

@@ -45,6 +45,7 @@ import BankAccountPage from "./pages/property/BankAccountPage";
 import AmenitiesPage from "./pages/property/AmenitiesPage";
 import RestrictionsPage from "./pages/property/RestrictionsPage";
 import ReferralsPage from "./pages/ReferralsPage";
+import ApiCatalogPage from "./pages/reference/ApiCatalogPage";
 import PublicListingPage from "./pages/property/PublicListingPage";
 
 const queryClient = new QueryClient({
@@ -127,6 +128,8 @@ const App = () => (
                         <Route path="/reports/export" element={<Reports />} />
                         <Route path="/plans" element={<Plans />} />
                         <Route path="/referrals" element={<ReferralsPage />} />
+                        <Route path="/api-catalog" element={<ApiCatalogPage />} />
+                        <Route path="/reference/api-catalog" element={<ApiCatalogPage />} />
                         <Route path="/refer-and-earn" element={<ReferralsPage />} />
                         <Route path="/my-pgs/public-listing" element={<PublicListingPage />} />
                         <Route path="/public-listing" element={<PublicListingPage />} />

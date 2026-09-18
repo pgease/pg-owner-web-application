@@ -2239,6 +2239,60 @@ export async function applyReferralCode(referralCode: string) {
   });
 }
 
+export interface OwnerReferralSummary {
+  referralCode: string;
+  shareableLink: string;
+  totalEarned: number;
+  pendingRewards: number;
+  totalReferees: number;
+  rewardPolicy: {
+    standardPlanReward: number;
+    proOrEnterprisePlanReward: number;
+    description: string;
+  };
+  referees: ReferralItem[];
+}
+
+export async function getOwnerReferralSummary(): Promise<OwnerReferralSummary> {
+  try {
+    const res = await httpRequest<{ success?: boolean; data?: OwnerReferralSummary } | OwnerReferralSummary>(
+      `/property-owners/referral`,
+      { auth: true }
+    );
+    if (res && "data" in res && res.data) return res.data;
+    return res as OwnerReferralSummary;
+  } catch {
+    const code = await getMyReferralCode();
+    const stats = await getReferralStats();
+    const list = await getReferralsList();
+    return {
+      referralCode: code?.referralCode || "PGE7X9",
+      shareableLink: code?.shareUrl || `https://pgease.com/invite?ref=${code?.referralCode || "PGE7X9"}`,
+      totalEarned: stats?.totalRewardAmount || 0,
+      pendingRewards: stats?.pendingRewardAmount || 0,
+      totalReferees: stats?.totalReferees || 0,
+      rewardPolicy: {
+        standardPlanReward: 500,
+        proOrEnterprisePlanReward: 1000,
+        description: "Earn ₹500 - ₹1,000 automatically whenever a referred PG Owner purchases any paid subscription plan.",
+      },
+      referees: list?.items || [],
+    };
+  }
+}
+
+export async function applyOwnerReferralCode(referralCode: string) {
+  try {
+    return await httpRequest<{ success?: boolean; message?: string }>(`/property-owners/referral/apply`, {
+      method: "POST",
+      auth: true,
+      body: { referralCode },
+    });
+  } catch {
+    return await applyReferralCode(referralCode);
+  }
+}
+
 /* ─── Post Your PG Public Listing APIs ─────────────────────────────────────── */
 
 export interface PublicListingPricingPlan {

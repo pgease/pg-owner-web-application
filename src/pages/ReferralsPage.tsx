@@ -9,20 +9,18 @@ import {
   Copy,
   Check,
   Share2,
-  ArrowRight,
   Sparkles,
   HelpCircle,
-  ExternalLink,
   ShieldCheck,
   CheckCircle2,
   AlertCircle,
   Loader2,
+  Banknote,
+  ArrowUpRight,
 } from "lucide-react";
 import {
-  getMyReferralCode,
-  getReferralStats,
-  getReferralsList,
-  applyReferralCode,
+  getOwnerReferralSummary,
+  applyOwnerReferralCode,
   type ReferralItem,
 } from "@/api/propertyOwner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -34,73 +32,74 @@ import { formatInr } from "@/lib/rentDashboard";
 
 export default function ReferralsPage() {
   const queryClient = useQueryClient();
-  const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
   const [inputCode, setInputCode] = useState("");
 
-  // Queries
-  const codeQuery = useQuery({
-    queryKey: ["referrals", "my-code"],
-    queryFn: getMyReferralCode,
-  });
-
-  const statsQuery = useQuery({
-    queryKey: ["referrals", "stats"],
-    queryFn: getReferralStats,
-  });
-
-  const listQuery = useQuery({
-    queryKey: ["referrals", "list"],
-    queryFn: () => getReferralsList({ page: 1, limit: 50 }),
+  // Consolidated PG Owner Referral Summary Query
+  const summaryQuery = useQuery({
+    queryKey: ["owner-referral-summary"],
+    queryFn: getOwnerReferralSummary,
   });
 
   // Apply code mutation
   const applyMutation = useMutation({
-    mutationFn: (code: string) => applyReferralCode(code),
-    onSuccess: () => {
+    mutationFn: (code: string) => applyOwnerReferralCode(code),
+    onSuccess: (res) => {
       toast({
         title: "Referral code applied!",
-        description: "Your account is now linked to your referrer.",
+        description: res?.message || "Your PG owner account is now linked to your referrer.",
       });
       setInputCode("");
+      void queryClient.invalidateQueries({ queryKey: ["owner-referral-summary"] });
       void queryClient.invalidateQueries({ queryKey: ["referrals"] });
     },
     onError: (err: unknown) => {
       toast({
         title: "Failed to apply code",
-        description: err instanceof Error ? err.message : "Invalid or already applied code.",
+        description: err instanceof Error ? err.message : "Invalid or already applied referral code.",
         variant: "destructive",
       });
     },
   });
 
-  const referralCode = codeQuery.data?.referralCode || "PGE7X9";
+  const referralCode = summaryQuery.data?.referralCode || "PGE7X9";
   const shareUrl =
-    codeQuery.data?.shareUrl ||
-    `https://www.pgease.com/signup?ref=${referralCode}`;
+    summaryQuery.data?.shareableLink ||
+    `https://pgease.com/partner/signup?ref=${referralCode}`;
 
-  const stats = statsQuery.data || {
-    totalReferees: 0,
-    qualifiedReferees: 0,
-    totalRewardAmount: 0,
-    pendingRewardAmount: 0,
-    referralCode,
-  };
+  const referees: ReferralItem[] = summaryQuery.data?.referees || [];
 
-  const referrals: ReferralItem[] = listQuery.data?.items || [];
+  const totalReferees = summaryQuery.data?.totalReferees ?? referees.length;
+  const totalEarned = summaryQuery.data?.totalEarned ?? 0;
+  const pendingRewards = summaryQuery.data?.pendingRewards ?? 0;
+  const qualifiedReferees = referees.filter(
+    (r) => r.rewardStatus === "credited" || r.rewardStatus === "paid"
+  ).length;
 
-  const handleCopy = () => {
+  const handleCopyLink = () => {
     navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
+    setCopiedLink(true);
     toast({
-      title: "Invite link copied to clipboard!",
+      title: "Invite link copied!",
       description: shareUrl,
     });
-    setTimeout(() => setCopied(false), 2500);
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(referralCode);
+    setCopiedCode(true);
+    toast({
+      title: "Referral code copied!",
+      description: referralCode,
+    });
+    setTimeout(() => setCopiedCode(false), 2500);
   };
 
   const handleWhatsAppShare = () => {
     const text = encodeURIComponent(
-      `Hey! I use PG Ease to manage my PG bookings, rents, agreements, and biometric KYC. Register using my link to get zero-commission direct settlements: ${shareUrl}`
+      `Hey! I use PG Ease to automate hostel & PG management, rent collections, and tenant KYC. Join using my referral code ${referralCode} or sign up here: ${shareUrl}`
     );
     window.open(`https://wa.me/?text=${text}`, "_blank");
   };
@@ -108,15 +107,30 @@ export default function ReferralsPage() {
   const handleApply = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputCode.trim()) return;
-    applyMutation.mutate(inputCode.trim().toUpperCase());
+    applyMutation.mutate(inputCode.trim());
+  };
+
+  const formatDate = (dateStr?: string | null) => {
+    if (!dateStr) return "Recent";
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return "Recent";
+      return d.toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      return "Recent";
+    }
   };
 
   return (
     <div className="space-y-8 pb-16 max-w-6xl mx-auto animate-fade-in">
       {/* HERO BANNER */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-900 via-blue-900 to-slate-900 text-white p-8 sm:p-10 shadow-xl border border-blue-800/40">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950 via-blue-900 to-slate-950 text-white p-8 sm:p-10 shadow-xl border border-blue-800/40">
         <div className="relative z-10 max-w-3xl space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-blue-200 text-xs font-bold uppercase tracking-wider">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-blue-200 text-xs font-bold uppercase tracking-wider">
             <Gift className="h-3.5 w-3.5 text-amber-400" />
             <span>PG Ease Owner Rewards Program</span>
           </div>
@@ -125,7 +139,7 @@ export default function ReferralsPage() {
             Earn <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-teal-300 to-emerald-300">₹1,000 Cash</span> per Referral.
           </h1>
           <p className="text-blue-100/90 text-sm sm:text-base leading-relaxed">
-            Invite hostel and PG owners to digitize with PG Ease. When they purchase any subscription plan, cash rewards are automatically credited directly to your settlement account.
+            Invite hostel and PG owners to digitize their properties with PG Ease. When they subscribe to any paid plan, cash rewards are automatically credited directly to your settlement bank account.
           </p>
 
           {/* SHARE CODE BOX */}
@@ -137,15 +151,28 @@ export default function ReferralsPage() {
                   {referralCode}
                 </p>
               </div>
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleCopy}
-                className="bg-white/10 hover:bg-white/20 text-white border border-white/30 text-xs font-bold gap-1.5 rounded-xl h-9"
-              >
-                {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
-                {copied ? "Copied" : "Copy Link"}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleCopyCode}
+                  className="bg-white/10 hover:bg-white/20 text-white border border-white/30 text-xs font-bold gap-1.5 rounded-xl h-9 px-3"
+                  title="Copy code only"
+                >
+                  {copiedCode ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copiedCode ? "Code Copied" : "Copy Code"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleCopyLink}
+                  className="bg-white/10 hover:bg-white/20 text-white border border-white/30 text-xs font-bold gap-1.5 rounded-xl h-9 px-3"
+                  title="Copy full invite link"
+                >
+                  {copiedLink ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
+                  {copiedLink ? "Link Copied" : "Copy Link"}
+                </Button>
+              </div>
             </div>
 
             <Button
@@ -171,9 +198,9 @@ export default function ReferralsPage() {
             <div className="space-y-1">
               <p className="text-xs font-semibold text-muted-foreground">Total Referees</p>
               <p className="text-2xl font-black text-foreground">
-                {statsQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : stats.totalReferees}
+                {summaryQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : totalReferees}
               </p>
-              <p className="text-[11px] text-muted-foreground">Registered via your link</p>
+              <p className="text-[11px] text-muted-foreground">Joined via your link/code</p>
             </div>
             <div className="h-12 w-12 rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
               <Users className="h-6 w-6" />
@@ -187,9 +214,9 @@ export default function ReferralsPage() {
             <div className="space-y-1">
               <p className="text-xs font-semibold text-muted-foreground">Qualified Referees</p>
               <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-                {statsQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : stats.qualifiedReferees}
+                {summaryQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : qualifiedReferees}
               </p>
-              <p className="text-[11px] text-muted-foreground">Purchased a plan</p>
+              <p className="text-[11px] text-muted-foreground">Purchased a paid plan</p>
             </div>
             <div className="h-12 w-12 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
               <Award className="h-6 w-6" />
@@ -203,9 +230,9 @@ export default function ReferralsPage() {
             <div className="space-y-1">
               <p className="text-xs font-semibold text-muted-foreground">Total Rewards Earned</p>
               <p className="text-2xl font-black text-foreground">
-                {statsQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : formatInr(stats.totalRewardAmount || 0)}
+                {summaryQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : formatInr(totalEarned)}
               </p>
-              <p className="text-[11px] text-emerald-600 font-semibold">Credited to payouts</p>
+              <p className="text-[11px] text-emerald-600 font-semibold">Credited to bank account</p>
             </div>
             <div className="h-12 w-12 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
               <IndianRupee className="h-6 w-6" />
@@ -219,7 +246,7 @@ export default function ReferralsPage() {
             <div className="space-y-1">
               <p className="text-xs font-semibold text-muted-foreground">Pending Rewards</p>
               <p className="text-2xl font-black text-muted-foreground">
-                {statsQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : formatInr(stats.pendingRewardAmount || 0)}
+                {summaryQuery.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : formatInr(pendingRewards)}
               </p>
               <p className="text-[11px] text-muted-foreground">Awaiting plan purchase</p>
             </div>
@@ -246,27 +273,25 @@ export default function ReferralsPage() {
               </div>
               <h3 className="text-sm font-bold text-foreground">Share your Link or Code</h3>
               <p className="text-xs text-muted-foreground">
-                Send your unique link via WhatsApp or copy your code to PG owners in your city or network.
+                Send your unique invite link via WhatsApp or share your code with PG & hostel owners in your city or network.
               </p>
             </div>
-
             <div className="p-4 rounded-2xl bg-muted/20 border border-border/60 space-y-2">
-              <div className="h-8 w-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center">
+              <div className="h-8 w-8 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center">
                 2
               </div>
-              <h3 className="text-sm font-bold text-foreground">They Subscribe to a Plan</h3>
+              <h3 className="text-sm font-bold text-foreground">Owner Signs Up & Subscribes</h3>
               <p className="text-xs text-muted-foreground">
-                When they sign up and purchase any Starter or Growth plan for their PG property.
+                They register with your code and activate any PG Ease subscription plan to manage their hostel.
               </p>
             </div>
-
             <div className="p-4 rounded-2xl bg-muted/20 border border-border/60 space-y-2">
               <div className="h-8 w-8 rounded-full bg-emerald-600 text-white font-bold text-xs flex items-center justify-center">
                 3
               </div>
-              <h3 className="text-sm font-bold text-foreground">Get Cash Rewards Credited</h3>
+              <h3 className="text-sm font-bold text-foreground">Cash Rewards Credited</h3>
               <p className="text-xs text-muted-foreground">
-                Receive ₹500 for starter plans and ₹1,000 for plans ≥ ₹3,000 directly to your bank account.
+                Receive ₹500 for starter plans and ₹1,000 for standard or enterprise plans directly into your settlement account.
               </p>
             </div>
           </div>
@@ -281,22 +306,22 @@ export default function ReferralsPage() {
             <CardHeader className="p-6 pb-4 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base font-bold text-foreground">
-                  Invited PG Owners & Status
+                  Invited PG Owners & Ledger
                 </CardTitle>
                 <CardDescription className="text-xs text-muted-foreground">
-                  Real-time reward settlement ledger
+                  Real-time referral performance and payout tracking
                 </CardDescription>
               </div>
               <Badge variant="outline" className="text-xs font-semibold">
-                {referrals.length} Total
+                {referees.length} Total
               </Badge>
             </CardHeader>
             <CardContent className="p-0">
-              {listQuery.isLoading ? (
+              {summaryQuery.isLoading ? (
                 <div className="py-12 flex items-center justify-center">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
-              ) : referrals.length === 0 ? (
+              ) : referees.length === 0 ? (
                 <div className="py-12 text-center space-y-3 px-6">
                   <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mx-auto text-muted-foreground">
                     <Gift className="h-6 w-6" />
@@ -310,7 +335,7 @@ export default function ReferralsPage() {
                     onClick={handleWhatsAppShare}
                     className="rounded-xl text-xs font-bold gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
                   >
-                    <Share2 className="h-3.5 w-3.5" /> Share Now
+                    <Share2 className="h-3.5 w-3.5" /> Share on WhatsApp
                   </Button>
                 </div>
               ) : (
@@ -326,7 +351,7 @@ export default function ReferralsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/40">
-                      {referrals.map((ref) => (
+                      {referees.map((ref) => (
                         <tr key={ref.id} className="hover:bg-muted/15 transition-colors">
                           <td className="py-3 px-5 font-semibold text-foreground">
                             <div>{ref.refereeName || "PG Owner"}</div>
@@ -339,7 +364,7 @@ export default function ReferralsPage() {
                             {ref.rewardAmount > 0 ? formatInr(ref.rewardAmount) : "Pending"}
                           </td>
                           <td className="py-3 px-4">
-                            {ref.rewardStatus === "credited" ? (
+                            {ref.rewardStatus === "credited" || ref.rewardStatus === "paid" ? (
                               <Badge className="bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 text-[10px] font-bold">
                                 Credited
                               </Badge>
@@ -350,11 +375,7 @@ export default function ReferralsPage() {
                             )}
                           </td>
                           <td className="py-3 px-5 text-right text-[11px] text-muted-foreground">
-                            {new Date(ref.joinedAt).toLocaleDateString("en-IN", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })}
+                            {formatDate(ref.joinedAt || ref.createdAt)}
                           </td>
                         </tr>
                       ))}
@@ -372,20 +393,20 @@ export default function ReferralsPage() {
             <CardHeader className="p-5 pb-3">
               <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
                 <HelpCircle className="h-4 w-4 text-blue-600" />
-                <span>Have a Referral Code?</span>
+                <span>Have an Invite Code?</span>
               </CardTitle>
               <CardDescription className="text-xs text-muted-foreground">
-                If you were invited by another PG owner, enter their code here.
+                Enter an invite code (e.g. PGO-NAME-XXXX), invite link, or referrer's registered mobile number.
               </CardDescription>
             </CardHeader>
             <CardContent className="p-5 pt-2">
               <form onSubmit={handleApply} className="space-y-3">
                 <Input
-                  placeholder="e.g. PGE7X9"
+                  placeholder="Code, Link, or Mobile Number"
                   value={inputCode}
-                  onChange={(e) => setInputCode(e.target.value.toUpperCase())}
-                  maxLength={10}
-                  className="font-mono uppercase tracking-widest text-center h-10 rounded-xl"
+                  onChange={(e) => setInputCode(e.target.value)}
+                  maxLength={120}
+                  className="text-center h-10 rounded-xl font-semibold text-xs sm:text-sm"
                 />
                 <Button
                   type="submit"
@@ -405,15 +426,16 @@ export default function ReferralsPage() {
           {/* REWARDS FAQ CARD */}
           <Card className="rounded-2xl border-border/80 shadow-xs bg-muted/15">
             <CardHeader className="p-5 pb-2">
-              <CardTitle className="text-xs font-bold text-foreground">
-                Reward Payout Terms
+              <CardTitle className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                <span>Reward Payout Policy</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-5 pt-0 space-y-2 text-[11px] text-muted-foreground">
-              <p>• Rewards are credited automatically when the referee makes their first plan purchase.</p>
-              <p>• ₹500 credited for Starter subscription plans.</p>
-              <p>• ₹1,000 credited for Growth & Enterprise plans (≥ ₹3,000).</p>
-              <p>• Payouts are transferred directly to your registered bank account with zero fee.</p>
+            <CardContent className="p-5 pt-0 space-y-2 text-[11px] text-muted-foreground leading-relaxed">
+              <p>• ₹500 cash credited for Starter subscription plans.</p>
+              <p>• ₹1,000 cash credited for Growth & Enterprise plans.</p>
+              <p>• Rewards are credited automatically upon first successful plan activation.</p>
+              <p>• Payouts are transferred directly to your bank account with zero fees.</p>
             </CardContent>
           </Card>
         </div>

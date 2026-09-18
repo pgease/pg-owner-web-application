@@ -38,6 +38,7 @@ export const API_FLOW_PHASE_ORDER: string[] = [
   "Roles & permissions",
   "Reports",
   "Plans & pricing",
+  "Referrals & partner rewards",
   "Settings",
   "Utilities & background",
 ];
@@ -816,6 +817,80 @@ export const IMPLEMENTED_API_CATALOG: ImplementedApiRow[] = [
     steps: [
       "Sidebar → **Plans & Pricing** (`/plans`) — plan and feature list load here.",
       "The same endpoint is also called from **Legacy staff** (`/staff`) for staff-related feature checks.",
+    ],
+  },
+  {
+    clientExport: "getOwnerReferralSummary",
+    method: "GET",
+    path: "/property-owners/referral",
+    auth: true,
+    useCase: "Fetch PG owner referral summary including referral code, shareable link, earned rewards, pending rewards, and referred owners ledger.",
+    flowPhase: "Referrals & partner rewards",
+    appRoute: "/referrals",
+    steps: [
+      "Sidebar → **Management** → **Refer & Earn (₹1,000)** (`/referrals`) or Dashboard Referral card.",
+      "Displays the owner's active referral code, link, and live ledger.",
+    ],
+  },
+  {
+    clientExport: "applyOwnerReferralCode",
+    method: "POST",
+    path: "/property-owners/referral/apply",
+    auth: true,
+    useCase: "Apply an inviter's referral code to link the newly registered property owner account.",
+    flowPhase: "Referrals & partner rewards",
+    appRoute: "/referrals",
+    steps: [
+      "Navigate to `/referrals`.",
+      "Enter the invite code in 'Have a Referral Code?' and click Apply.",
+    ],
+  },
+  {
+    clientExport: "getMyReferralCode",
+    method: "GET",
+    path: "/referrals/my-code",
+    auth: true,
+    useCase: "Fetch current authenticated user referral code and WhatsApp/share URL.",
+    flowPhase: "Referrals & partner rewards",
+    appRoute: "/referrals",
+    steps: [
+      "Loads on `/referrals` to populate copy-link and WhatsApp share actions.",
+    ],
+  },
+  {
+    clientExport: "getReferralStats",
+    method: "GET",
+    path: "/referrals/stats",
+    auth: true,
+    useCase: "Fetch high-level referral performance metrics: total referees, qualified plan purchases, earned rewards, and pending rewards.",
+    flowPhase: "Referrals & partner rewards",
+    appRoute: "/referrals",
+    steps: [
+      "Powers the 4 stat cards on .",
+    ],
+  },
+  {
+    clientExport: "getReferralsList",
+    method: "GET",
+    path: "/referrals/list",
+    auth: true,
+    useCase: "Fetch paginated ledger entries of referred PG owners with subscription status, reward amounts, and payout dates.",
+    flowPhase: "Referrals & partner rewards",
+    appRoute: "/referrals",
+    steps: [
+      "Renders the live referees settlement ledger table on .",
+    ],
+  },
+  {
+    clientExport: "applyReferralCode",
+    method: "POST",
+    path: "/referrals/apply",
+    auth: true,
+    useCase: "Unified referral code redemption endpoint.",
+    flowPhase: "Referrals & partner rewards",
+    appRoute: "/referrals",
+    steps: [
+      "Submits invite code in  apply code card.",
     ],
   },
   {

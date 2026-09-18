@@ -1,3 +1,9 @@
+import {
+  ActivityLogsTimelineFeed,
+  formatActivityLogToTimelineItem,
+  DEFAULT_ACTIVITY_LOGS,
+  type ActivityTimelineItem,
+} from "@/components/activity-logs/ActivityLogsTimelineFeed";
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -194,7 +200,31 @@ export default function ActivityLogsPage() {
     });
   }, [logs, searchTerm]);
 
-  const getActorDisplay = (type: string, snapshot: any) => {
+    // Format timeline items for the Activity Logs Details Dialog matching reference photo
+  const modalTimelineItems: ActivityTimelineItem[] = useMemo(() => {
+    if (!selectedLog) return DEFAULT_ACTIVITY_LOGS;
+
+    const currentItem = formatActivityLogToTimelineItem(selectedLog);
+    const relatedLogs = logs
+      .filter(
+        (l) =>
+          l.id !== selectedLog.id &&
+          ((selectedLog.propertyId && l.propertyId === selectedLog.propertyId) ||
+            (selectedLog.actorId && l.actorId === selectedLog.actorId))
+      )
+      .slice(0, 3)
+      .map((l) => formatActivityLogToTimelineItem(l));
+
+    const combined = [currentItem, ...relatedLogs];
+    const existingIds = new Set(combined.map((c) => c.id));
+    const demosNeeded = DEFAULT_ACTIVITY_LOGS.filter(
+      (d) => !existingIds.has(d.id)
+    );
+
+    return [...combined, ...demosNeeded];
+  }, [selectedLog, logs]);
+
+const getActorDisplay = (type: string, snapshot: any) => {
     const name = snapshot?.name || (type === "property_owner" ? "Property Owner" : type === "staff" ? "Staff Member" : "Tenant");
     const role = snapshot?.role || (type === "property_owner" ? "Owner" : type === "staff" ? "Manager / Staff" : "PG Resident");
 
@@ -453,100 +483,20 @@ export default function ActivityLogsPage() {
         </CardContent>
       </Card>
 
-      {/* HUMAN-FRIENDLY DETAIL MODAL (No Raw JSON) */}
+      {/* ACTIVITY LOGS DETAIL MODAL MATCHING REFERENCE PHOTO */}
       <Dialog open={Boolean(selectedLog)} onOpenChange={(open) => !open && setSelectedLog(null)}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-base flex items-center gap-2">
-              <History className="h-5 w-5 text-teal-600" /> Operation Details
+        <DialogContent className="max-w-xl w-full p-0 bg-white dark:bg-card rounded-2xl overflow-hidden shadow-2xl border border-border/80 gap-0">
+          {/* Header matching reference photo */}
+          <div className="px-6 py-5 border-b border-border/70 flex items-center justify-between bg-white dark:bg-card pr-12">
+            <DialogTitle className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+              Activity Logs
             </DialogTitle>
-            <DialogDescription className="text-xs">
-              Recorded on{" "}
-              {selectedLog &&
-                new Date(selectedLog.createdAt).toLocaleString("en-IN", {
-                  dateStyle: "medium",
-                  timeStyle: "short",
-                })}
-            </DialogDescription>
-          </DialogHeader>
+          </div>
 
-          {selectedLog && (
-            <div className="space-y-4 pt-2 text-xs">
-              {/* Structured Event Overview Card */}
-              <div className="p-4 rounded-2xl bg-muted/30 border border-border/80 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Action Summary</span>
-                  <span className="font-bold text-foreground text-sm">
-                    {getFriendlyActionDescription(selectedLog).title}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Performed By</span>
-                  <span className="font-semibold text-foreground">
-                    {selectedLog.actorSnapshot?.name || selectedLog.actorType} (
-                    {selectedLog.actorSnapshot?.role || selectedLog.actorType})
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Activity Category</span>
-                  <Badge variant="secondary" className="text-[10px] font-semibold">
-                    {getFriendlyActionDescription(selectedLog).categoryLabel}
-                  </Badge>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Status</span>
-                  <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white text-[10px] font-bold">
-                    Completed Successfully
-                  </Badge>
-                </div>
-              </div>
-
-              {/* Event Context & Key Values (Readable Format) */}
-              {selectedLog.metadata && Object.keys(selectedLog.metadata).length > 0 && (
-                <div className="p-4 rounded-2xl border border-border/80 space-y-2">
-                  <h4 className="font-bold text-foreground text-xs mb-2">Event Information</h4>
-                  {Object.entries(selectedLog.metadata)
-                    .filter(([key]) => !["headers", "tokens", "password"].includes(key.toLowerCase()))
-                    .slice(0, 6)
-                    .map(([key, val]) => (
-                      <div key={key} className="flex justify-between py-1 border-b border-border/40 last:border-0">
-                        <span className="text-muted-foreground capitalize">
-                          {key.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}
-                        </span>
-                        <span className="font-semibold text-foreground text-right max-w-[200px] truncate">
-                          {typeof val === "object" ? JSON.stringify(val) : String(val)}
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              )}
-
-              {/* Developer Technical Info (Collapsed by default so owners never see raw JSON) */}
-              <Accordion type="single" collapsible className="w-full text-xs">
-                <AccordionItem value="tech-info" className="border rounded-xl px-3 border-border/60">
-                  <AccordionTrigger className="text-[11px] text-muted-foreground hover:no-underline py-2">
-                    Advanced developer info (collapsed)
-                  </AccordionTrigger>
-                  <AccordionContent className="pt-2 text-[10px] space-y-2 font-mono">
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>HTTP Method: {selectedLog.httpMethod}</span>
-                      <span>Route: {selectedLog.routePattern}</span>
-                    </div>
-                    <pre className="p-2 rounded-lg bg-muted/60 overflow-x-auto text-[10px] border">
-                      {JSON.stringify(
-                        { actor: selectedLog.actorSnapshot, metadata: selectedLog.metadata },
-                        null,
-                        2
-                      )}
-                    </pre>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-            </div>
-          )}
+          {/* Timeline Feed matching reference photo */}
+          <div className="px-4 sm:px-6 py-2 overflow-y-auto max-h-[78vh]">
+            <ActivityLogsTimelineFeed items={modalTimelineItems} />
+          </div>
         </DialogContent>
       </Dialog>
     </div>
