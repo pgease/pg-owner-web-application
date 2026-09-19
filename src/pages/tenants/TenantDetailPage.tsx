@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -42,6 +42,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
@@ -65,6 +66,7 @@ import {
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
 import {
   tenantBedNo,
+  tenantBlock,
   tenantDisplayName,
   tenantFloor,
   tenantInitials,
@@ -108,11 +110,165 @@ function waLink(phone: string): string | null {
   return `https://wa.me/${n}`;
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+export function parseFlexibleDate(dateVal?: string | Date | null): Date | null {
+  if (!dateVal) return null;
+  if (dateVal instanceof Date) return isNaN(dateVal.getTime()) ? null : dateVal;
+  if (typeof dateVal !== "string") return null;
+  const trimmed = dateVal.trim();
+  if (!trimmed || trimmed === "—" || trimmed === "-" || trimmed.toLowerCase() === "null") return null;
+
+  // DD/MM/YYYY or DD-MM-YYYY
+  const dmyMatch = trimmed.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+  if (dmyMatch) {
+    const [, d, m, y] = dmyMatch;
+    const parsed = new Date(Number(y), Number(m) - 1, Number(d));
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+
+  // YYYY-MM-DD
+  const ymdMatch = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (ymdMatch) {
+    const [, y, m, d] = ymdMatch;
+    const parsed = new Date(Number(y), Number(m) - 1, Number(d));
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+
+  const d = new Date(trimmed);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+export function formatDateText(dateVal?: string | Date | null): string {
+  if (!dateVal) return "—";
+  const d = parseFlexibleDate(dateVal);
+  if (!d) return typeof dateVal === "string" ? dateVal : "—";
+  const day = d.getDate().toString().padStart(2, "0");
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const month = monthNames[d.getMonth()];
+  const year = d.getFullYear();
+  return `${day} ${month} ${year}`;
+}
+
+export function safeDateInputString(dateVal?: string | Date | null): string {
+  if (!dateVal) return "";
+  const d = parseFlexibleDate(dateVal);
+  if (!d) return "";
+  const y = d.getFullYear();
+  const m = (d.getMonth() + 1).toString().padStart(2, "0");
+  const day = d.getDate().toString().padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function getStayDurationText(
+  joiningDate?: string | Date | null,
+  moveOutDate?: string | Date | null,
+  isOnNotice?: boolean,
+  expectedMoveOutDate?: string | Date | null
+): { label: string; text: string; isPast: boolean } {
+  if (!joiningDate) {
+    return { label: "Staying Since", text: "—", isPast: false };
+  }
+  const start = new Date(joiningDate);
+  if (isNaN(start.getTime())) {
+    return { label: "Staying Since", text: "—", isPast: false };
+  }
+
+  const now = new Date();
+
+  // If tenant has already moved out
+  if (moveOutDate) {
+    const end = new Date(moveOutDate);
+    if (!isNaN(end.getTime()) && end <= now) {
+      const diffMs = end.getTime() - start.getTime();
+      const diffDays = Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+      let durationStr = `${diffDays} days`;
+      if (diffDays >= 30) {
+        const months = Math.floor(diffDays / 30);
+        durationStr = `${months} month${months > 1 ? "s" : ""}`;
+      } else if (diffDays >= 7) {
+        const weeks = Math.floor(diffDays / 7);
+        durationStr = `${weeks} week${weeks > 1 ? "s" : ""}`;
+      }
+      return {
+        label: "Stayed For",
+        text: `${durationStr} (Left on ${formatDateText(end)})`,
+        isPast: true,
+      };
+    }
+  }
+
+  // Future move-in
+  if (start > now) {
+    const diffDays = Math.ceil((start.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return {
+      label: "Move-in In",
+      text: `${diffDays} day${diffDays > 1 ? "s" : ""}`,
+      isPast: false,
+    };
+  }
+
+  // Currently active tenant
+  const diffMs = now.getTime() - start.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  let stayText = "";
+  if (diffDays < 7) {
+    stayText = `${diffDays} day${diffDays === 1 ? "" : "s"}`;
+  } else if (diffDays < 30) {
+    const weeks = Math.floor(diffDays / 7);
+    const remDays = diffDays % 7;
+    stayText = remDays > 0 ? `${weeks} wk${weeks > 1 ? "s" : ""} ${remDays}d` : `${weeks} week${weeks > 1 ? "s" : ""}`;
+  } else if (diffDays < 365) {
+    const months = Math.floor(diffDays / 30);
+    stayText = `${months} month${months > 1 ? "s" : ""}`;
+  } else {
+    const years = Math.floor(diffDays / 365);
+    const remMonths = Math.floor((diffDays % 365) / 30);
+    stayText = remMonths > 0 ? `${years} yr${years > 1 ? "s" : ""} ${remMonths} mo` : `${years} year${years > 1 ? "s" : ""}`;
+  }
+
+  if (isOnNotice && expectedMoveOutDate) {
+    const vacate = new Date(expectedMoveOutDate);
+    const daysLeft = Math.ceil((vacate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysLeft > 0) {
+      return {
+        label: "On Notice",
+        text: `${stayText} (Leaving in ${daysLeft} days)`,
+        isPast: false,
+      };
+    } else {
+      return {
+        label: "Notice Expired",
+        text: `${stayText} (Vacate was due ${formatDateText(vacate)})`,
+        isPast: true,
+      };
+    }
+  }
+
+  return { label: "Staying Since", text: stayText, isPast: false };
+}
+
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] sm:gap-4 border-b border-border/60 py-2.5 last:border-0">
+    <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] sm:gap-4 border-b border-border/60 py-2.5 last:border-0 items-center">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      <span className="text-xs font-medium text-foreground sm:text-right break-words">{value || "—"}</span>
+      <span className="text-xs font-medium text-foreground sm:text-right break-words">{value ?? "—"}</span>
+    </div>
+  );
+}
+
+function EditField({
+  label,
+  children,
+  className = "",
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`space-y-1 py-1.5 border-b border-border/40 last:border-0 ${className}`}>
+      <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
+      {children}
     </div>
   );
 }
@@ -205,8 +361,9 @@ export default function TenantDetailPage() {
     }
   };
 
-  // Dialog States
+  // Edit state (Inline edit directly on the page, no modal)
   const [editing, setEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [activityDrawerOpen, setActivityDrawerOpen] = useState(false);
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [noticeForm, setNoticeForm] = useState({
@@ -235,27 +392,49 @@ export default function TenantDetailPage() {
     houseRules: "1. No loud music after 10 PM.\n2. Guests allowed until 8 PM.\n3. Keep common areas clean.",
   });
 
-  // Edit Profile form
+  // Edit Profile form matching RentOk comprehensive fields
   const [form, setForm] = useState({
+    // Renting Details
     name: "",
+    monthlyRent: "",
+    securityDeposit: "",
+    rentDueDate: "1",
+    rentalFrequency: "Monthly",
+    stayType: "Long Stay",
+    lockinPeriodMonths: "0",
+    noticePeriodDays: "30",
+    agreementPeriodMonths: "0",
+    joiningDate: "",
+    expectedMoveOutDate: "",
+    referredBy: "",
+    bookedBy: "",
+    checkinTime: "",
+    checkoutTime: "",
+    lastMeterReading: "",
+    lastReadingDate: "",
+    rentingType: "Bed",
+    collectOnlinePayments: true,
+    gstApplicable: false,
+    gstPercentage: "18",
+
+    // Personal Details
     mobileNumber: "",
-    emergencyContact: "",
-    workAddress: "",
-    email: "",
-    remarks: "",
     alternatePhone: "",
-    foodPreference: "",
+    email: "",
     dob: "",
     gender: "",
+    tenantType: "Student",
     bloodGroup: "",
-    currentAddress: "",
     permanentAddress: "",
-    nationality: "",
-    gstNumber: "",
-    panNumber: "",
-    companyName: "",
-    companyAddress: "",
-    businessOwnerName: "",
+    currentAddress: "",
+    nationality: "Indian",
+    govtIdNumber: "",
+    foodPreference: "",
+    remarks: "",
+    emergencyContact: "",
+    workAddress: "",
+
+    // Guardian Details
     fatherName: "",
     fatherPhone: "",
     fatherOccupation: "",
@@ -265,6 +444,16 @@ export default function TenantDetailPage() {
     guardianName: "",
     guardianPhone: "",
     guardianAddress: "",
+
+    // GST Details
+    gstNumber: "",
+    panNumber: "",
+    companyName: "",
+    companyAddress: "",
+    businessOwnerName: "",
+
+    // Bank Details
+    accountHolderName: "",
     accountNumber: "",
     ifscCode: "",
     upiId: "",
@@ -272,38 +461,98 @@ export default function TenantDetailPage() {
 
   useEffect(() => {
     if (tenant) {
+      const rt = (tenant as any).roomTenant || (tenant as any).currentStay || {};
       setForm({
+        // Renting Details
         name: tenant.name ?? "",
+        monthlyRent: String(tenant.monthlyRent ?? rt.rentAmount ?? (tenant as any).rentAmount ?? ""),
+        securityDeposit: String(tenant.securityDeposit ?? rt.securityDeposit ?? ""),
+        rentDueDate: String(tenant.rentDueDate ?? rt.rentDueDate ?? (tenant as any).rentDueDate ?? "1"),
+        rentalFrequency: rt.rentalFrequency ?? (tenant as any).rentalFrequency ?? "Monthly",
+        stayType: rt.stayType ?? (tenant as any).stayType ?? "Long Stay",
+        lockinPeriodMonths: String(rt.lockinPeriodMonths ?? (tenant as any).lockinPeriodMonths ?? "0"),
+        noticePeriodDays: String(rt.noticePeriodDays ?? (tenant as any).noticePeriodDays ?? "30"),
+        agreementPeriodMonths: String(rt.agreementPeriodMonths ?? (tenant as any).agreementPeriodMonths ?? "0"),
+        joiningDate: safeDateInputString(
+          tenant.joiningDate ||
+          tenant.moveInDate ||
+          rt.startDate ||
+          (tenant as any).startDate ||
+          (tenant as any).moveInDate
+        ),
+        expectedMoveOutDate: safeDateInputString(
+          tenant.expectedMoveOutDate ||
+          rt.vacateOn ||
+          (tenant as any).notice?.vacateOn
+        ),
+        referredBy: rt.referredBy ?? (tenant as any).referredBy ?? "",
+        bookedBy: rt.bookedBy ?? (tenant as any).bookedBy ?? "",
+        checkinTime: rt.checkinTime ?? (tenant as any).checkinTime ?? "",
+        checkoutTime: rt.checkoutTime ?? (tenant as any).checkoutTime ?? "",
+        lastMeterReading: String(rt.lastMeterReading ?? (tenant as any).lastMeterReading ?? ""),
+        lastReadingDate: rt.lastReadingDate ? new Date(rt.lastReadingDate).toISOString().split("T")[0] : (tenant as any).lastReadingDate ? new Date((tenant as any).lastReadingDate).toISOString().split("T")[0] : "",
+        rentingType: rt.rentingType ?? (tenant as any).rentingType ?? "Bed",
+        collectOnlinePayments: rt.collectOnlinePayments !== undefined ? Boolean(rt.collectOnlinePayments) : true,
+        gstApplicable: rt.gstApplicable !== undefined ? Boolean(rt.gstApplicable) : false,
+        gstPercentage: String(rt.gstPercentage ?? (tenant as any).gstPercentage ?? "18"),
+
+        // Personal Details
+        email: tenant.email ?? "",
         mobileNumber: tenant.mobileNumber ?? tenant.phone ?? "",
+        alternatePhone: (tenant as any).alternatePhone ?? (tenant as any).alternateNumber ?? "",
+        dob: safeDateInputString(
+          (tenant as any).personalDetails?.dob ||
+          (tenant as any).tenant?.personalDetails?.dob ||
+          (tenant as any).dob ||
+          (tenant as any).tenant?.dob ||
+          (tenant as any).dateOfBirth ||
+          (tenant as any).tenant?.dateOfBirth ||
+          (tenant as any).kycInfo?.dob ||
+          (tenant as any).kyc?.dob
+        ),
+        gender: (tenant as any).gender ?? (tenant as any).personalDetails?.gender ?? (tenant as any).tenant?.gender ?? "",
+        tenantType: (tenant as any).tenantType ?? (tenant as any).personalDetails?.tenantType ?? (tenant as any).tenant?.tenantType ?? "Student",
+        bloodGroup: (tenant as any).bloodGroup ?? (tenant as any).personalDetails?.bloodGroup ?? (tenant as any).tenant?.bloodGroup ?? "",
+        permanentAddress:
+          (tenant as any).personalDetails?.permanentAddress ||
+          (tenant as any).tenant?.personalDetails?.permanentAddress ||
+          (tenant as any).permanentAddress ||
+          (tenant as any).tenant?.permanentAddress ||
+          (tenant as any).address ||
+          (tenant as any).tenant?.address ||
+          (tenant as any).personalDetails?.address ||
+          "",
+        currentAddress: (tenant as any).currentAddress ?? "",
+        nationality: (tenant as any).nationality ?? "Indian",
+        govtIdNumber: (tenant as any).govtIdNumber ?? (tenant as any).govtId ?? (tenant as any).aadhaarNumber ?? "",
+        foodPreference: (tenant as any).foodPreference ?? (tenant as any).foodPreferences ?? "",
+        remarks: (tenant as any).remarks ?? "",
         emergencyContact: tenant.emergencyContact ?? "",
         workAddress: tenant.workAddress ?? "",
-        email: tenant.email ?? "",
-        remarks: (tenant as any).remarks ?? "",
-        alternatePhone: (tenant as any).alternatePhone ?? "",
-        foodPreference: (tenant as any).foodPreference ?? "",
-        dob: (tenant as any).dob ?? "",
-        gender: (tenant as any).gender ?? "",
-        bloodGroup: (tenant as any).bloodGroup ?? "",
-        currentAddress: (tenant as any).currentAddress ?? "",
-        permanentAddress: (tenant as any).permanentAddress ?? "",
-        nationality: (tenant as any).nationality ?? "",
-        gstNumber: (tenant as any).gstNumber ?? "",
+
+        // GST Details
+        gstNumber: (tenant as any).gstNumber ?? (tenant as any).gstin ?? "",
         panNumber: (tenant as any).panNumber ?? "",
         companyName: (tenant as any).companyName ?? "",
         companyAddress: (tenant as any).companyAddress ?? "",
         businessOwnerName: (tenant as any).businessOwnerName ?? "",
+
+        // Guardian Details
         fatherName: (tenant as any).fatherName ?? "",
-        fatherPhone: (tenant as any).fatherPhone ?? "",
+        fatherPhone: (tenant as any).fatherPhone ?? (tenant as any).fatherContact ?? "",
         fatherOccupation: (tenant as any).fatherOccupation ?? "",
         motherName: (tenant as any).motherName ?? "",
-        motherPhone: (tenant as any).motherPhone ?? "",
+        motherPhone: (tenant as any).motherPhone ?? (tenant as any).motherContact ?? "",
         motherOccupation: (tenant as any).motherOccupation ?? "",
         guardianName: (tenant as any).guardianName ?? "",
-        guardianPhone: (tenant as any).guardianPhone ?? "",
-        guardianAddress: (tenant as any).guardianAddress ?? "",
-        accountNumber: (tenant as any).accountNumber ?? "",
-        ifscCode: (tenant as any).ifscCode ?? "",
-        upiId: (tenant as any).upiId ?? "",
+        guardianPhone: (tenant as any).guardianPhone ?? (tenant as any).guardianContact ?? "",
+        guardianAddress: (tenant as any).guardianAddress ?? (tenant as any).localGuardianAddress ?? "",
+
+        // Bank Details
+        accountHolderName: (tenant as any).accountHolderName ?? (tenant as any).bankAccountHolderName ?? tenant.name ?? "",
+        accountNumber: (tenant as any).accountNumber ?? (tenant as any).bankAccountNumber ?? "",
+        ifscCode: (tenant as any).ifscCode ?? (tenant as any).bankIfscCode ?? "",
+        upiId: (tenant as any).upiId ?? (tenant as any).bankUpiId ?? "",
       });
       if (tenant.monthlyRent) {
         setAgreementForm((prev) => ({
@@ -339,11 +588,65 @@ export default function TenantDetailPage() {
   const name = tenantDisplayName(tenant);
   const initials = tenantInitials(tenant);
   const photo = (tenant as any)?.photoUrl || (tenant as any)?.imageUrl || (tenant as any)?.profilePhotoUrl;
-  const roomNo = tenantRoomNo(tenant);
-  const bedNo = tenantBedNo(tenant);
-  const floor = tenantFloor(tenant);
+  const rawRoomNo = tenantRoomNo(tenant);
+  const rawBedNo = tenantBedNo(tenant);
+  const rawFloor = tenantFloor(tenant);
   const rent = tenantRentAmount(tenant);
   const duesLabel = tenantRentDueLabel(tenant);
+
+  const matchingRoomFromList = (targetRooms || []).find(
+    (r: any) =>
+      r.id === tenant.roomId ||
+      r.id === (tenant as any).currentStay?.roomId ||
+      r.id === (tenant as any).roomTenant?.roomId
+  );
+
+  const effectiveRoomNo =
+    rawRoomNo !== "—"
+      ? rawRoomNo
+      : (tenant as any).roomNumber ||
+        (tenant as any).roomNo ||
+        (tenant as any).currentStay?.roomNumber ||
+        (tenant as any).roomTenant?.roomNumber ||
+        (tenant as any).room?.roomNumber ||
+        (tenant as any).room?.name ||
+        matchingRoomFromList?.roomNumber ||
+        "—";
+
+  const effectiveBedNo =
+    rawBedNo !== "—"
+      ? rawBedNo
+      : (tenant as any).bedNumber ||
+        (tenant as any).bedNo ||
+        (tenant as any).currentStay?.bedNumber ||
+        (tenant as any).roomTenant?.bedNumber ||
+        (tenant as any).bed?.bedNumber ||
+        "—";
+
+  const effectiveFloor =
+    rawFloor !== "—"
+      ? rawFloor
+      : (tenant as any).floor?.name ||
+        (tenant as any).floor ||
+        (tenant as any).currentStay?.floor ||
+        (tenant as any).roomTenant?.floor ||
+        (matchingRoomFromList as any)?.floorName ||
+        "—";
+
+  const effectiveBlock =
+    tenantBlock(tenant) !== "—"
+      ? tenantBlock(tenant)
+      : (tenant as any)?.block?.name ||
+        (tenant as any)?.block ||
+        (tenant as any)?.room?.block ||
+        (tenant as any)?.roomTenant?.block ||
+        (tenant as any)?.currentStay?.block ||
+        "Block A";
+
+  const roomNo = effectiveRoomNo;
+  const bedNo = effectiveBedNo;
+  const floor = effectiveFloor;
+  const block = effectiveBlock;
   const isKycDone = Boolean(
     tenant.isKycVerified ||
     (tenant as any).is_kyc_verified ||
@@ -422,48 +725,250 @@ export default function TenantDetailPage() {
   const noticeStartDate = tenant.noticeGivenAt || (tenant as any).notice?.noticeStartedAt || (tenant as any).currentStay?.notice?.noticeStartedAt || "Recently";
   const noticeVacateDate = tenant.expectedMoveOutDate || (tenant as any).notice?.vacateOn || (tenant as any).currentStay?.notice?.vacateOn || (tenant as any).currentStay?.vacateOn;
 
+  const blockName = (tenant as any)?.block?.name || (tenant as any)?.room?.block || (tenant as any)?.roomTenant?.block || "Block A";
+  const currentProperty = (propertyList || []).find((p: any) => p.id === currentPropertyId);
+  const currentPropertyName = currentProperty?.name || (tenant as any)?.property?.name || "PG Ease";
+
+  const stayDuration = getStayDurationText(
+    form.joiningDate || tenant?.joiningDate || tenant?.moveInDate,
+    form.expectedMoveOutDate || tenant?.expectedMoveOutDate,
+    hasActiveNotice,
+    noticeVacateDate
+  );
+
+  const handleCancelEditing = () => {
+    if (tenant) {
+      const rt = (tenant as any).roomTenant || (tenant as any).currentStay || {};
+      setForm({
+        name: tenant.name ?? "",
+        monthlyRent: String(tenant.monthlyRent ?? rt.rentAmount ?? (tenant as any).rentAmount ?? ""),
+        securityDeposit: String(tenant.securityDeposit ?? rt.securityDeposit ?? ""),
+        rentDueDate: String(tenant.rentDueDate ?? rt.rentDueDate ?? (tenant as any).rentDueDate ?? "1"),
+        rentalFrequency: rt.rentalFrequency ?? (tenant as any).rentalFrequency ?? "Monthly",
+        stayType: rt.stayType ?? (tenant as any).stayType ?? "Long Stay",
+        lockinPeriodMonths: String(rt.lockinPeriodMonths ?? (tenant as any).lockinPeriodMonths ?? "0"),
+        noticePeriodDays: String(rt.noticePeriodDays ?? (tenant as any).noticePeriodDays ?? "30"),
+        agreementPeriodMonths: String(rt.agreementPeriodMonths ?? (tenant as any).agreementPeriodMonths ?? "0"),
+        joiningDate: safeDateInputString(
+          tenant.joiningDate ||
+          tenant.moveInDate ||
+          rt.startDate ||
+          (tenant as any).startDate ||
+          (tenant as any).moveInDate
+        ),
+        expectedMoveOutDate: safeDateInputString(
+          tenant.expectedMoveOutDate ||
+          rt.vacateOn ||
+          (tenant as any).notice?.vacateOn
+        ),
+        referredBy: rt.referredBy ?? (tenant as any).referredBy ?? "",
+        bookedBy: rt.bookedBy ?? (tenant as any).bookedBy ?? "",
+        checkinTime: rt.checkinTime ?? (tenant as any).checkinTime ?? "",
+        checkoutTime: rt.checkoutTime ?? (tenant as any).checkoutTime ?? "",
+        lastMeterReading: String(rt.lastMeterReading ?? (tenant as any).lastMeterReading ?? ""),
+        lastReadingDate: rt.lastReadingDate ? new Date(rt.lastReadingDate).toISOString().split("T")[0] : "",
+        rentingType: rt.rentingType ?? (tenant as any).rentingType ?? "Bed",
+        collectOnlinePayments: rt.collectOnlinePayments !== undefined ? Boolean(rt.collectOnlinePayments) : true,
+        gstApplicable: rt.gstApplicable !== undefined ? Boolean(rt.gstApplicable) : false,
+        gstPercentage: String(rt.gstPercentage ?? (tenant as any).gstPercentage ?? "18"),
+        mobileNumber: tenant.mobileNumber ?? tenant.phone ?? "",
+        alternatePhone: (tenant as any).alternatePhone ?? (tenant as any).alternateNumber ?? "",
+        email: tenant.email ?? "",
+        dob: safeDateInputString(
+          (tenant as any).personalDetails?.dob ||
+          (tenant as any).tenant?.personalDetails?.dob ||
+          (tenant as any).dob ||
+          (tenant as any).tenant?.dob ||
+          (tenant as any).dateOfBirth ||
+          (tenant as any).tenant?.dateOfBirth ||
+          (tenant as any).kycInfo?.dob ||
+          (tenant as any).kyc?.dob
+        ),
+        gender: (tenant as any).gender ?? (tenant as any).personalDetails?.gender ?? (tenant as any).tenant?.gender ?? "",
+        tenantType: (tenant as any).tenantType ?? (tenant as any).personalDetails?.tenantType ?? (tenant as any).tenant?.tenantType ?? "Student",
+        bloodGroup: (tenant as any).bloodGroup ?? (tenant as any).personalDetails?.bloodGroup ?? (tenant as any).tenant?.bloodGroup ?? "",
+        permanentAddress:
+          (tenant as any).personalDetails?.permanentAddress ||
+          (tenant as any).tenant?.personalDetails?.permanentAddress ||
+          (tenant as any).permanentAddress ||
+          (tenant as any).tenant?.permanentAddress ||
+          (tenant as any).address ||
+          (tenant as any).tenant?.address ||
+          (tenant as any).personalDetails?.address ||
+          "",
+        currentAddress: (tenant as any).currentAddress ?? "",
+        nationality: (tenant as any).nationality ?? "Indian",
+        govtIdNumber: (tenant as any).govtIdNumber ?? (tenant as any).govtId ?? (tenant as any).aadhaarNumber ?? "",
+        foodPreference: (tenant as any).foodPreference ?? (tenant as any).foodPreferences ?? "",
+        remarks: (tenant as any).remarks ?? "",
+        emergencyContact: tenant.emergencyContact ?? "",
+        workAddress: tenant.workAddress ?? "",
+        gstNumber: (tenant as any).gstNumber ?? "",
+        panNumber: (tenant as any).panNumber ?? "",
+        companyName: (tenant as any).companyName ?? "",
+        companyAddress: (tenant as any).companyAddress ?? "",
+        businessOwnerName: (tenant as any).businessOwnerName ?? "",
+        fatherName: (tenant as any).fatherName ?? "",
+        fatherPhone: (tenant as any).fatherPhone ?? (tenant as any).fatherContact ?? "",
+        fatherOccupation: (tenant as any).fatherOccupation ?? "",
+        motherName: (tenant as any).motherName ?? "",
+        motherPhone: (tenant as any).motherPhone ?? (tenant as any).motherContact ?? "",
+        motherOccupation: (tenant as any).motherOccupation ?? "",
+        guardianName: (tenant as any).guardianName ?? "",
+        guardianPhone: (tenant as any).guardianPhone ?? (tenant as any).guardianContact ?? "",
+        guardianAddress: (tenant as any).guardianAddress ?? "",
+        accountHolderName: (tenant as any).accountHolderName ?? "",
+        accountNumber: (tenant as any).accountNumber ?? "",
+        ifscCode: (tenant as any).ifscCode ?? "",
+        upiId: (tenant as any).upiId ?? "",
+      });
+    }
+    setEditing(false);
+  };
+
   const handleSaveProfile = async () => {
     if (!currentPropertyId || !tenantId) return;
+    setIsSaving(true);
+    const rt = (tenant as any)?.roomTenant || (tenant as any)?.currentStay || {};
+    const matchingRoom = (targetRooms || []).find(
+      (r: any) =>
+        r.id === tenant.roomId ||
+        r.id === rt.roomId ||
+        (roomNo && String(r.roomNumber) === String(roomNo)) ||
+        (tenant.roomNumber && String(r.roomNumber) === String(tenant.roomNumber))
+    );
+    const resolvedRoomId =
+      tenant.roomId ||
+      rt.roomId ||
+      (tenant as any).room?.id ||
+      matchingRoom?.id ||
+      (targetRooms && targetRooms.length > 0 ? targetRooms[0].id : "");
+
+    const resolvedBedNumber = Number(
+      bedNo ||
+      tenant.bedNo ||
+      tenant.bedNumber ||
+      rt.bedNumber ||
+      (tenant as any).bed?.bedNumber ||
+      1
+    );
+
+    const resolvedElectricityBill = Number(
+      (tenant as any).electricityBill ||
+      rt.electricityBill ||
+      (tenant as any).room?.electricityBill ||
+      matchingRoom?.electricityBill ||
+      0
+    );
+
+    const resolvedJoiningDate =
+      form.joiningDate ||
+      tenant.joiningDate ||
+      tenant.moveInDate ||
+      rt.startDate ||
+      (tenant as any).startDate ||
+      new Date().toISOString().split("T")[0];
+
+    if (!resolvedRoomId) {
+      toast({
+        title: "Room information missing",
+        description: "Could not identify tenant's assigned room. Please verify room allocation.",
+        variant: "destructive",
+      });
+      setIsSaving(false);
+      return;
+    }
+
     try {
-      await updatePropertyTenant(currentPropertyId, tenantId, {
-        name: form.name.trim(),
-        phone: form.mobileNumber.trim(),
+      await updatePropertyTenant(currentPropertyId, roomTenantId || tenantId, {
+        // Required fields by backend AddTenantDto
+        name: form.name.trim() || tenant.name || "",
+        phone: form.mobileNumber.trim() || tenant.phone || "",
+        roomId: resolvedRoomId,
+        bedNumber: resolvedBedNumber,
+        rentDueDate: form.rentDueDate ? Number(form.rentDueDate) : Number(tenant.rentDueDate || rt.rentDueDate || 1),
+        monthlyRent: form.monthlyRent ? Number(form.monthlyRent) : Number(tenant.monthlyRent || rt.rentAmount || 0),
+        joiningDate: resolvedJoiningDate,
+        electricityBill: resolvedElectricityBill,
+        securityDeposit: form.securityDeposit ? Number(form.securityDeposit) : Number(tenant.securityDeposit || rt.securityDeposit || 0),
+
+        // Stay & Agreement Settings
+        rentalFrequency: form.rentalFrequency || undefined,
+        stayType: form.stayType || undefined,
+        lockinPeriodMonths: form.lockinPeriodMonths ? Number(form.lockinPeriodMonths) : 0,
+        noticePeriodDays: form.noticePeriodDays ? Number(form.noticePeriodDays) : 30,
+        agreementPeriodMonths: form.agreementPeriodMonths ? Number(form.agreementPeriodMonths) : 0,
+        referredBy: form.referredBy.trim() || undefined,
+        bookedBy: form.bookedBy.trim() || undefined,
+        checkinTime: form.checkinTime.trim() || undefined,
+        checkoutTime: form.checkoutTime.trim() || undefined,
+        rentingType: form.rentingType || undefined,
+        collectOnlinePayments: Boolean(form.collectOnlinePayments),
+        gstApplicable: Boolean(form.gstApplicable),
+        gstPercentage: form.gstApplicable && form.gstPercentage ? Number(form.gstPercentage) : undefined,
+        lastMeterReading: form.lastMeterReading.trim() || undefined,
+        lastReadingDate: form.lastReadingDate || undefined,
+
+        // Personal Details (Whitelisted property names)
         email: form.email.trim() || undefined,
         remarks: form.remarks.trim() || undefined,
         alternatePhone: form.alternatePhone.trim() || undefined,
-        foodPreference: form.foodPreference.trim() || undefined,
+        alternateNumber: form.alternatePhone.trim() || undefined,
+        foodPreferences: form.foodPreference.trim() || undefined,
         dob: form.dob || undefined,
         gender: form.gender || undefined,
+        tenantType: form.tenantType || undefined,
         bloodGroup: form.bloodGroup.trim() || undefined,
         currentAddress: form.currentAddress.trim() || undefined,
         permanentAddress: form.permanentAddress.trim() || undefined,
+        address: form.permanentAddress.trim() || undefined,
         nationality: form.nationality.trim() || undefined,
+        govtIdNumber: form.govtIdNumber.trim() || undefined,
+        officeOrCollegeName: form.workAddress.trim() || undefined,
+
+        // GST Details
         gstNumber: form.gstNumber.trim() || undefined,
+        gstin: form.gstNumber.trim() || undefined,
         panNumber: form.panNumber.trim() || undefined,
         companyName: form.companyName.trim() || undefined,
         companyAddress: form.companyAddress.trim() || undefined,
         businessOwnerName: form.businessOwnerName.trim() || undefined,
+
+        // Guardian Details
         fatherName: form.fatherName.trim() || undefined,
         fatherPhone: form.fatherPhone.trim() || undefined,
+        fatherContact: form.fatherPhone.trim() || undefined,
         fatherOccupation: form.fatherOccupation.trim() || undefined,
         motherName: form.motherName.trim() || undefined,
         motherPhone: form.motherPhone.trim() || undefined,
+        motherContact: form.motherPhone.trim() || undefined,
         motherOccupation: form.motherOccupation.trim() || undefined,
         guardianName: form.guardianName.trim() || undefined,
         guardianPhone: form.guardianPhone.trim() || undefined,
+        guardianContact: form.guardianPhone.trim() || undefined,
         guardianAddress: form.guardianAddress.trim() || undefined,
-        accountNumber: form.accountNumber.trim() || undefined,
-        ifscCode: form.ifscCode.trim() || undefined,
-        upiId: form.upiId.trim() || undefined,
-        emergencyContact: form.emergencyContact.trim() || undefined,
-        workAddress: form.workAddress.trim() || undefined,
+        localGuardianAddress: form.guardianAddress.trim() || undefined,
+
+        // Bank Details
+        bankAccountHolderName: form.accountHolderName.trim() || undefined,
+        bankAccountNumber: form.accountNumber.trim() || undefined,
+        bankIfscCode: form.ifscCode.trim() || undefined,
+        bankUpiId: form.upiId.trim() || undefined,
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.tenants(currentPropertyId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.tenantDetail(currentPropertyId, tenantId) });
-      toast({ title: "Profile updated successfully" });
+      toast({ title: "Profile updated successfully! 🎉" });
       setEditing(false);
     } catch (e: any) {
-      toast({ title: "Update failed", description: e?.message, variant: "destructive" });
+      const errMsg =
+        Array.isArray(e?.response?.data?.message)
+          ? e.response.data.message.join(", ")
+          : Array.isArray(e?.message)
+          ? e.message.join(", ")
+          : e?.message || "Could not save details";
+      toast({ title: "Update failed", description: errMsg, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -653,6 +1158,38 @@ export default function TenantDetailPage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {editing ? (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCancelEditing}
+                  disabled={isSaving}
+                  className="h-8 px-3 text-xs font-semibold"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSaveProfile}
+                  disabled={isSaving}
+                  className="h-8 px-3.5 text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white gap-1.5 shadow-sm"
+                >
+                  {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                  Save Changes
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 border-teal-600 text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-950 font-bold shadow-xs"
+                onClick={() => setEditing(true)}
+              >
+                <Pencil className="h-3.5 w-3.5" /> Edit Profile
+              </Button>
+            )}
+
             <Button
               variant="outline"
               size="sm"
@@ -717,279 +1254,1283 @@ export default function TenantDetailPage() {
 
           {/* TAB 1: OVERVIEW */}
           <TabsContent value="overview" className="mt-6 space-y-6">
-            <div className="grid gap-6 grid-cols-1 md:grid-cols-12">
+            <div className="grid gap-6 grid-cols-1 lg:grid-cols-12 items-start">
               
-              {/* Left Column (Details & Collapsibles) - Span 7 */}
-              <div className="md:col-span-7 space-y-4">
+              {/* Left Column (Profile & Renting Summary) - Span 4 */}
+              <div className="lg:col-span-4 space-y-4">
                 
-                {/* Profile header block */}
-                <div className="flex items-center gap-4 p-4 rounded-xl border bg-muted/10">
-                  <Avatar className="h-16 w-16 border-2 border-primary/20 text-lg font-bold">
-                    {photo ? <AvatarImage src={photo} alt={name} className="object-cover" /> : null}
-                    <AvatarFallback className="bg-primary/10 text-primary">{initials}</AvatarFallback>
-                  </Avatar>
-                  <div className="space-y-1 min-w-0">
-                    <h2 className="text-xl font-bold text-foreground truncate">{name}</h2>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {isKycDone ? (
-                        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] py-0.5 px-2 font-medium">
-                          Aadhaar Verified ✓
+                {/* Profile Card */}
+                <Card className="border border-border/80 shadow-xs rounded-2xl overflow-hidden bg-card">
+                  <CardContent className="p-5 flex flex-col items-center text-center space-y-3">
+                    <div className="relative">
+                      <Avatar className="h-20 w-20 border-2 border-teal-500/30 text-xl font-bold shadow-xs">
+                        {photo ? <AvatarImage src={photo} alt={name} className="object-cover" /> : null}
+                        <AvatarFallback className="bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300">
+                          {initials}
+                        </AvatarFallback>
+                      </Avatar>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-center gap-2">
+                        <h2 className="text-lg font-bold text-foreground">{name}</h2>
+                        <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[10px] px-2 py-0.5 border-emerald-300 font-semibold">
+                          Active
                         </Badge>
-                      ) : isKycRequested ? (
-                        <div className="flex items-center gap-1.5">
-                          <Badge className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] py-0.5 px-2 font-medium">
-                            KYC Requested ⏳
-                          </Badge>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 px-1.5 text-[10px] text-teal-600 hover:text-teal-700 hover:bg-teal-50"
-                            onClick={handleRequestKyc}
-                            disabled={requestKycMut.isPending}
-                          >
-                            {requestKycMut.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Resend Link"}
-                          </Button>
-                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground font-medium">{phone || "No mobile number"}</p>
+                    </div>
+
+                    {/* Quick Action Buttons: Call, WhatsApp, Move Room */}
+                    <div className="grid grid-cols-3 gap-2 w-full pt-1">
+                      {phone ? (
+                        <a
+                          href={`tel:${phone}`}
+                          className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors text-xs font-semibold text-foreground"
+                        >
+                          <Phone className="h-4 w-4 text-teal-600" />
+                          <span>Call</span>
+                        </a>
                       ) : (
-                        <div className="flex items-center gap-2">
-                          <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] py-0.5 px-2 font-medium">
-                            Aadhar Pending
+                        <div className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl border border-border/60 bg-muted/10 opacity-50 text-xs font-semibold">
+                          <Phone className="h-4 w-4 text-muted-foreground" />
+                          <span>Call</span>
+                        </div>
+                      )}
+
+                      {phone ? (
+                        <a
+                          href={`https://wa.me/${phoneDigits(phone)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors text-xs font-semibold text-foreground"
+                        >
+                          <MessageCircle className="h-4 w-4 text-emerald-600" />
+                          <span>WhatsApp</span>
+                        </a>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl border border-border/60 bg-muted/10 opacity-50 text-xs font-semibold">
+                          <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                          <span>WhatsApp</span>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!subAccess.canPerformOperations) {
+                            setGateFeature("Tenant Relocation");
+                            setGateModalOpen(true);
+                          } else {
+                            setMoveModalOpen(true);
+                          }
+                        }}
+                        className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors text-xs font-semibold text-foreground"
+                      >
+                        <ArrowRightLeft className="h-4 w-4 text-blue-600" />
+                        <span>Move</span>
+                      </button>
+                    </div>
+
+                    {/* Room allocation pill */}
+                    <div className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-muted/30 border text-xs font-semibold text-muted-foreground">
+                      <span>Room : <strong className="text-foreground">{effectiveRoomNo !== "—" ? `Room ${effectiveRoomNo}` : "—"} {effectiveBedNo !== "—" ? `- Bed ${effectiveBedNo}` : ""}</strong></span>
+                      <button
+                        type="button"
+                        onClick={() => setEditing(true)}
+                        className="text-blue-600 hover:text-blue-700"
+                        title="Edit Details"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Aadhaar KYC Card with FIXED Non-Cramped UI */}
+                    <div className="w-full p-3.5 rounded-xl border bg-muted/15 text-left space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Aadhaar KYC</span>
+                        {isKycDone ? (
+                          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 text-[10px] font-semibold">
+                            Verified ✓
                           </Badge>
+                        ) : isKycRequested ? (
+                          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border-blue-300 text-[10px] font-semibold">
+                            Dispatched ⏳
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-300 text-[10px] font-semibold">
+                            Pending
+                          </Badge>
+                        )}
+                      </div>
+
+                      {isKycDone ? (
+                        <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-1.5">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" /> Verified via DigiLocker e-KYC
+                        </p>
+                      ) : isKycRequested ? (
+                        <div className="space-y-2 pt-1">
+                          <p className="text-[11px] text-muted-foreground">
+                            Verification link was dispatched via WhatsApp. Click below if you need to resend it.
+                          </p>
                           <Button
                             size="sm"
-                            className="h-6 px-2 text-[10px] bg-teal-600 hover:bg-teal-700 text-white gap-1 rounded-full shadow-xs"
+                            variant="outline"
+                            className="w-full h-8 text-xs font-bold text-blue-700 hover:text-blue-800 bg-white dark:bg-slate-900 border-blue-300 rounded-lg shadow-2xs gap-1.5"
                             onClick={handleRequestKyc}
                             disabled={requestKycMut.isPending}
                           >
                             {requestKycMut.isPending ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             ) : (
-                              <ShieldCheck className="h-3 w-3" />
+                              <Send className="h-3.5 w-3.5 text-blue-600" />
                             )}
-                            Request KYC
+                            Resend WhatsApp KYC Link
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="pt-1">
+                          <Button
+                            size="sm"
+                            className="w-full h-8 text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white rounded-lg shadow-xs gap-1.5"
+                            onClick={handleRequestKyc}
+                            disabled={requestKycMut.isPending}
+                          >
+                            {requestKycMut.isPending ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <ShieldCheck className="h-3.5 w-3.5" />
+                            )}
+                            Send WhatsApp KYC Link
                           </Button>
                         </div>
                       )}
-                      <span className="text-[10px] text-muted-foreground">Joined at : {tenant.moveInDate ? new Date(tenant.moveInDate).toLocaleDateString("en-IN") : "—"}</span>
                     </div>
-                  </div>
-                </div>
 
-                {/* Tenant Details Card (Rent & Deposit) */}
-                <Card className="border-border/60 shadow-sm overflow-hidden">
-                  <CardHeader className="pb-3 border-b bg-muted/15 flex flex-row items-center gap-2">
-                    <Building2 className="h-4.5 w-4.5 text-primary" />
-                    <CardTitle className="text-sm font-bold">Rent & Deposit</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-4 grid grid-cols-2 gap-4">
-                    <div>
-                      <span className="text-xs text-muted-foreground block">block name</span>
-                      <span className="font-semibold text-sm text-foreground">{(tenant as any).block?.name || "Block A"}</span>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground block">Floor no</span>
-                      <span className="font-semibold text-sm text-foreground">{(tenant as any).floor?.name || floor || "—"}</span>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground block">Room No.</span>
-                      <span className="font-semibold text-sm text-foreground">{roomNo || "—"}</span>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground block">Bed No</span>
-                      <span className="font-semibold text-sm text-foreground">{bedNo || "—"}</span>
-                    </div>
-                    <div className="col-span-2">
-                      <span className="text-xs text-muted-foreground block">Bed Sharing</span>
-                      <span className="font-semibold text-sm text-foreground">{(tenant as any).room?.capacity ? `${(tenant as any).room.capacity} Bed Sharing` : "2 Bed Sharing"}</span>
+                    {/* RENTING SUMMARY CARD (EXACT RENTOK MATCH) */}
+                    <div className="w-full p-4 rounded-xl border bg-card text-left space-y-2.5 shadow-2xs">
+                      <div className="flex items-center justify-between border-b pb-2">
+                        <span className="text-xs font-bold text-foreground">Renting Summary</span>
+                        <button
+                          type="button"
+                          onClick={() => setEditing(true)}
+                          className="text-blue-600 hover:text-blue-700"
+                          title="Edit Renting Details"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                      </div>
+                      <div className="space-y-1.5 text-xs">
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Date Of Joining</span>
+                          <span className="font-semibold text-foreground">
+                            {formatDateText(form.joiningDate || tenant.joiningDate || tenant.moveInDate)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Move Out Date</span>
+                          <span className="font-semibold text-foreground">
+                            {formatDateText(form.expectedMoveOutDate || tenant.expectedMoveOutDate)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">{stayDuration.label}</span>
+                          <span className="font-bold text-teal-700 dark:text-teal-400">
+                            {stayDuration.text}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Rent Amount</span>
+                          <span className="font-bold text-foreground">
+                            {form.monthlyRent || tenant.monthlyRent
+                              ? `₹${Number(form.monthlyRent || tenant.monthlyRent).toLocaleString("en-IN")}`
+                              : "—"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Add Rent On</span>
+                          <span className="font-semibold text-foreground">
+                            {form.rentDueDate || tenant.rentDueDate
+                              ? `${form.rentDueDate || tenant.rentDueDate}st of every month`
+                              : "1st of every month"}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Collapsible Personal Info */}
-                <details className="group border rounded-lg bg-card overflow-hidden">
-                  <summary className="flex justify-between items-center p-4 font-semibold text-sm cursor-pointer hover:bg-muted/30 select-none">
-                    <div className="flex items-center gap-2">
-                      <ClipboardList className="h-4 w-4 text-primary" />
-                      <span>Personal info</span>
-                    </div>
-                    <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180 text-muted-foreground" />
-                  </summary>
-                  <div className="p-4 border-t bg-muted/10">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                      <DetailRow label="Tenant Type" value={(tenant as any).tenantType || "—"} />
-                      <DetailRow label="Gender" value={(tenant as any).gender || "—"} />
-                      <DetailRow label="Date Of Birth" value={(tenant as any).dob ? new Date((tenant as any).dob).toLocaleDateString("en-GB") : "—"} />
-                      <DetailRow label="Blood Group" value={(tenant as any).bloodGroup || "—"} />
-                      <DetailRow label="Nationality" value={(tenant as any).nationality || "Indian"} />
-                      <DetailRow label="Check-in / Out Time" value={`${(tenant as any).checkinTime || "12:00 PM"} / ${(tenant as any).checkoutTime || "11:00 AM"}`} />
-                      <DetailRow label="Food Preference" value={(tenant as any).foodPreference || (tenant as any).foodPreferences || "—"} />
-                      <DetailRow label="Remarks" value={(tenant as any).remarks || "—"} />
-                      <DetailRow label="Current Address" value={(tenant as any).currentAddress || "—"} />
-                    </div>
-                  </div>
-                </details>
-
-                {/* Collapsible Contact Info */}
-                <details className="group border rounded-lg bg-card overflow-hidden">
-                  <summary className="flex justify-between items-center p-4 font-semibold text-sm cursor-pointer hover:bg-muted/30 select-none">
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-primary" />
-                      <span>Contact info</span>
-                    </div>
-                    <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180 text-muted-foreground" />
-                  </summary>
-                  <div className="p-4 border-t bg-muted/10">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                      <DetailRow label="Contact Number" value={phone} />
-                      <DetailRow label="Alternate Number" value={(tenant as any).alternatePhone || "—"} />
-                      <DetailRow label="Email" value={tenant.email || "—"} />
-                      <DetailRow label="Emergency Contact" value={tenant.emergencyContact || "—"} />
-                      <DetailRow label="Permanent Address" value={(tenant as any).permanentAddress || "—"} />
-                    </div>
-                  </div>
-                </details>
-
-                {/* Collapsible GST Details */}
-                <details className="group border rounded-lg bg-card overflow-hidden">
-                  <summary className="flex justify-between items-center p-4 font-semibold text-sm cursor-pointer hover:bg-muted/30 select-none">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-primary" />
-                      <span>GST details</span>
-                    </div>
-                    <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180 text-muted-foreground" />
-                  </summary>
-                  <div className="p-4 border-t bg-muted/10">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                      <DetailRow label="GST Number" value={(tenant as any).gstNumber || "—"} />
-                      <DetailRow label="PAN Number" value={(tenant as any).panNumber || "—"} />
-                      <DetailRow label="Company Name" value={(tenant as any).companyName || "—"} />
-                      <DetailRow label="Business Owner Name" value={(tenant as any).businessOwnerName || "—"} />
-                      <DetailRow label="Company Address" value={(tenant as any).companyAddress || "—"} />
-                    </div>
-                  </div>
-                </details>
-
-                {/* Collapsible Parent Details */}
-                <details className="group border rounded-lg bg-card overflow-hidden">
-                  <summary className="flex justify-between items-center p-4 font-semibold text-sm cursor-pointer hover:bg-muted/30 select-none">
-                    <div className="flex items-center gap-2">
-                      <ClipboardList className="h-4 w-4 text-primary" />
-                      <span>Parent & Guardian details</span>
-                    </div>
-                    <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180 text-muted-foreground" />
-                  </summary>
-                  <div className="p-4 border-t bg-muted/10">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                      <DetailRow label="Father Name" value={(tenant as any).fatherName || "—"} />
-                      <DetailRow label="Father Contact" value={(tenant as any).fatherPhone || "—"} />
-                      <DetailRow label="Father Occupation" value={(tenant as any).fatherOccupation || "—"} />
-                      <DetailRow label="Mother Name" value={(tenant as any).motherName || "—"} />
-                      <DetailRow label="Mother Contact" value={(tenant as any).motherPhone || "—"} />
-                      <DetailRow label="Mother Occupation" value={(tenant as any).motherOccupation || "—"} />
-                      <DetailRow label="Local Guardian Name" value={(tenant as any).guardianName || "—"} />
-                      <DetailRow label="Local Guardian Phone" value={(tenant as any).guardianPhone || "—"} />
-                      <DetailRow label="Local Guardian Address" value={(tenant as any).guardianAddress || "—"} />
-                    </div>
-                  </div>
-                </details>
-
-                {/* Collapsible Bank Details */}
-                <details className="group border rounded-lg bg-card overflow-hidden">
-                  <summary className="flex justify-between items-center p-4 font-semibold text-sm cursor-pointer hover:bg-muted/30 select-none">
-                    <div className="flex items-center gap-2">
-                      <Lock className="h-4 w-4 text-primary" />
-                      <span>Bank details</span>
-                    </div>
-                    <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180 text-muted-foreground" />
-                  </summary>
-                  <div className="p-4 border-t bg-muted/10">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                      <DetailRow label="Account Holder Name" value={(tenant as any).accountHolderName || (tenant as any).bankAccountHolderName || name || "—"} />
-                      <DetailRow label="Account Number" value={(tenant as any).accountNumber || "—"} />
-                      <DetailRow label="IFSC Code" value={(tenant as any).ifscCode || "—"} />
-                      <DetailRow label="UPI ID" value={(tenant as any).upiId || "—"} />
-                    </div>
-                  </div>
-                </details>
-
-                {/* Profile Action Bar matching RentOK Screenshot 2 */}
-                <div className="flex items-center gap-2 p-3 rounded-2xl bg-card border border-border/80 shadow-xs">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 rounded-xl text-xs font-semibold gap-1.5"
-                    onClick={() =>
-                      toast({
-                        title: "Upload Documents",
-                        description: "Select KYC, Rental Agreement, or Police verification file to upload.",
-                      })
-                    }
-                  >
-                    <FileText className="h-3.5 w-3.5 text-teal-600" /> Add Docs
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 rounded-xl text-xs font-semibold gap-1.5"
-                    onClick={() => setEditing(true)}
-                  >
-                    <Pencil className="h-3.5 w-3.5 text-blue-600" /> Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="flex-1 rounded-xl text-xs font-bold gap-1.5 bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
-                    onClick={() => setActivityDrawerOpen(true)}
-                  >
-                    <Clock className="h-3.5 w-3.5" /> Activity Log
-                  </Button>
-                </div>
-              </div>
-
-              {/* Right Column (Rent info & Payments) - Span 5 */}
-              <div className="md:col-span-5 space-y-4">
-                
-                {/* Rent info Card */}
+                {/* Next Rent Cycle & Dues Card */}
                 <Card className="border-border/60 shadow-sm overflow-hidden">
-                  <CardHeader className="pb-3 border-b bg-muted/15 flex flex-row items-center gap-2">
-                    <IndianRupee className="h-4.5 w-4.5 text-primary" />
-                    <CardTitle className="text-sm font-bold">Rent info</CardTitle>
+                  <CardHeader className="pb-3 border-b bg-muted/15 flex flex-row items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <IndianRupee className="h-4 w-4 text-primary" />
+                      <CardTitle className="text-xs font-bold uppercase tracking-wider">Next Rent Cycle</CardTitle>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-2 text-xs text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+                      onClick={() => {
+                        setPaymentForm((p) => ({
+                          ...p,
+                          amountPaid: Number(form.monthlyRent || tenant.monthlyRent || rent || 0),
+                        }));
+                        setRecordPaymentOpen(true);
+                      }}
+                    >
+                      + Record
+                    </Button>
                   </CardHeader>
-                  <CardContent className="p-4 space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <span className="text-xs text-muted-foreground block">Deposit amount</span>
-                        <span className="font-bold text-sm text-foreground">
-                          {tenant.securityDeposit ? `₹${Number(tenant.securityDeposit).toLocaleString("en-IN")}` : "—"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-xs text-muted-foreground block">Rent per month</span>
-                        <span className="font-bold text-sm text-foreground">
-                          {tenant.monthlyRent ? `₹${Number(tenant.monthlyRent).toLocaleString("en-IN")}/mo` : "—"}
-                        </span>
-                      </div>
-                      <div className="col-span-2 border-t pt-2">
-                        <span className="text-xs text-muted-foreground block">Next Rent due date</span>
-                        <span className="font-semibold text-sm text-foreground">{duesLabel}</span>
-                      </div>
+                  <CardContent className="p-4 space-y-3 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Deposit Held</span>
+                      <span className="font-bold text-foreground">
+                        {form.securityDeposit || tenant.securityDeposit
+                          ? `₹${Number(form.securityDeposit || tenant.securityDeposit).toLocaleString("en-IN")}`
+                          : "—"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Next Due Date</span>
+                      <span className="font-semibold text-foreground">{duesLabel}</span>
                     </div>
                     {phone && (
-                      <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white gap-2" asChild>
+                      <Button className="w-full h-8 text-xs bg-teal-600 hover:bg-teal-700 text-white gap-1.5 rounded-lg shadow-2xs mt-2" asChild>
                         <a
                           href={`https://wa.me/${phoneDigits(phone)}?text=${encodeURIComponent(
-                            `Hi ${name}, this is a friendly reminder that your rent of ₹${tenant.monthlyRent} for room ${roomNo} is due on ${duesLabel}. Please clear it. Thank you!`
+                            `Hi ${name}, this is a friendly reminder that your rent of ₹${form.monthlyRent || tenant.monthlyRent} for room ${roomNo} is due on ${duesLabel}. Please clear it. Thank you!`
                           )}`}
                           target="_blank"
                           rel="noreferrer"
                         >
-                          <MessageCircle className="h-4 w-4" /> Remind to Pay
+                          <MessageCircle className="h-3.5 w-3.5" /> Send Rent Due Reminder
                         </a>
                       </Button>
                     )}
                   </CardContent>
                 </Card>
+              </div>
 
-                {/* Recent Payments Card */}
+              {/* Right Column (All Editable Sections & Payments) - Span 8 */}
+              <div className="lg:col-span-8 space-y-4">
+                
+                {/* STICKY INLINE EDIT MODE BANNER */}
+                {editing && (
+                  <div className="sticky top-2 z-30 flex items-center justify-between p-3.5 rounded-2xl bg-teal-500/10 border border-teal-500/30 backdrop-blur-md shadow-md animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="h-8 w-8 rounded-xl bg-teal-600 text-white flex items-center justify-center shadow-xs">
+                        <Pencil className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-teal-950 dark:text-teal-100">
+                          Inline Edit Mode Active
+                        </h4>
+                        <p className="text-[11px] text-teal-700 dark:text-teal-300">
+                          Edit every field directly on this page below, then click Save.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-3 text-xs font-medium"
+                        onClick={handleCancelEditing}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-8 px-3.5 text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white gap-1.5 shadow-xs"
+                        onClick={handleSaveProfile}
+                        disabled={isSaving}
+                      >
+                        {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                        Save Changes
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* SECTION 1: RENTING DETAILS (MATCHING RENTOK SCREENSHOT) */}
+                <details className="group border rounded-xl bg-card overflow-hidden shadow-xs" open>
+                  <summary className="flex justify-between items-center p-4 font-bold text-sm cursor-pointer hover:bg-muted/30 select-none border-b bg-muted/15">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4.5 w-4.5 text-primary" />
+                      <span>Renting Details</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!editing && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 gap-1"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setEditing(true);
+                          }}
+                        >
+                          <Pencil className="h-3 w-3" /> Edit
+                        </Button>
+                      )}
+                      <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180 text-muted-foreground" />
+                    </div>
+                  </summary>
+
+                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-card">
+                    {/* PG Hierarchy Fields */}
+                    {editing ? (
+                      <EditField label="PG Name">
+                        <Input value={currentPropertyName} disabled className="bg-muted text-xs font-medium" />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="PG Name" value={currentPropertyName} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Block">
+                        <Input value={effectiveBlock} disabled className="bg-muted text-xs font-medium" />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Block" value={effectiveBlock} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Floor">
+                        <Input value={effectiveFloor} disabled className="bg-muted text-xs font-medium" />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Floor" value={effectiveFloor} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Room Number">
+                        <Input value={effectiveRoomNo} disabled className="bg-muted text-xs font-medium" />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Room Number" value={effectiveRoomNo} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Bed Number">
+                        <Input value={effectiveBedNo} disabled className="bg-muted text-xs font-medium" />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Bed Number" value={effectiveBedNo} />
+                    )}
+
+                    {/* Renting Parameters */}
+                    {editing ? (
+                      <EditField label="Full Name">
+                        <Input
+                          value={form.name}
+                          onChange={(e) => setForm({ ...form, name: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="Tenant's full name"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Full Name" value={form.name || name} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Fixed Monthly Rent (₹)">
+                        <Input
+                          type="number"
+                          value={form.monthlyRent}
+                          onChange={(e) => setForm({ ...form, monthlyRent: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="e.g. 12000"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow
+                        label="Fixed Rent"
+                        value={form.monthlyRent ? `₹${Number(form.monthlyRent).toLocaleString("en-IN")}` : "—"}
+                      />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Add Rent On (Cycle Day: 1-31)">
+                        <Input
+                          type="number"
+                          min="1"
+                          max="31"
+                          value={form.rentDueDate}
+                          onChange={(e) => setForm({ ...form, rentDueDate: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="1"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow
+                        label="Add Rent On"
+                        value={`${form.rentDueDate || "1"}st of every cycle`}
+                      />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Rental Frequency">
+                        <select
+                          aria-label="Rental Frequency"
+                          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          value={form.rentalFrequency}
+                          onChange={(e) => setForm({ ...form, rentalFrequency: e.target.value })}
+                        >
+                          <option value="Monthly">Monthly</option>
+                          <option value="Quarterly">Quarterly</option>
+                          <option value="Half-Yearly">Half-Yearly</option>
+                          <option value="Yearly">Yearly</option>
+                        </select>
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Rental Frequency" value={form.rentalFrequency || "Monthly"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Stay Type">
+                        <select
+                          aria-label="Stay Type"
+                          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          value={form.stayType}
+                          onChange={(e) => setForm({ ...form, stayType: e.target.value })}
+                        >
+                          <option value="Long Stay">Long Stay</option>
+                          <option value="Short Stay">Short Stay</option>
+                          <option value="Daily">Daily</option>
+                        </select>
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Stay Type" value={form.stayType || "Long Stay"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Lock-in Period (Months)">
+                        <Input
+                          type="number"
+                          value={form.lockinPeriodMonths}
+                          onChange={(e) => setForm({ ...form, lockinPeriodMonths: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="0"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Lockin Period (Months)" value={form.lockinPeriodMonths || "0"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Security Deposit (₹)">
+                        <Input
+                          type="number"
+                          value={form.securityDeposit}
+                          onChange={(e) => setForm({ ...form, securityDeposit: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="e.g. 15000"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow
+                        label="Security Deposit"
+                        value={form.securityDeposit ? `₹${Number(form.securityDeposit).toLocaleString("en-IN")}` : "—"}
+                      />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Renting Type">
+                        <Input
+                          value={form.rentingType}
+                          onChange={(e) => setForm({ ...form, rentingType: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="Bed / Private Room"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Renting Type" value={form.rentingType || "—"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Date Of Joining / Move-in">
+                        <Input
+                          type="date"
+                          value={form.joiningDate}
+                          onChange={(e) => setForm({ ...form, joiningDate: e.target.value })}
+                          className="h-9 text-xs"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow
+                        label="Date Of Joining"
+                        value={formatDateText(form.joiningDate || tenant.joiningDate || tenant.moveInDate)}
+                      />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Expected Move Out Date">
+                        <Input
+                          type="date"
+                          value={form.expectedMoveOutDate}
+                          onChange={(e) => setForm({ ...form, expectedMoveOutDate: e.target.value })}
+                          className="h-9 text-xs"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow
+                        label="Move Out Date"
+                        value={formatDateText(form.expectedMoveOutDate || tenant.expectedMoveOutDate)}
+                      />
+                    )}
+
+                    {/* Staying Since duration */}
+                    <DetailRow label={stayDuration.label} value={<span className="text-teal-700 dark:text-teal-400 font-bold">{stayDuration.text}</span>} />
+
+                    {editing ? (
+                      <EditField label="Notice Period (Days)">
+                        <Input
+                          type="number"
+                          value={form.noticePeriodDays}
+                          onChange={(e) => setForm({ ...form, noticePeriodDays: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="30"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Notice Period (Days)" value={`${form.noticePeriodDays || "30"} Days`} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Agreement Period (Months)">
+                        <Input
+                          type="number"
+                          value={form.agreementPeriodMonths}
+                          onChange={(e) => setForm({ ...form, agreementPeriodMonths: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="11"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Agreement Period (Months)" value={form.agreementPeriodMonths || "0"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Referred By">
+                        <Input
+                          value={form.referredBy}
+                          onChange={(e) => setForm({ ...form, referredBy: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="Friend, Agent, or Portal"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Referred By" value={form.referredBy || "—"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Booked By">
+                        <Input
+                          value={form.bookedBy}
+                          onChange={(e) => setForm({ ...form, bookedBy: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="Manager name"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Booked By" value={form.bookedBy || "—"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Checkin Time">
+                        <Input
+                          value={form.checkinTime}
+                          onChange={(e) => setForm({ ...form, checkinTime: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="e.g. 11:00 AM"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Checkin Time" value={form.checkinTime || "—"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Checkout Time">
+                        <Input
+                          value={form.checkoutTime}
+                          onChange={(e) => setForm({ ...form, checkoutTime: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="e.g. 12:00 PM"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Checkout Time" value={form.checkoutTime || "—"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Last Meter Reading">
+                        <Input
+                          value={form.lastMeterReading}
+                          onChange={(e) => setForm({ ...form, lastMeterReading: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="e.g. 1420"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Last Meter Reading" value={form.lastMeterReading || "—"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Last Reading Date">
+                        <Input
+                          type="date"
+                          value={form.lastReadingDate}
+                          onChange={(e) => setForm({ ...form, lastReadingDate: e.target.value })}
+                          className="h-9 text-xs"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Last Reading Date" value={formatDateText(form.lastReadingDate)} />
+                    )}
+
+                    {/* Toggles */}
+                    {editing ? (
+                      <div className="flex items-center justify-between p-2.5 rounded-lg border bg-muted/20">
+                        <div>
+                          <Label className="text-xs font-semibold cursor-pointer">Collect Online Payments</Label>
+                          <p className="text-[10px] text-muted-foreground">Allow UPI/Netbanking payments</p>
+                        </div>
+                        <Switch
+                          checked={form.collectOnlinePayments}
+                          onCheckedChange={(checked) => setForm({ ...form, collectOnlinePayments: checked })}
+                        />
+                      </div>
+                    ) : (
+                      <DetailRow
+                        label="Collect Online Payments"
+                        value={form.collectOnlinePayments ? "Yes ✓" : "No ✗"}
+                      />
+                    )}
+
+                    {editing ? (
+                      <div className="space-y-2 p-2.5 rounded-lg border bg-muted/20">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label className="text-xs font-semibold cursor-pointer">GST Applicable</Label>
+                            <p className="text-[10px] text-muted-foreground">Tax charges applied on rent</p>
+                          </div>
+                          <Switch
+                            checked={form.gstApplicable}
+                            onCheckedChange={(checked) => setForm({ ...form, gstApplicable: checked })}
+                          />
+                        </div>
+                        {form.gstApplicable && (
+                          <div className="space-y-1 pt-1">
+                            <Label className="text-[10px]">GST Percentage (%)</Label>
+                            <Input
+                              type="number"
+                              value={form.gstPercentage}
+                              onChange={(e) => setForm({ ...form, gstPercentage: e.target.value })}
+                              className="h-8 text-xs"
+                              placeholder="18"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <DetailRow
+                        label="GST Applicable"
+                        value={form.gstApplicable ? `Yes (${form.gstPercentage}%) ✓` : "No ✗"}
+                      />
+                    )}
+
+                    <DetailRow
+                      label="Tenant Added On"
+                      value={formatDateText(tenant.createdAt)}
+                    />
+                  </div>
+                </details>
+
+                {/* SECTION 2: TENANT PERSONAL DETAILS */}
+                <details className="group border rounded-xl bg-card overflow-hidden shadow-xs" open>
+                  <summary className="flex justify-between items-center p-4 font-bold text-sm cursor-pointer hover:bg-muted/30 select-none border-b bg-muted/15">
+                    <div className="flex items-center gap-2">
+                      <ClipboardList className="h-4.5 w-4.5 text-primary" />
+                      <span>Tenant Personal Details</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!editing && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 gap-1"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setEditing(true);
+                          }}
+                        >
+                          <Pencil className="h-3 w-3" /> Edit
+                        </Button>
+                      )}
+                      <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180 text-muted-foreground" />
+                    </div>
+                  </summary>
+
+                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 bg-card">
+                    {editing ? (
+                      <EditField label="Remarks">
+                        <Input
+                          value={form.remarks}
+                          onChange={(e) => setForm({ ...form, remarks: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="Special remarks or notes"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Remarks" value={form.remarks || "—"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Permanent Address">
+                        <Input
+                          value={form.permanentAddress}
+                          onChange={(e) => setForm({ ...form, permanentAddress: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="House, Street, City, State, PIN"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow
+                        label="Permanent Address"
+                        value={
+                          form.permanentAddress ||
+                          (tenant as any).personalDetails?.permanentAddress ||
+                          (tenant as any).tenant?.personalDetails?.permanentAddress ||
+                          (tenant as any).permanentAddress ||
+                          (tenant as any).tenant?.permanentAddress ||
+                          (tenant as any).address ||
+                          (tenant as any).tenant?.address ||
+                          (tenant as any).personalDetails?.address ||
+                          "—"
+                        }
+                      />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Contact Number (Mobile) *">
+                        <Input
+                          value={form.mobileNumber}
+                          onChange={(e) => setForm({ ...form, mobileNumber: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="10-digit mobile"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Contact Number" value={phone} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Current Address">
+                        <Input
+                          value={form.currentAddress}
+                          onChange={(e) => setForm({ ...form, currentAddress: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="Local city address"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Current Address" value={form.currentAddress || "—"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Alternate Number">
+                        <Input
+                          value={form.alternatePhone}
+                          onChange={(e) => setForm({ ...form, alternatePhone: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="Alternate phone"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Alternate Number" value={form.alternatePhone || "—"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Nationality">
+                        <Input
+                          value={form.nationality}
+                          onChange={(e) => setForm({ ...form, nationality: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="Indian"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Nationality" value={form.nationality || "—"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Email Address">
+                        <Input
+                          type="email"
+                          value={form.email}
+                          onChange={(e) => setForm({ ...form, email: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="tenant@example.com"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Email" value={form.email || tenant.email || "—"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Work / College Address">
+                        <Input
+                          value={form.workAddress}
+                          onChange={(e) => setForm({ ...form, workAddress: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="Company or College name & address"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Work / College Address" value={form.workAddress || tenant.workAddress || "—"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Date Of Birth">
+                        <Input
+                          type="date"
+                          value={form.dob}
+                          onChange={(e) => setForm({ ...form, dob: e.target.value })}
+                          className="h-9 text-xs"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow
+                        label="Date Of Birth"
+                        value={formatDateText(
+                          form.dob ||
+                          (tenant as any).personalDetails?.dob ||
+                          (tenant as any).tenant?.personalDetails?.dob ||
+                          (tenant as any).dob ||
+                          (tenant as any).tenant?.dob ||
+                          (tenant as any).dateOfBirth ||
+                          (tenant as any).tenant?.dateOfBirth ||
+                          (tenant as any).kycInfo?.dob ||
+                          (tenant as any).kyc?.dob
+                        )}
+                      />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Govt. ID / Aadhaar Number">
+                        <Input
+                          value={form.govtIdNumber}
+                          onChange={(e) => setForm({ ...form, govtIdNumber: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="12-digit Aadhaar / Passport"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Govt. ID / Aadhaar" value={form.govtIdNumber || (tenant as any).aadhaarNumber || "—"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Gender">
+                        <select
+                          aria-label="Gender"
+                          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          value={form.gender}
+                          onChange={(e) => setForm({ ...form, gender: e.target.value })}
+                        >
+                          <option value="">Select Gender</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Gender" value={form.gender || "—"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Food Preferences">
+                        <Input
+                          value={form.foodPreference}
+                          onChange={(e) => setForm({ ...form, foodPreference: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="Veg, Non-Veg, Jain"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Food Preferences" value={form.foodPreference || "—"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Tenant Type">
+                        <select
+                          aria-label="Tenant Type"
+                          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          value={form.tenantType}
+                          onChange={(e) => setForm({ ...form, tenantType: e.target.value })}
+                        >
+                          <option value="Student">Student</option>
+                          <option value="Working Professional">Working Professional</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Tenant Type" value={form.tenantType || "—"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Emergency Contact">
+                        <Input
+                          value={form.emergencyContact}
+                          onChange={(e) => setForm({ ...form, emergencyContact: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="Name & phone"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Emergency Contact" value={form.emergencyContact || tenant.emergencyContact || "—"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Blood Group">
+                        <Input
+                          value={form.bloodGroup}
+                          onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="e.g. B+, O+, AB+"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow label="Blood Group" value={form.bloodGroup || "—"} />
+                    )}
+                  </div>
+                </details>
+
+                {/* SECTION 3: GUARDIAN & PARENT DETAILS */}
+                <details className="group border rounded-xl bg-card overflow-hidden shadow-xs">
+                  <summary className="flex justify-between items-center p-4 font-semibold text-sm cursor-pointer hover:bg-muted/30 select-none border-b bg-muted/15">
+                    <div className="flex items-center gap-2">
+                      <ClipboardList className="h-4 w-4 text-primary" />
+                      <span>Guardian & Parent Details</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!editing && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 gap-1"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setEditing(true);
+                          }}
+                        >
+                          <Pencil className="h-3 w-3" /> Edit
+                        </Button>
+                      )}
+                      <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180 text-muted-foreground" />
+                    </div>
+                  </summary>
+
+                  <div className="p-4 bg-card">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                      {editing ? (
+                        <EditField label="Father Name">
+                          <Input
+                            value={form.fatherName}
+                            onChange={(e) => setForm({ ...form, fatherName: e.target.value })}
+                            className="h-9 text-xs"
+                            placeholder="Father's full name"
+                          />
+                        </EditField>
+                      ) : (
+                        <DetailRow label="Father Name" value={form.fatherName || "—"} />
+                      )}
+
+                      {editing ? (
+                        <EditField label="Mother Contact">
+                          <Input
+                            value={form.motherPhone}
+                            onChange={(e) => setForm({ ...form, motherPhone: e.target.value })}
+                            className="h-9 text-xs"
+                            placeholder="Mother's phone"
+                          />
+                        </EditField>
+                      ) : (
+                        <DetailRow label="Mother Contact" value={form.motherPhone || "—"} />
+                      )}
+
+                      {editing ? (
+                        <EditField label="Father Contact">
+                          <Input
+                            value={form.fatherPhone}
+                            onChange={(e) => setForm({ ...form, fatherPhone: e.target.value })}
+                            className="h-9 text-xs"
+                            placeholder="Father's phone"
+                          />
+                        </EditField>
+                      ) : (
+                        <DetailRow label="Father Contact" value={form.fatherPhone || "—"} />
+                      )}
+
+                      {editing ? (
+                        <EditField label="Local Guardian Name">
+                          <Input
+                            value={form.guardianName}
+                            onChange={(e) => setForm({ ...form, guardianName: e.target.value })}
+                            className="h-9 text-xs"
+                            placeholder="Guardian's name"
+                          />
+                        </EditField>
+                      ) : (
+                        <DetailRow label="Local Guardian Name" value={form.guardianName || "—"} />
+                      )}
+
+                      {editing ? (
+                        <EditField label="Father Occupation">
+                          <Input
+                            value={form.fatherOccupation}
+                            onChange={(e) => setForm({ ...form, fatherOccupation: e.target.value })}
+                            className="h-9 text-xs"
+                            placeholder="e.g. Businessman"
+                          />
+                        </EditField>
+                      ) : (
+                        <DetailRow label="Father Occupation" value={form.fatherOccupation || "—"} />
+                      )}
+
+                      {editing ? (
+                        <EditField label="Local Guardian Phone">
+                          <Input
+                            value={form.guardianPhone}
+                            onChange={(e) => setForm({ ...form, guardianPhone: e.target.value })}
+                            className="h-9 text-xs"
+                            placeholder="Guardian's phone"
+                          />
+                        </EditField>
+                      ) : (
+                        <DetailRow label="Local Guardian Phone" value={form.guardianPhone || "—"} />
+                      )}
+
+                      {editing ? (
+                        <EditField label="Mother Name">
+                          <Input
+                            value={form.motherName}
+                            onChange={(e) => setForm({ ...form, motherName: e.target.value })}
+                            className="h-9 text-xs"
+                            placeholder="Mother's full name"
+                          />
+                        </EditField>
+                      ) : (
+                        <DetailRow label="Mother Name" value={form.motherName || "—"} />
+                      )}
+
+                      {editing ? (
+                        <EditField label="Local Guardian Address" className="sm:col-span-2">
+                          <Input
+                            value={form.guardianAddress}
+                            onChange={(e) => setForm({ ...form, guardianAddress: e.target.value })}
+                            className="h-9 text-xs"
+                            placeholder="Guardian's local residence address"
+                          />
+                        </EditField>
+                      ) : (
+                        <DetailRow label="Local Guardian Address" value={form.guardianAddress || "—"} />
+                      )}
+                    </div>
+                  </div>
+                </details>
+
+                {/* SECTION 4: GST DETAILS */}
+                <details className="group border rounded-xl bg-card overflow-hidden shadow-xs">
+                  <summary className="flex justify-between items-center p-4 font-semibold text-sm cursor-pointer hover:bg-muted/30 select-none border-b bg-muted/15">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-primary" />
+                      <span>GST Details</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!editing && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 gap-1"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setEditing(true);
+                          }}
+                        >
+                          <Pencil className="h-3 w-3" /> Edit
+                        </Button>
+                      )}
+                      <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180 text-muted-foreground" />
+                    </div>
+                  </summary>
+
+                  <div className="p-4 bg-card">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                      {editing ? (
+                        <EditField label="GST Number (GSTIN)">
+                          <Input
+                            value={form.gstNumber}
+                            onChange={(e) => setForm({ ...form, gstNumber: e.target.value })}
+                            className="h-9 text-xs"
+                            placeholder="e.g. 07AAAAA0000A1Z5"
+                          />
+                        </EditField>
+                      ) : (
+                        <DetailRow label="GST Number" value={form.gstNumber || "—"} />
+                      )}
+
+                      {editing ? (
+                        <EditField label="Business Owner Name">
+                          <Input
+                            value={form.businessOwnerName}
+                            onChange={(e) => setForm({ ...form, businessOwnerName: e.target.value })}
+                            className="h-9 text-xs"
+                            placeholder="Owner name"
+                          />
+                        </EditField>
+                      ) : (
+                        <DetailRow label="Business Owner Name" value={form.businessOwnerName || "—"} />
+                      )}
+
+                      {editing ? (
+                        <EditField label="PAN Number">
+                          <Input
+                            value={form.panNumber}
+                            onChange={(e) => setForm({ ...form, panNumber: e.target.value })}
+                            className="h-9 text-xs"
+                            placeholder="e.g. ABCDE1234F"
+                          />
+                        </EditField>
+                      ) : (
+                        <DetailRow label="PAN Number" value={form.panNumber || "—"} />
+                      )}
+
+                      {editing ? (
+                        <EditField label="Company Address">
+                          <Input
+                            value={form.companyAddress}
+                            onChange={(e) => setForm({ ...form, companyAddress: e.target.value })}
+                            className="h-9 text-xs"
+                            placeholder="Official billing address"
+                          />
+                        </EditField>
+                      ) : (
+                        <DetailRow label="Company Address" value={form.companyAddress || "—"} />
+                      )}
+
+                      {editing ? (
+                        <EditField label="Company Name" className="sm:col-span-2">
+                          <Input
+                            value={form.companyName}
+                            onChange={(e) => setForm({ ...form, companyName: e.target.value })}
+                            className="h-9 text-xs"
+                            placeholder="Registered business name"
+                          />
+                        </EditField>
+                      ) : (
+                        <DetailRow label="Company Name" value={form.companyName || "—"} />
+                      )}
+                    </div>
+                  </div>
+                </details>
+
+                {/* SECTION 5: BANK DETAILS */}
+                <details className="group border rounded-xl bg-card overflow-hidden shadow-xs">
+                  <summary className="flex justify-between items-center p-4 font-semibold text-sm cursor-pointer hover:bg-muted/30 select-none border-b bg-muted/15">
+                    <div className="flex items-center gap-2">
+                      <Lock className="h-4 w-4 text-primary" />
+                      <span>Bank Details</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!editing && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 gap-1"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setEditing(true);
+                          }}
+                        >
+                          <Pencil className="h-3 w-3" /> Edit
+                        </Button>
+                      )}
+                      <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180 text-muted-foreground" />
+                    </div>
+                  </summary>
+
+                  <div className="p-4 bg-card">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                      {editing ? (
+                        <EditField label="Bank Holder Name" className="sm:col-span-2">
+                          <Input
+                            value={form.accountHolderName}
+                            onChange={(e) => setForm({ ...form, accountHolderName: e.target.value })}
+                            className="h-9 text-xs"
+                            placeholder="Name on bank passbook"
+                          />
+                        </EditField>
+                      ) : (
+                        <DetailRow label="Bank Holder Name" value={form.accountHolderName || name || "—"} />
+                      )}
+
+                      {editing ? (
+                        <EditField label="Account Number">
+                          <Input
+                            value={form.accountNumber}
+                            onChange={(e) => setForm({ ...form, accountNumber: e.target.value })}
+                            className="h-9 text-xs"
+                            placeholder="Bank account number"
+                          />
+                        </EditField>
+                      ) : (
+                        <DetailRow label="Account Number" value={form.accountNumber || "—"} />
+                      )}
+
+                      {editing ? (
+                        <EditField label="IFSC Code">
+                          <Input
+                            value={form.ifscCode}
+                            onChange={(e) => setForm({ ...form, ifscCode: e.target.value })}
+                            className="h-9 text-xs"
+                            placeholder="e.g. HDFC0001234"
+                          />
+                        </EditField>
+                      ) : (
+                        <DetailRow label="IFSC Code" value={form.ifscCode || "—"} />
+                      )}
+
+                      {editing ? (
+                        <EditField label="UPI ID (VPA)" className="sm:col-span-2">
+                          <Input
+                            value={form.upiId}
+                            onChange={(e) => setForm({ ...form, upiId: e.target.value })}
+                            className="h-9 text-xs"
+                            placeholder="e.g. name@okhdfcbank"
+                          />
+                        </EditField>
+                      ) : (
+                        <DetailRow label="UPI ID" value={form.upiId || "—"} />
+                      )}
+                    </div>
+                  </div>
+                </details>
+
+                {/* SECTION 6: RECENT PAYMENTS */}
                 <Card className="border-border/60 shadow-sm">
                   <CardHeader className="pb-3 border-b bg-muted/15 flex flex-row items-center justify-between">
                     <CardTitle className="text-sm font-bold">Recent Payments</CardTitle>
@@ -1000,7 +2541,7 @@ export default function TenantDetailPage() {
                       onClick={() => {
                         setPaymentForm((p) => ({
                           ...p,
-                          amountPaid: Number(tenant.monthlyRent || rent || 0),
+                          amountPaid: Number(form.monthlyRent || tenant.monthlyRent || rent || 0),
                         }));
                         setRecordPaymentOpen(true);
                       }}
@@ -1034,7 +2575,7 @@ export default function TenantDetailPage() {
                                   {noteText || pay.dueType || `Rent via ${String(method).toUpperCase()}`}
                                 </p>
                                 <p className="text-[10px] text-muted-foreground">
-                                  {payDate ? new Date(payDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "Recently"}
+                                  {payDate ? formatDateText(payDate) : "Recently"}
                                 </p>
                               </div>
                               <div className="text-right shrink-0">
@@ -1050,8 +2591,9 @@ export default function TenantDetailPage() {
                         })}
                       </div>
                     ) : (
-                      <div className="text-center py-4 space-y-2">
-                        <p className="text-xs text-muted-foreground">No recent payments recorded for this stay.</p>
+                      <div className="text-center py-6">
+                        <IndianRupee className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
+                        <p className="text-xs text-muted-foreground mb-3">No payment records yet</p>
                         <Button
                           size="sm"
                           variant="outline"
@@ -1295,11 +2837,11 @@ export default function TenantDetailPage() {
                         <p className="text-xs text-amber-700 dark:text-amber-400">
                           Notice Given On:{" "}
                           <span className="font-semibold">
-                            {noticeStartDate ? (new Date(noticeStartDate).toString() !== "Invalid Date" ? new Date(noticeStartDate).toLocaleDateString("en-IN") : noticeStartDate) : "Recently"}
+                            {noticeStartDate ? formatDateText(noticeStartDate) : "Recently"}
                           </span>
                           {" "}• Expected Move-Out:{" "}
                           <span className="font-bold underline">
-                            {noticeVacateDate ? (new Date(noticeVacateDate).toString() !== "Invalid Date" ? new Date(noticeVacateDate).toLocaleDateString("en-IN") : noticeVacateDate) : "Scheduled"}
+                            {noticeVacateDate ? formatDateText(noticeVacateDate) : "Scheduled"}
                           </span>
                         </p>
                       </div>
@@ -1654,174 +3196,7 @@ export default function TenantDetailPage() {
           </DialogContent>
         </Dialog>
 
-        {/* DIALOG 4: EDIT PROFILE */}
-        <Dialog open={editing} onOpenChange={setEditing}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Edit Tenant Profile</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-2">
-              {/* Basic Details */}
-              <div className="border-b pb-3 space-y-3">
-                <h3 className="font-semibold text-sm text-teal-600">Basic Info</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label>Full Name</Label>
-                    <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Mobile Number</Label>
-                    <Input value={form.mobileNumber} onChange={(e) => setForm({ ...form, mobileNumber: e.target.value })} />
-                  </div>
-                </div>
-              </div>
 
-              {/* Personal Details */}
-              <div className="border-b pb-3 space-y-3">
-                <h3 className="font-semibold text-sm text-teal-600">Personal Details</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label>Remarks</Label>
-                    <Input value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Email</Label>
-                    <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Alternate Contact Number</Label>
-                    <Input value={form.alternatePhone} onChange={(e) => setForm({ ...form, alternatePhone: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Food Preference</Label>
-                    <Input value={form.foodPreference} onChange={(e) => setForm({ ...form, foodPreference: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Date of Birth</Label>
-                    <Input type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Gender</Label>
-                    <Input value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Blood Group</Label>
-                    <Input value={form.bloodGroup} onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Nationality</Label>
-                    <Input value={form.nationality} onChange={(e) => setForm({ ...form, nationality: e.target.value })} />
-                  </div>
-                  <div className="space-y-1 sm:col-span-2">
-                    <Label>Current Address</Label>
-                    <Input value={form.currentAddress} onChange={(e) => setForm({ ...form, currentAddress: e.target.value })} />
-                  </div>
-                  <div className="space-y-1 sm:col-span-2">
-                    <Label>Permanent Address</Label>
-                    <Input value={form.permanentAddress} onChange={(e) => setForm({ ...form, permanentAddress: e.target.value })} />
-                  </div>
-                </div>
-              </div>
-
-              {/* GST Details */}
-              <div className="border-b pb-3 space-y-3">
-                <h3 className="font-semibold text-sm text-teal-600">GST Details</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label>GST Number</Label>
-                    <Input value={form.gstNumber} onChange={(e) => setForm({ ...form, gstNumber: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>PAN Number</Label>
-                    <Input value={form.panNumber} onChange={(e) => setForm({ ...form, panNumber: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Company Name</Label>
-                    <Input value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Company Address</Label>
-                    <Input value={form.companyAddress} onChange={(e) => setForm({ ...form, companyAddress: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Business Owner Name</Label>
-                    <Input value={form.businessOwnerName} onChange={(e) => setForm({ ...form, businessOwnerName: e.target.value })} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Parents & Local Guardian Details */}
-              <div className="border-b pb-3 space-y-3">
-                <h3 className="font-semibold text-sm text-teal-600">Parents & Guardian Details</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label>Father Name</Label>
-                    <Input value={form.fatherName} onChange={(e) => setForm({ ...form, fatherName: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Father Contact</Label>
-                    <Input value={form.fatherPhone} onChange={(e) => setForm({ ...form, fatherPhone: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Father Occupation</Label>
-                    <Input value={form.fatherOccupation} onChange={(e) => setForm({ ...form, fatherOccupation: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Mother Name</Label>
-                    <Input value={form.motherName} onChange={(e) => setForm({ ...form, motherName: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Mother Contact</Label>
-                    <Input value={form.motherPhone} onChange={(e) => setForm({ ...form, motherPhone: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Mother Occupation</Label>
-                    <Input value={form.motherOccupation} onChange={(e) => setForm({ ...form, motherOccupation: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Guardian Name</Label>
-                    <Input value={form.guardianName} onChange={(e) => setForm({ ...form, guardianName: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Guardian Contact</Label>
-                    <Input value={form.guardianPhone} onChange={(e) => setForm({ ...form, guardianPhone: e.target.value })} />
-                  </div>
-                  <div className="space-y-1 sm:col-span-2">
-                    <Label>Guardian Address</Label>
-                    <Input value={form.guardianAddress} onChange={(e) => setForm({ ...form, guardianAddress: e.target.value })} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Bank Details */}
-              <div className="space-y-3">
-                <h3 className="font-semibold text-sm text-teal-600">Bank Details</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label>Account Number</Label>
-                    <Input value={form.accountNumber} onChange={(e) => setForm({ ...form, accountNumber: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>IFSC Code</Label>
-                    <Input value={form.ifscCode} onChange={(e) => setForm({ ...form, ifscCode: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label>UPI ID</Label>
-                    <Input value={form.upiId} onChange={(e) => setForm({ ...form, upiId: e.target.value })} />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setEditing(false)}>
-                Cancel
-              </Button>
-              <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={handleSaveProfile}>
-                Save Changes
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
 
         {/* RECORD MANUAL PAYMENT MODAL */}
         <Dialog open={recordPaymentOpen} onOpenChange={setRecordPaymentOpen}>

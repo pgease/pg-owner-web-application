@@ -44,6 +44,7 @@ import {
 } from "@/hooks/usePropertyOwnerQueries";
 import { buildFeatureKeySet, userHasFeatureForRow, type PlanTierKey } from "@/lib/planFeatures";
 import { useSubscriptionAccess } from "@/hooks/useSubscriptionAccess";
+import { useEntitlements } from "@/hooks/useEntitlements";
 import { useApp } from "@/context/AppContext";
 import { toast } from "@/components/ui/use-toast";
 
@@ -132,7 +133,7 @@ export default function Plans() {
       priceAnnual: 290,
       description: "Direct UPI payments with zero gateway fees, manual verify & Dedicated Account Manager.",
       features: [
-        "₹29 / bed / month (45-Day Free Trial)",
+        "₹29 / bed / month",
         "Direct UPI intent collection (0% fee)",
         "Manual payment verification (Approve / Reject)",
         "Dedicated Account Manager (Rahul Sharma)",
@@ -141,7 +142,7 @@ export default function Plans() {
         "Electricity meter billing",
       ],
       popular: false,
-      trialDays: 45,
+      trialDays: 0,
     },
     {
       id: "0e5b4f85-eeb4-4fdd-9128-f00390d26fb8",
@@ -151,7 +152,7 @@ export default function Plans() {
       priceAnnual: 490,
       description: "Automated payment gateway, automated T+2 settlement & dedicated branded PG website.",
       features: [
-        "₹49 / bed / month",
+        "₹49 / bed / month (45-Day Pro Trial)",
         "Everything included in Lite Plan",
         "Automated Payment Gateway collection",
         "Automated Settlement (T+2 bank transfer)",
@@ -161,7 +162,7 @@ export default function Plans() {
         "Automated WhatsApp rent alerts",
       ],
       popular: true,
-      trialDays: 0,
+      trialDays: 45,
     },
   ];
 
@@ -340,15 +341,15 @@ export default function Plans() {
                 )}
               </div>
               <h3 className="text-xl font-bold text-foreground">
-                {currentPlanKey === "PRO"
+                {currentPlanKey === "PRO" || subAccess.isTrial
                   ? "PG Ease Professional Suite"
                   : "PG Ease Lite Suite (Zero Gateway Fee)"}
               </h3>
               <p className="text-xs text-muted-foreground">
                 {subAccess.isTrial
-                  ? `Your 45-day free trial gives you full Lite Plan access until ${subAccess.trialExpiresAt?.toLocaleDateString("en-IN") || "45 days"}.`
+                  ? `Your 45-day Pro Trial gives you full Pro access with automated collections, WhatsApp automation, and dedicated PG website (${subAccess.trialDaysRemaining} days remaining).`
                   : subAccess.isExpired
-                  ? "Your 45-day free trial has concluded. Please subscribe to Lite (₹29/bed) or Pro (₹49/bed) to restore operations."
+                  ? "Your 45-day Pro Trial has concluded. Please subscribe to Lite (₹29/bed) or Pro (₹49/bed) to restore operations."
                   : currentPlanData?.expiresAt
                   ? `Renewal Date: ${new Date(currentPlanData.expiresAt).toLocaleDateString("en-IN")}`
                   : "Active subscription with Dedicated Account Manager"}
@@ -615,14 +616,14 @@ export default function Plans() {
               {isPro && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <Badge className="bg-teal-600 text-white text-[10px] px-2.5 shadow-sm font-bold tracking-wide">
-                    MOST POPULAR
+                    {subAccess.isTrial ? "45-DAY PRO TRIAL ACTIVE" : "MOST POPULAR • ₹49/BED"}
                   </Badge>
                 </div>
               )}
               {!isPro && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge className="bg-amber-500 text-white text-[10px] px-2.5 shadow-sm font-bold tracking-wide">
-                    45-DAY FREE TRIAL
+                  <Badge className="bg-slate-700 text-white text-[10px] px-2.5 shadow-sm font-bold tracking-wide">
+                    LITE • ₹29/BED
                   </Badge>
                 </div>
               )}
@@ -784,7 +785,7 @@ export default function Plans() {
             }`}
             onClick={() => subAccess.setDemoPlan("trial")}
           >
-            🟢 45-Day Trial
+            🟢 45-Day Pro Trial
           </Button>
           <Button
             size="sm"
@@ -800,11 +801,11 @@ export default function Plans() {
             size="sm"
             variant="outline"
             className={`h-7 text-[11px] rounded-lg border-teal-500/40 text-teal-300 hover:bg-teal-950/50 ${
-              subAccess.currentPlan === "PRO" && !subAccess.isExpired ? "bg-teal-500/20 ring-1 ring-teal-400" : "bg-transparent"
+              subAccess.currentPlan === "PRO" && !subAccess.isExpired && !subAccess.isTrial ? "bg-teal-500/20 ring-1 ring-teal-400" : "bg-transparent"
             }`}
             onClick={() => subAccess.setDemoPlan("pro")}
           >
-            👑 Pro Active
+            👑 Paid Pro
           </Button>
           <Button
             size="sm"

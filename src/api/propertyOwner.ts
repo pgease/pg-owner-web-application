@@ -298,11 +298,25 @@ export interface PlanFeature {
   limit: number | null;
 }
 
+export interface UnifiedSubscription {
+  status: 'TRIAL' | 'LITE' | 'PRO' | 'EXPIRED';
+  planId: string | null;
+  planName: string;
+  planDisplayName: string;
+  pricePerBed: number;
+  trial: boolean;
+  daysRemaining: number;
+  trialEndsAt: string | null;
+  isExpired: boolean;
+}
+
 export interface MyFeaturesResponse {
   planName: string;
   planDisplayName: string;
   isDefault: boolean;
   features: PlanFeature[];
+  featuresMap?: Record<string, boolean>;
+  subscription?: UnifiedSubscription;
 }
 
 export async function getMyFeatures() {
@@ -561,6 +575,82 @@ export interface PropertyTenant {
   isKycVerified?: boolean;
   kycInfo?: any;
   kycStatus?: string;
+  // Flattened stay / room assignment details
+  roomId?: string;
+  bedNumber?: number | string;
+  rentDueDate?: number | string;
+  joiningDate?: string;
+  rentalFrequency?: string;
+  stayType?: string;
+  lockinPeriodMonths?: number | string;
+  noticePeriodDays?: number | string;
+  agreementPeriodMonths?: number | string;
+  referredBy?: string;
+  bookedBy?: string;
+  checkinTime?: string;
+  checkoutTime?: string;
+  rentingType?: string;
+  collectOnlinePayments?: boolean;
+  gstApplicable?: boolean;
+  gstPercentage?: number | string;
+  lastMeterReading?: string;
+  lastReadingDate?: string;
+  electricityBill?: number;
+  sharingType?: string;
+  // Personal & Guardian & GST & Bank fields
+  alternatePhone?: string;
+  alternateNumber?: string;
+  dob?: string;
+  gender?: string;
+  tenantType?: string;
+  bloodGroup?: string;
+  foodPreference?: string;
+  foodPreferences?: string;
+  remarks?: string;
+  nationality?: string;
+  officeOrCollegeName?: string;
+  currentAddress?: string;
+  permanentAddress?: string;
+  address?: string;
+  fatherName?: string;
+  fatherPhone?: string;
+  fatherContact?: string;
+  fatherOccupation?: string;
+  motherName?: string;
+  motherPhone?: string;
+  motherContact?: string;
+  motherOccupation?: string;
+  guardianName?: string;
+  guardianPhone?: string;
+  guardianContact?: string;
+  guardianAddress?: string;
+  localGuardianAddress?: string;
+  gstNumber?: string;
+  gstin?: string;
+  panNumber?: string;
+  companyName?: string;
+  businessOwnerName?: string;
+  companyAddress?: string;
+  accountNumber?: string;
+  bankAccountNumber?: string;
+  ifscCode?: string;
+  bankIfscCode?: string;
+  upiId?: string;
+  bankUpiId?: string;
+  accountHolderName?: string;
+  bankAccountHolderName?: string;
+  isKycRequested?: boolean;
+  personalDetails?: any;
+  guardianDetails?: any;
+  gstDetails?: any;
+  bankDetails?: any;
+  currentStay?: any;
+  paymentDetails?: any;
+  recentPayments?: any[];
+  staysHistory?: any[];
+  complaints?: any[];
+  agreements?: any[];
+  [key: string]: any;
 }
 
 /** @deprecated use PropertyTenant */
@@ -649,40 +739,71 @@ export function normalizeSingleTenant(raw: any): PropertyTenant {
     floor,
     block,
     sharingType,
+    // Stay & Agreement Settings
+    rentDueDate: Number(stay.rentDueDate ?? t.rentDueDate ?? t.roomTenant?.rentDueDate ?? 1),
+    joiningDate: stay.startDate ?? t.joiningDate ?? moveInDate ?? "",
+    rentalFrequency: stay.rentalFrequency ?? t.rentalFrequency ?? t.roomTenant?.rentalFrequency ?? "Monthly",
+    stayType: stay.stayType ?? t.stayType ?? t.roomTenant?.stayType ?? "Long Stay",
+    lockinPeriodMonths: Number(stay.lockinPeriodMonths ?? t.lockinPeriodMonths ?? t.roomTenant?.lockinPeriodMonths ?? 0),
+    noticePeriodDays: Number(stay.noticePeriodDays ?? t.noticePeriodDays ?? t.roomTenant?.noticePeriodDays ?? 30),
+    agreementPeriodMonths: Number(stay.agreementPeriodMonths ?? t.agreementPeriodMonths ?? t.roomTenant?.agreementPeriodMonths ?? 11),
+    referredBy: stay.referredBy ?? t.referredBy ?? t.roomTenant?.referredBy ?? "",
+    bookedBy: stay.bookedBy ?? t.bookedBy ?? t.roomTenant?.bookedBy ?? "",
+    checkinTime: stay.checkinTime ?? t.checkinTime ?? t.roomTenant?.checkinTime ?? "12:00 PM",
+    checkoutTime: stay.checkoutTime ?? t.checkoutTime ?? t.roomTenant?.checkoutTime ?? "11:00 AM",
+    rentingType: stay.rentingType ?? t.rentingType ?? t.roomTenant?.rentingType ?? "Bed",
+    collectOnlinePayments: stay.collectOnlinePayments !== undefined ? Boolean(stay.collectOnlinePayments) : t.collectOnlinePayments !== undefined ? Boolean(t.collectOnlinePayments) : true,
+    gstApplicable: stay.gstApplicable !== undefined ? Boolean(stay.gstApplicable) : t.gstApplicable !== undefined ? Boolean(t.gstApplicable) : false,
+    gstPercentage: Number(stay.gstPercentage ?? t.gstPercentage ?? 18),
+    lastMeterReading: String(stay.lastMeterReading ?? t.lastMeterReading ?? ""),
+    lastReadingDate: stay.lastReadingDate ?? t.lastReadingDate ?? "",
+    electricityBill: Number(stay.electricityBill ?? t.electricityBill ?? 0),
     // Personal details
-    alternatePhone: personal.alternatePhone ?? t.alternatePhone ?? "",
+    alternatePhone: personal.alternatePhone ?? t.alternatePhone ?? (t as any).alternateNumber ?? "",
+    alternateNumber: personal.alternatePhone ?? t.alternatePhone ?? (t as any).alternateNumber ?? "",
     dob: personal.dob ?? t.dob ?? "",
     gender: personal.gender ?? t.gender ?? "",
     tenantType: personal.tenantType ?? t.tenantType ?? "",
     bloodGroup: personal.bloodGroup ?? t.bloodGroup ?? "",
-    foodPreference: personal.foodPreferences ?? personal.foodPreference ?? t.foodPreference ?? "",
+    foodPreference: personal.foodPreferences ?? personal.foodPreference ?? t.foodPreferences ?? t.foodPreference ?? "",
+    foodPreferences: personal.foodPreferences ?? personal.foodPreference ?? t.foodPreferences ?? t.foodPreference ?? "",
     remarks: personal.remarks ?? t.remarks ?? "",
     nationality: personal.nationality ?? t.nationality ?? "Indian",
-    workAddress: personal.officeOrCollegeName ?? personal.workAddress ?? t.workAddress ?? "",
+    workAddress: personal.officeOrCollegeName ?? personal.workAddress ?? t.officeOrCollegeName ?? t.workAddress ?? "",
+    officeOrCollegeName: personal.officeOrCollegeName ?? personal.workAddress ?? t.officeOrCollegeName ?? t.workAddress ?? "",
     currentAddress: personal.currentAddress ?? t.currentAddress ?? "",
-    permanentAddress: personal.permanentAddress ?? t.permanentAddress ?? "",
+    permanentAddress: personal.permanentAddress ?? t.permanentAddress ?? t.address ?? "",
     emergencyContact: personal.emergencyContact ?? t.emergencyContact ?? "",
     // Guardian details
     fatherName: guardian.fatherName ?? t.fatherName ?? "",
-    fatherPhone: guardian.fatherPhone ?? t.fatherPhone ?? "",
+    fatherPhone: guardian.fatherPhone ?? t.fatherPhone ?? (t as any).fatherContact ?? "",
+    fatherContact: guardian.fatherPhone ?? t.fatherPhone ?? (t as any).fatherContact ?? "",
     fatherOccupation: guardian.fatherOccupation ?? t.fatherOccupation ?? "",
     motherName: guardian.motherName ?? t.motherName ?? "",
-    motherPhone: guardian.motherPhone ?? t.motherPhone ?? "",
+    motherPhone: guardian.motherPhone ?? t.motherPhone ?? (t as any).motherContact ?? "",
+    motherContact: guardian.motherPhone ?? t.motherPhone ?? (t as any).motherContact ?? "",
     motherOccupation: guardian.motherOccupation ?? t.motherOccupation ?? "",
     guardianName: guardian.localGuardianName ?? guardian.guardianName ?? t.guardianName ?? "",
-    guardianPhone: guardian.localGuardianPhone ?? guardian.guardianPhone ?? t.guardianPhone ?? "",
-    guardianAddress: guardian.localGuardianAddress ?? guardian.guardianAddress ?? t.guardianAddress ?? "",
+    guardianPhone: guardian.localGuardianPhone ?? guardian.guardianPhone ?? t.guardianPhone ?? (t as any).guardianContact ?? "",
+    guardianContact: guardian.localGuardianPhone ?? guardian.guardianPhone ?? t.guardianPhone ?? (t as any).guardianContact ?? "",
+    guardianAddress: guardian.localGuardianAddress ?? guardian.guardianAddress ?? t.localGuardianAddress ?? t.guardianAddress ?? "",
+    localGuardianAddress: guardian.localGuardianAddress ?? guardian.guardianAddress ?? t.localGuardianAddress ?? t.guardianAddress ?? "",
     // GST
-    gstNumber: gst.gstNumber ?? t.gstNumber ?? "",
+    gstNumber: gst.gstNumber ?? t.gstNumber ?? (t as any).gstin ?? "",
+    gstin: gst.gstNumber ?? t.gstNumber ?? (t as any).gstin ?? "",
     panNumber: gst.panNumber ?? t.panNumber ?? "",
     companyName: gst.companyName ?? t.companyName ?? "",
     businessOwnerName: gst.businessOwnerName ?? t.businessOwnerName ?? "",
     companyAddress: gst.companyAddress ?? t.companyAddress ?? "",
     // Bank
-    accountNumber: bank.bankAccountNumber ?? bank.accountNumber ?? t.accountNumber ?? "",
-    ifscCode: bank.bankIfscCode ?? bank.ifscCode ?? t.ifscCode ?? "",
-    upiId: bank.bankUpiId ?? bank.upiId ?? t.upiId ?? "",
-    accountHolderName: bank.bankAccountHolderName ?? bank.accountHolderName ?? t.name ?? "",
+    accountNumber: bank.bankAccountNumber ?? bank.accountNumber ?? t.bankAccountNumber ?? t.accountNumber ?? "",
+    bankAccountNumber: bank.bankAccountNumber ?? bank.accountNumber ?? t.bankAccountNumber ?? t.accountNumber ?? "",
+    ifscCode: bank.bankIfscCode ?? bank.ifscCode ?? t.bankIfscCode ?? t.ifscCode ?? "",
+    bankIfscCode: bank.bankIfscCode ?? bank.ifscCode ?? t.bankIfscCode ?? t.ifscCode ?? "",
+    upiId: bank.bankUpiId ?? bank.upiId ?? t.bankUpiId ?? t.upiId ?? "",
+    bankUpiId: bank.bankUpiId ?? bank.upiId ?? t.bankUpiId ?? t.upiId ?? "",
+    accountHolderName: bank.bankAccountHolderName ?? bank.accountHolderName ?? t.bankAccountHolderName ?? t.name ?? "",
+    bankAccountHolderName: bank.bankAccountHolderName ?? bank.accountHolderName ?? t.bankAccountHolderName ?? t.name ?? "",
     // KYC
     isKycVerified,
     isKycRequested,
@@ -720,37 +841,88 @@ export function normalizePropertyTenantsList(raw: unknown): PropertyTenant[] {
 }
 
 export interface UpdatePropertyTenantPayload {
+  // Renting Details
+  roomId?: string;
+  bedNumber?: number;
+  electricityBill?: number;
+  monthlyRent?: number;
+  securityDeposit?: number;
+  rentDueDate?: number;
+  rentalFrequency?: string;
+  stayType?: string;
+  lockinPeriodMonths?: number;
+  noticePeriodDays?: number;
+  agreementPeriodMonths?: number;
+  joiningDate?: string;
+  expectedMoveOutDate?: string;
+  referredBy?: string;
+  bookedBy?: string;
+  checkinTime?: string;
+  checkoutTime?: string;
+  rentingType?: string;
+  collectOnlinePayments?: boolean;
+  gstApplicable?: boolean;
+  gstPercentage?: number;
+  lastMeterReading?: string;
+  lastReadingDate?: string;
+  miscellaneousFees?: number;
+
+  // Personal Details
   name?: string;
   phone?: string;
   email?: string;
   remarks?: string;
   alternatePhone?: string;
+  alternateNumber?: string;
+  officeOrCollegeName?: string;
   foodPreference?: string;
   dob?: string;
+  dateOfBirth?: string;
   gender?: string;
+  tenantType?: string;
   bloodGroup?: string;
   currentAddress?: string;
   permanentAddress?: string;
+  address?: string;
   nationality?: string;
+  govtIdNumber?: string;
+  emergencyContact?: string;
+  workAddress?: string;
+  foodPreferences?: string;
+
+  // GST Details
   gstNumber?: string;
+  gstin?: string;
   panNumber?: string;
   companyName?: string;
   companyAddress?: string;
   businessOwnerName?: string;
+
+  // Guardian Details
   fatherName?: string;
   fatherPhone?: string;
+  fatherContact?: string;
   fatherOccupation?: string;
   motherName?: string;
   motherPhone?: string;
+  motherContact?: string;
   motherOccupation?: string;
   guardianName?: string;
   guardianPhone?: string;
+  guardianContact?: string;
   guardianAddress?: string;
+  localGuardianAddress?: string;
+
+  // Bank Details
+  accountHolderName?: string;
+  bankAccountHolderName?: string;
   accountNumber?: string;
+  bankAccountNumber?: string;
   ifscCode?: string;
+  bankIfscCode?: string;
   upiId?: string;
-  emergencyContact?: string;
-  workAddress?: string;
+  bankUpiId?: string;
+  [key: string]: any;
 }
 
 export async function updatePropertyTenant(
@@ -1001,6 +1173,7 @@ export interface RoomItem {
   block?: string;
   createdAt?: string;
   beds?: any[];
+  electricityBill?: number;
 }
 
 /** POST /properties/:id/rooms often returns `{ room, beds }` instead of a bare room. */
@@ -1590,21 +1763,25 @@ export interface SubscriptionPlan {
   id: string;
   name: string;
   code: string;
+  pricePerBed?: number;
   priceMonthly: number;
   priceAnnual: number;
   features: string[];
   maxProperties: number;
-  maxTenants: number;
+  maxTenants?: number;
+  maxBeds?: number;
   isPopular?: boolean;
 }
 
 export interface CurrentPlanResponse {
   currentPlan: SubscriptionPlan | null;
-  subscriptionStatus: 'active' | 'trial' | 'expired' | 'free';
+  subscriptionStatus: 'active' | 'trial' | 'expired' | 'free' | 'lite' | 'pro';
+  subscription?: UnifiedSubscription;
   expiresAt: string | null;
   daysRemaining: number | null;
-  propertiesUsage: { used: number; max: number };
-  tenantsUsage: { used: number; max: number };
+  propertiesUsage?: { used: number; max: number };
+  tenantsUsage?: { used: number; max: number };
+  bedsUsage?: { used: number; max: number };
 }
 
 export async function getPlans() {

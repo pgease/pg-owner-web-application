@@ -443,7 +443,6 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
     if (!name.trim()) return "Enter tenant full name.";
     const digits = phone.replace(/\D/g, "");
     if (digits.length !== 10) return "Enter a valid 10-digit contact number.";
-    if (!gender) return "Select tenant gender.";
     if (!hasSelectValue(effectiveRoomId)) return "Select a room for allocation.";
     if (!bedNumber) return "Select an available bed for allocation.";
     return null;
@@ -451,15 +450,8 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
 
   const getStepTwoError = (): string | null => {
     if (!moveInDate) return "Enter move-in / joining date.";
-    if (lockInPeriod === undefined || lockInPeriod === null || lockInPeriod === "") {
-      return "Select lock-in period duration.";
-    }
-    if (!noticePeriod) return "Select notice period duration.";
     const rentNum = parseInt(fixedRent, 10);
     if (isNaN(rentNum) || rentNum <= 0) return "Enter monthly fixed rent amount (must be greater than 0).";
-    if (securityDeposit.trim() === "") return "Enter security deposit amount (enter 0 if none).";
-    const depNum = parseInt(securityDeposit, 10);
-    if (isNaN(depNum) || depNum < 0) return "Enter valid security deposit amount (enter 0 if none).";
     return null;
   };
 
@@ -564,6 +556,7 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
         alternatePhone: alternatePhone ? `+91${alternatePhone.replace(/\D/g, "")}` : undefined,
         tenantType: tenantType || undefined,
         bloodGroup: bloodGroup || undefined,
+        foodPreferences: foodPreference.trim() || undefined,
         currentAddress: formattedCurrentAddress || undefined,
         permanentAddress: formattedPermanentAddress || undefined,
         nationality: nationality || "Indian",
@@ -611,15 +604,29 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
       });
 
       // Save secondary custom profile fields
-      if (addedTenant?.id) {
+      const targetId = (addedTenant as any)?.roomTenant?.id || (addedTenant as any)?.tenant?.id || addedTenant?.id;
+      if (targetId) {
         const permanentAddress = [permStreet, permCity, permState, permPincode].filter(Boolean).join(", ");
         const currentAddress = sameAsPermanent ? permanentAddress : [currStreet, currCity, currState, currPincode].filter(Boolean).join(", ");
 
-        await updatePropertyTenant(propertyId, addedTenant.id, {
+        await updatePropertyTenant(propertyId, targetId, {
+          // Required stay fields
+          roomId: idStr(effectiveRoomId),
+          bedNumber: parseInt(bedNumber, 10) || 1,
+          monthlyRent: parseInt(fixedRent, 10) || 0,
+          securityDeposit: parseInt(securityDeposit, 10) || 0,
+          rentDueDate: parseInt(rentDueDate.replace(/\D/g, "")) || 1,
+          joiningDate: moveInDate,
+          electricityBill: 0,
+          name: name.trim(),
+          phone: phone.startsWith("+") ? phone : `+91${phone.replace(/\D/g, "")}`,
+
+          // Whitelisted personal & secondary fields
           remarks: remarks.trim() || undefined,
           email: email.trim() || undefined,
           alternatePhone: alternatePhone.trim() || undefined,
-          foodPreference: foodPreference || undefined,
+          alternateNumber: alternatePhone.trim() || undefined,
+          foodPreferences: foodPreference || undefined,
           dob: dob || undefined,
           gender: gender || undefined,
           bloodGroup: bloodGroup.trim() || undefined,
@@ -640,13 +647,12 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
           guardianName: guardianName.trim() || undefined,
           guardianPhone: guardianPhone.trim() || undefined,
           guardianAddress: guardianAddress.trim() || undefined,
-          accountNumber: accountNumber.trim() || undefined,
-          ifscCode: ifscCode.trim() || undefined,
-          upiId: upiId.trim() || undefined,
+          bankAccountNumber: accountNumber.trim() || undefined,
+          bankIfscCode: ifscCode.trim() || undefined,
+          bankUpiId: upiId.trim() || undefined,
           checkinTime: checkinTime || undefined,
           checkoutTime: checkoutTime || undefined,
-          emergencyContact: bookedBy.trim() || undefined,
-          workAddress: referredBy.trim() || undefined,
+          officeOrCollegeName: referredBy.trim() || undefined,
         } as any);
       }
 

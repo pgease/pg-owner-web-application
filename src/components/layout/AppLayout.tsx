@@ -2,6 +2,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import AppSidebar from "./AppSidebar";
 import AppHeader from "./AppHeader";
+import { SubscriptionBanner } from "./SubscriptionBanner";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -27,6 +28,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
         )}
       >
         <AppHeader onMenuToggle={() => setMobileOpen(!mobileOpen)} />
+        <SubscriptionBanner />
         <main className="flex-1 bg-muted/20 p-4 md:p-6">{children}</main>
       </div>
     </div>

@@ -24,6 +24,7 @@ import {
   BookOpen,
   Home,
   FileSpreadsheet,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -66,8 +67,8 @@ const navItems: NavItem[] = [
       { title: "Structure & Rooms", url: "/my-pgs/structure", permissionKey: "room_view" },
       { title: "Amenities", url: "/my-pgs/amenities", permissionKey: "room_view" },
       { title: "Restrictions", url: "/my-pgs/restrictions", permissionKey: "room_view" },
-      { title: "WiFi Management", url: "/my-pgs/wifi", permissionKey: "room_view" },
-      { title: "Property Notices", url: "/my-pgs/notices", permissionKey: "room_view" },
+      { title: "WiFi Management", url: "/my-pgs/wifi", permissionKey: "room_view", featureKey: "wifi_management" },
+      { title: "Property Notices", url: "/my-pgs/notices", permissionKey: "room_view", featureKey: "digital_notice_board" },
       { title: "Bank Account", url: "/my-pgs/bank", permissionKey: "room_view" },
       { title: "Public Listing", url: "/my-pgs/public-listing", permissionKey: "room_view" },
     ],
@@ -79,12 +80,12 @@ const navItems: NavItem[] = [
     permissionKey: "tenant_view",
     children: [
       { title: "Tenant List", url: "/tenants", permissionKey: "tenant_view" },
-      { title: "Leads & Visits", url: "/leads", permissionKey: "tenant_view", featureKey: "LEAD_CRM" },
+      { title: "Leads & Visits", url: "/leads", permissionKey: "tenant_view", featureKey: "lead_crm" },
       { title: "Add tenant", url: "/tenants/add", permissionKey: "tenant_add" },
-      { title: "Tenant KYC", url: "/tenants/kyc", permissionKey: "kyc_view", featureKey: "AADHAAR_KYC" },
+      { title: "Tenant KYC", url: "/tenants/kyc", permissionKey: "kyc_view", featureKey: "aadhaar_kyc" },
       { title: "Notice Period", url: "/tenants/notice-period", permissionKey: "tenant_view" },
-      { title: "Guest Log & Requests", url: "/tenants/guests", permissionKey: "guest_log" },
-      { title: "Team List", url: "/team", permissionKey: "team_view_members" },
+      { title: "Guest Log & Requests", url: "/tenants/guests", permissionKey: "guest_log", featureKey: "nightout_guest_requests" },
+      { title: "Team List", url: "/team", permissionKey: "team_view_members", featureKey: "staff_roles_permissions" },
     ],
   },
   {
@@ -96,7 +97,7 @@ const navItems: NavItem[] = [
       { title: "Rent Collection", url: "/rent-payments", permissionKey: "account_view_dues" },
       { title: "Payment History", url: "/rent-payments/history", permissionKey: "account_view_dues" },
       { title: "Dues & Pending", url: "/rent-payments/dues", permissionKey: "account_view_dues" },
-      { title: "Expenses Ledger", url: "/expenses", permissionKey: "expense_view" },
+      { title: "Expenses Ledger", url: "/expenses", permissionKey: "expense_view", featureKey: "expense_tracking" },
       { title: "Refunds", url: "/refunds", permissionKey: "refund_add" },
     ],
   },
@@ -105,6 +106,7 @@ const navItems: NavItem[] = [
     url: "/reports",
     icon: BarChart3,
     permissionKey: "account_view_dues",
+    featureKey: "advanced_reports",
   },
   {
     title: "Operations",
@@ -112,8 +114,8 @@ const navItems: NavItem[] = [
     icon: Wrench,
     children: [
       { title: "Complaints Desk", url: "/complaints", permissionKey: "complaint_view_all" },
-      { title: "Food & Dining", url: "/food", permissionKey: "food_view_edit" },
-      { title: "Night Out Passes", url: "/nightout", permissionKey: "nightout_view" },
+      { title: "Food & Dining", url: "/food", permissionKey: "food_view_edit", featureKey: "food_menu_planner" },
+      { title: "Night Out Passes", url: "/nightout", permissionKey: "nightout_view", featureKey: "nightout_guest_requests" },
       { title: "Eviction", url: "/eviction", permissionKey: "eviction_approve" },
     ],
   },
@@ -124,7 +126,7 @@ const navItems: NavItem[] = [
     children: [
       { title: "Plans & Pricing", url: "/plans" },
       { title: "Refer & Earn (₹1,000)", url: "/referrals" },
-      { title: "Activity Audit Logs", url: "/activity-logs" },
+      { title: "Activity Audit Logs", url: "/activity-logs", featureKey: "audit_logs" },
       { title: "Profile Settings", url: "/settings" },
       { title: "Support Help", url: "/support" },
     ],
@@ -240,9 +242,12 @@ const AppSidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }: AppSideb
                                     navigate("/plans");
                                     onMobileClose?.();
                                   }}
+                                  title="Upgrade to unlock this Pro feature"
                                 >
                                   <span className="truncate">{child.title}</span>
-                                  <span className="text-[10px] uppercase text-amber-600/90">Plan</span>
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                                    <Lock className="h-2.5 w-2.5" /> Pro
+                                  </span>
                                 </button>
                               </li>
                             );
