@@ -1,4 +1,4 @@
-import { Building2, DoorOpen, BedDouble, IndianRupee, Smartphone } from "lucide-react";
+import { Building2, DoorOpen, BedDouble, IndianRupee, Smartphone, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,6 +13,8 @@ import {
   tenantRentDueLabel,
   tenantRoomNo,
   tenantVerificationLabel,
+  tenantStatusDisplay,
+  tenantCode,
 } from "@/lib/tenantDisplay";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +27,8 @@ interface TenantCardProps {
 export function TenantCard({ tenant, onOpen, className }: TenantCardProps) {
   const verified = tenantVerificationLabel(tenant) === "verified";
   const photo = (tenant as any)?.photoUrl || (tenant as any)?.imageUrl || (tenant as any)?.profilePhotoUrl;
+  const statusInfo = tenantStatusDisplay(tenant);
+  const code = tenantCode(tenant);
 
   return (
     <Card
@@ -39,6 +43,8 @@ export function TenantCard({ tenant, onOpen, className }: TenantCardProps) {
       }}
       className={cn(
         "cursor-pointer transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        statusInfo.status === "UNDER_NOTICE" && "border-amber-300 dark:border-amber-800/60 bg-amber-500/[0.02]",
+        statusInfo.status === "MOVED_OUT" && "opacity-75 bg-muted/20",
         className,
       )}
     >
@@ -49,8 +55,20 @@ export function TenantCard({ tenant, onOpen, className }: TenantCardProps) {
             <AvatarFallback className="text-sm font-medium bg-muted">{tenantInitials(tenant)}</AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1 space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
               <p className="font-semibold leading-tight truncate">{tenantDisplayName(tenant)}</p>
+              {code && (
+                <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                  {code}
+                </span>
+              )}
+              <Badge
+                variant="outline"
+                className={cn("text-[10px] px-1.5 py-0 font-medium shrink-0 flex items-center gap-1", statusInfo.badgeClass)}
+              >
+                {statusInfo.status === "UNDER_NOTICE" && <Clock className="h-2.5 w-2.5" />}
+                {statusInfo.label}
+              </Badge>
               <Badge
                 variant="secondary"
                 className={cn(
@@ -58,7 +76,7 @@ export function TenantCard({ tenant, onOpen, className }: TenantCardProps) {
                   verified ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" : "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-100",
                 )}
               >
-                {verified ? "Aadhaar verified" : "Pending verification"}
+                {verified ? "Aadhaar verified" : "Pending KYC"}
               </Badge>
               <span className="inline-flex items-center text-muted-foreground" title="Phone on file">
                 <Smartphone className="h-3.5 w-3.5" />

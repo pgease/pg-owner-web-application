@@ -24,7 +24,7 @@ export interface SubscriptionAccessInfo {
   hasDedicatedAccountManager: boolean;
   subdomainUrl: string;
   isLoading: boolean;
-  setDemoPlan: (mode: "trial" | "expired" | "pro" | "reset") => void;
+  setDemoPlan: (mode: "trial" | "expired" | "pro" | "lite" | "reset") => void;
 }
 
 export function useSubscriptionAccess(): SubscriptionAccessInfo {

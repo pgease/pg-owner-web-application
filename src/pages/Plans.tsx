@@ -69,6 +69,7 @@ const features = [
   { name: "Live Occupancy & Revenue Analytics", featureKey: "ADVANCED_ANALYTICS", free: false, lite: true, pro: true },
   { name: "Digital Rental Agreement eSign", featureKey: "RENTAL_AGREEMENT", free: false, lite: false, pro: true },
   { name: "Automated WhatsApp Alerts & Reminders", featureKey: "WHATSAPP_AUTOMATION", free: false, lite: false, pro: true },
+  { name: "Notice Period Tracking & Bed Vacate Timeline", featureKey: "notice_period_tracker", free: false, lite: false, pro: true },
 ];
 
 export default function Plans() {
@@ -680,26 +681,49 @@ export default function Plans() {
                   })}
                 </div>
 
-                <Button
-                  className={`w-full font-semibold rounded-xl mt-4 ${
-                    isCurrent
-                      ? "border-teal-600 text-teal-600"
-                      : isPro
-                      ? "bg-teal-600 hover:bg-teal-700 text-white shadow-sm"
-                      : "bg-slate-900 hover:bg-slate-800 text-white shadow-sm"
-                  }`}
-                  variant={isCurrent ? "outline" : "default"}
-                  disabled={isCurrent || createOrderMut.isPending}
-                  onClick={() => handleUpgradeCheckout(plan.id || plan.name.toLowerCase())}
-                >
-                  {createOrderMut.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : isCurrent ? (
-                    "Active Plan"
-                  ) : (
-                    `Subscribe (${selectedBeds} beds • ₹${totalBilling.toLocaleString("en-IN")})`
+                <div className="space-y-2 pt-2">
+                  <Button
+                    className={`w-full font-semibold rounded-xl ${
+                      isCurrent
+                        ? "border-teal-600 text-teal-600 cursor-default"
+                        : isPro
+                        ? "bg-teal-600 hover:bg-teal-700 text-white shadow-sm"
+                        : "bg-slate-900 hover:bg-slate-800 text-white shadow-sm"
+                    }`}
+                    variant={isCurrent ? "outline" : "default"}
+                    disabled={isCurrent || createOrderMut.isPending}
+                    onClick={() => handleUpgradeCheckout(plan.id || plan.name.toLowerCase())}
+                  >
+                    {createOrderMut.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : isCurrent ? (
+                      "Active Plan ✓"
+                    ) : (
+                      `Subscribe (${selectedBeds} beds • ₹${totalBilling.toLocaleString("en-IN")})`
+                    )}
+                  </Button>
+
+                  {!isCurrent && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-xs font-semibold h-8 rounded-xl border-dashed hover:border-teal-500 hover:text-teal-600"
+                      onClick={() => {
+                        const targetTier = isPro ? "pro" : "lite";
+                        subAccess.setDemoPlan(targetTier);
+                        toast({
+                          title: isPro ? "Switched to Pro Plan 👑" : "Switched to Lite Plan ⚡",
+                          description: isPro
+                            ? "All Pro features unlocked (₹49/bed)."
+                            : "Viewing as Lite Plan owner (₹29/bed). Pro-exclusive automation is gated.",
+                        });
+                      }}
+                    >
+                      {isPro ? "👑 Select / Switch to Pro Plan" : "⚡ Select / Switch to Lite Plan"}
+                    </Button>
                   )}
-                </Button>
+                </div>
               </CardContent>
             </Card>
           );
@@ -765,6 +789,141 @@ export default function Plans() {
         </CardContent>
       </Card>
 
+      {/* LITE PLAN VS PRO PLAN BREAKDOWN GUIDE */}
+      <Card className="rounded-2xl border border-teal-200 dark:border-teal-900 bg-gradient-flow shadow-sm overflow-hidden">
+        <CardHeader className="bg-muted/5 border-b pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-xl bg-teal-500/10 text-teal-600 flex items-center justify-center font-bold">
+                <Zap className="h-4 w-4" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-bold">
+                  What a PG Owner in the Lite Plan Can See & Use
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Lite Plan provides complete operational autonomy at ₹29/bed/month with zero transaction fees on Direct UPI.
+                </CardDescription>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant={subAccess.currentPlan === "LITE" && !subAccess.isTrial && !subAccess.isExpired ? "default" : "outline"}
+              className={`text-xs rounded-xl font-bold h-8 gap-1.5 ${
+                subAccess.currentPlan === "LITE" && !subAccess.isTrial && !subAccess.isExpired
+                  ? "bg-teal-600 text-white"
+                  : "border-teal-500 text-teal-700 dark:text-teal-300"
+              }`}
+              onClick={() => {
+                subAccess.setDemoPlan("lite");
+                toast({
+                  title: "Switched to Lite Plan ⚡",
+                  description: "Now viewing all pages as a Lite Plan owner.",
+                });
+              }}
+            >
+              <Zap className="h-3.5 w-3.5" />
+              {subAccess.currentPlan === "LITE" && !subAccess.isTrial && !subAccess.isExpired
+                ? "Active Plan (Lite)"
+                : "Preview Lite Plan Experience"}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Column 1: Unlocked on Lite */}
+            <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.03] space-y-3">
+              <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
+                <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  Included & Unlocked in Lite Plan (₹29/bed)
+                </span>
+                <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-0 text-[10px] font-bold">
+                  FREE TO USE
+                </Badge>
+              </div>
+              <ul className="space-y-2 text-xs text-slate-700 dark:text-slate-300">
+                <li className="flex items-start gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                  <span><strong>Direct UPI / QR Collection:</strong> 0% transaction fee. Instant rent deposit directly into your bank account.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                  <span><strong>Manual Payment Verification:</strong> One-tap approve or reject receipts and rent proofs.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                  <span><strong>Unlimited PG Structure:</strong> Floors, rooms, bed mappings, sharing types, and amenities.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                  <span><strong>Full Tenant Operations:</strong> Add tenants (manual & bulk Excel import), manage tenant profiles and history.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                  <span><strong>Complaints & Maintenance:</strong> Dedicated desk, staff assignment, and maintenance resolution threads.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                  <span><strong>Daily Living Ops:</strong> Food menu planner, meal attendance, guest visitor logs, and property notices.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                  <span><strong>Financial Tracking:</strong> Expenses ledger, dues & pending balances, electricity billing calculations.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-600 mt-0.5 shrink-0" />
+                  <span><strong>Dedicated Manager:</strong> Personal guidance from your assigned account manager (Rahul Sharma).</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Column 2: Pro Exclusive */}
+            <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/[0.03] space-y-3">
+              <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
+                <span className="text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                  <Lock className="h-4 w-4 text-amber-600" />
+                  Gated Pro-Exclusive Features (₹49/bed)
+                </span>
+                <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-0 text-[10px] font-bold">
+                  PRO ONLY
+                </Badge>
+              </div>
+              <ul className="space-y-2 text-xs text-slate-700 dark:text-slate-300">
+                <li className="flex items-start gap-2">
+                  <Lock className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+                  <span><strong>Automated Payment Gateway:</strong> Credit/debit cards, Netbanking, recurring collections, T+2 auto-settlement.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Lock className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+                  <span><strong>Automated WhatsApp Alerts:</strong> Rent due reminders, receipt dispatch, and vacancy broadcast to tenants.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Lock className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+                  <span><strong>Aadhaar eSign Rental Agreement:</strong> Legally binding digital agreements via DigiO directly from mobile app.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Lock className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+                  <span><strong>Dedicated PG Subdomain Website:</strong> SEO-optimized public site (<code>{'{pgname}'}.pgease.in</code>) with live vacancy.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Lock className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+                  <span><strong>Notice Period Tracker:</strong> Tenant move-out countdowns and vacancy forecasting timeline.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Lock className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+                  <span><strong>Custom Staff Roles & Permissions:</strong> Granular access control for wardens, managers, and accountants.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Lock className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+                  <span><strong>Advanced Reports & Analytics:</strong> Deep financial, revenue collection, and occupancy trend reports.</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* PLAN STATUS SIMULATION TOOLBAR */}
       <div className="mt-8 p-3.5 rounded-2xl bg-slate-900 text-white shadow-lg border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
@@ -773,17 +932,39 @@ export default function Plans() {
           </div>
           <div>
             <span className="text-xs font-bold text-slate-200 block">Plan Simulator Demo Toolbar:</span>
-            <span className="text-[11px] text-slate-400 block">Test expired subscription, active trial, or pro plan UI</span>
+            <span className="text-[11px] text-slate-400 block">Test Lite plan, active Pro trial, paid Pro, or expired subscription UI</span>
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
           <Button
             size="sm"
             variant="outline"
+            className={`h-7 text-[11px] rounded-lg border-teal-500/40 text-teal-300 hover:bg-teal-950/50 ${
+              subAccess.currentPlan === "LITE" && !subAccess.isTrial && !subAccess.isExpired ? "bg-teal-500/20 ring-1 ring-teal-400 font-bold" : "bg-transparent"
+            }`}
+            onClick={() => {
+              subAccess.setDemoPlan("lite");
+              toast({
+                title: "Switched to Lite Plan ⚡",
+                description: "Viewing as Lite Plan owner (₹29/bed). Pro-exclusive automation is gated.",
+              });
+            }}
+          >
+            ⚡ Lite Plan (₹29/bed)
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
             className={`h-7 text-[11px] rounded-lg border-amber-500/40 text-amber-300 hover:bg-amber-950/50 ${
               subAccess.isTrial ? "bg-amber-500/20 ring-1 ring-amber-400" : "bg-transparent"
             }`}
-            onClick={() => subAccess.setDemoPlan("trial")}
+            onClick={() => {
+              subAccess.setDemoPlan("trial");
+              toast({
+                title: "Switched to 45-Day Pro Trial 🟢",
+                description: "All Pro features unlocked during trial.",
+              });
+            }}
           >
             🟢 45-Day Pro Trial
           </Button>
@@ -793,7 +974,13 @@ export default function Plans() {
             className={`h-7 text-[11px] rounded-lg border-red-500/40 text-red-300 hover:bg-red-950/50 ${
               subAccess.isExpired ? "bg-red-500/20 ring-1 ring-red-400" : "bg-transparent"
             }`}
-            onClick={() => subAccess.setDemoPlan("expired")}
+            onClick={() => {
+              subAccess.setDemoPlan("expired");
+              toast({
+                title: "Switched to Expired Plan 🔴",
+                description: "Viewing in read-only expired state.",
+              });
+            }}
           >
             🔴 Expired Plan ⚠️
           </Button>
@@ -803,7 +990,13 @@ export default function Plans() {
             className={`h-7 text-[11px] rounded-lg border-teal-500/40 text-teal-300 hover:bg-teal-950/50 ${
               subAccess.currentPlan === "PRO" && !subAccess.isExpired && !subAccess.isTrial ? "bg-teal-500/20 ring-1 ring-teal-400" : "bg-transparent"
             }`}
-            onClick={() => subAccess.setDemoPlan("pro")}
+            onClick={() => {
+              subAccess.setDemoPlan("pro");
+              toast({
+                title: "Switched to Paid Pro Plan 👑",
+                description: "Full Pro features activated.",
+              });
+            }}
           >
             👑 Paid Pro
           </Button>
@@ -811,7 +1004,13 @@ export default function Plans() {
             size="sm"
             variant="ghost"
             className="h-7 text-[11px] text-slate-400 hover:text-white rounded-lg"
-            onClick={() => subAccess.setDemoPlan("reset")}
+            onClick={() => {
+              subAccess.setDemoPlan("reset");
+              toast({
+                title: "Reset to Live API State",
+                description: "Synced with backend authoritative plan.",
+              });
+            }}
           >
             Reset (Live API)
           </Button>

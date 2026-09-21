@@ -83,7 +83,7 @@ const navItems: NavItem[] = [
       { title: "Leads & Visits", url: "/leads", permissionKey: "tenant_view", featureKey: "lead_crm" },
       { title: "Add tenant", url: "/tenants/add", permissionKey: "tenant_add" },
       { title: "Tenant KYC", url: "/tenants/kyc", permissionKey: "kyc_view", featureKey: "aadhaar_kyc" },
-      { title: "Notice Period", url: "/tenants/notice-period", permissionKey: "tenant_view" },
+      { title: "Notice Period", url: "/tenants/notice-period", permissionKey: "tenant_view", featureKey: "notice_period_tracker" },
       { title: "Guest Log & Requests", url: "/tenants/guests", permissionKey: "guest_log", featureKey: "nightout_guest_requests" },
       { title: "Team List", url: "/team", permissionKey: "team_view_members", featureKey: "staff_roles_permissions" },
     ],

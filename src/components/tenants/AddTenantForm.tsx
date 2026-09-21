@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   Select,
@@ -79,16 +80,24 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
   const [gender, setGender] = useState("");
   const [bloodGroup, setBloodGroup] = useState("");
   
-  // Structured Permanent Address (4 fields)
+  // Structured Permanent Address (8 fields per spec)
+  const [permHouseNumber, setPermHouseNumber] = useState("");
   const [permStreet, setPermStreet] = useState("");
+  const [permLocality, setPermLocality] = useState("");
   const [permCity, setPermCity] = useState("");
+  const [permDistrict, setPermDistrict] = useState("");
   const [permState, setPermState] = useState("");
+  const [permCountry, setPermCountry] = useState("India");
   const [permPincode, setPermPincode] = useState("");
 
-  // Structured Current Address (4 fields)
+  // Structured Current Address (8 fields per spec)
+  const [currHouseNumber, setCurrHouseNumber] = useState("");
   const [currStreet, setCurrStreet] = useState("");
+  const [currLocality, setCurrLocality] = useState("");
   const [currCity, setCurrCity] = useState("");
+  const [currDistrict, setCurrDistrict] = useState("");
   const [currState, setCurrState] = useState("");
+  const [currCountry, setCurrCountry] = useState("India");
   const [currPincode, setCurrPincode] = useState("");
   const [sameAsPermanent, setSameAsPermanent] = useState(false);
 
@@ -97,12 +106,26 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
   // Sync Current Address when "sameAsPermanent" is checked
   useEffect(() => {
     if (sameAsPermanent) {
+      setCurrHouseNumber(permHouseNumber);
       setCurrStreet(permStreet);
+      setCurrLocality(permLocality);
       setCurrCity(permCity);
+      setCurrDistrict(permDistrict);
       setCurrState(permState);
+      setCurrCountry(permCountry);
       setCurrPincode(permPincode);
     }
-  }, [sameAsPermanent, permStreet, permCity, permState, permPincode]);
+  }, [
+    sameAsPermanent,
+    permHouseNumber,
+    permStreet,
+    permLocality,
+    permCity,
+    permDistrict,
+    permState,
+    permCountry,
+    permPincode,
+  ]);
 
   // GST Details
   const [gstNumber, setGstNumber] = useState("");
@@ -125,6 +148,7 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
   const [guardianAddress, setGuardianAddress] = useState("");
 
   // Bank Details
+  const [bankName, setBankName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [ifscCode, setIfscCode] = useState("");
   const [upiId, setUpiId] = useState("");
@@ -144,7 +168,13 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
   const [rentalFrequency, setRentalFrequency] = useState("Monthly");
   const [rentDueDate, setRentDueDate] = useState("1st");
   const [securityDeposit, setSecurityDeposit] = useState("");
+  const [electricityBill, setElectricityBill] = useState("0");
   const [electricityMeter, setElectricityMeter] = useState(false);
+
+  // Rent Engine Invoicing Rules
+  const [billingStartDate, setBillingStartDate] = useState(new Date().toISOString().split("T")[0]);
+  const [gracePeriodDays, setGracePeriodDays] = useState("0");
+  const [rentDisabled, setRentDisabled] = useState(false);
 
   // --- STEP 3: Payment Details State ---
   const [rentDueAmt, setRentDueAmt] = useState("0");
@@ -534,8 +564,33 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
         }
       };
 
-      const formattedPermanentAddress = [permStreet, permCity, permState, permPincode].filter(Boolean).join(", ");
-      const formattedCurrentAddress = [currStreet, currCity, currState, currPincode].filter(Boolean).join(", ");
+      const formattedPermanentAddress = [
+        permHouseNumber,
+        permStreet,
+        permLocality,
+        permCity,
+        permDistrict,
+        permState,
+        permCountry,
+        permPincode,
+      ]
+        .filter(Boolean)
+        .join(", ");
+
+      const formattedCurrentAddress = sameAsPermanent
+        ? formattedPermanentAddress
+        : [
+            currHouseNumber,
+            currStreet,
+            currLocality,
+            currCity,
+            currDistrict,
+            currState,
+            currCountry,
+            currPincode,
+          ]
+            .filter(Boolean)
+            .join(", ");
 
       const addedTenant = await addTenant(propertyId, {
         name: name.trim(),
@@ -548,7 +603,7 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
         securityDeposit: parseInt(securityDeposit, 10) || 0,
         rentDueDate: parseInt(rentDueDate.replace(/\D/g, "")) || 1,
         joiningDate: moveInDate,
-        electricityBill: 0,
+        electricityBill: parseInt(electricityBill, 10) || 0,
         email: email.trim() || undefined,
         gender: gender || undefined,
         dob: dob || undefined,
@@ -559,7 +614,28 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
         foodPreferences: foodPreference.trim() || undefined,
         currentAddress: formattedCurrentAddress || undefined,
         permanentAddress: formattedPermanentAddress || undefined,
-        nationality: nationality || "Indian",
+        // Discrete 8-part address fields
+        permHouseNumber: permHouseNumber.trim() || undefined,
+        permStreet: permStreet.trim() || undefined,
+        permLocality: permLocality.trim() || undefined,
+        permCity: permCity.trim() || undefined,
+        permDistrict: permDistrict.trim() || undefined,
+        permState: permState.trim() || undefined,
+        permCountry: permCountry.trim() || "India",
+        permPincode: permPincode.trim() || undefined,
+        currHouseNumber: (sameAsPermanent ? permHouseNumber : currHouseNumber).trim() || undefined,
+        currStreet: (sameAsPermanent ? permStreet : currStreet).trim() || undefined,
+        currLocality: (sameAsPermanent ? permLocality : currLocality).trim() || undefined,
+        currCity: (sameAsPermanent ? permCity : currCity).trim() || undefined,
+        currDistrict: (sameAsPermanent ? permDistrict : currDistrict).trim() || undefined,
+        currState: (sameAsPermanent ? permState : currState).trim() || undefined,
+        currCountry: (sameAsPermanent ? permCountry : currCountry).trim() || "India",
+        currPincode: (sameAsPermanent ? permPincode : currPincode).trim() || undefined,
+        // Rent Engine Invoicing Rules
+        billingStartDate: billingStartDate || moveInDate,
+        gracePeriodDays: parseInt(gracePeriodDays, 10) || 0,
+        rentDisabled: Boolean(rentDisabled),
+        nationality: nationality || "India",
         remarks: remarks.trim() || undefined,
         gstin: gstNumber.trim() || undefined,
         businessName: companyName.trim() || undefined,
@@ -575,6 +651,7 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
         guardianContact: guardianPhone ? `+91${guardianPhone.replace(/\D/g, "")}` : undefined,
         guardianPhone: guardianPhone ? `+91${guardianPhone.replace(/\D/g, "")}` : undefined,
         guardianAddress: guardianAddress.trim() || undefined,
+        bankName: bankName.trim() || undefined,
         bankAccountHolderName: name.trim() || undefined,
         bankAccountNumber: accountNumber.trim() || undefined,
         bankIfscCode: ifscCode.trim() || undefined,
@@ -606,9 +683,6 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
       // Save secondary custom profile fields
       const targetId = (addedTenant as any)?.roomTenant?.id || (addedTenant as any)?.tenant?.id || addedTenant?.id;
       if (targetId) {
-        const permanentAddress = [permStreet, permCity, permState, permPincode].filter(Boolean).join(", ");
-        const currentAddress = sameAsPermanent ? permanentAddress : [currStreet, currCity, currState, currPincode].filter(Boolean).join(", ");
-
         await updatePropertyTenant(propertyId, targetId, {
           // Required stay fields
           roomId: idStr(effectiveRoomId),
@@ -617,9 +691,14 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
           securityDeposit: parseInt(securityDeposit, 10) || 0,
           rentDueDate: parseInt(rentDueDate.replace(/\D/g, "")) || 1,
           joiningDate: moveInDate,
-          electricityBill: 0,
+          electricityBill: parseInt(electricityBill, 10) || 0,
           name: name.trim(),
           phone: phone.startsWith("+") ? phone : `+91${phone.replace(/\D/g, "")}`,
+
+          // Rent Engine Invoicing Rules
+          billingStartDate: billingStartDate || moveInDate,
+          gracePeriodDays: parseInt(gracePeriodDays, 10) || 0,
+          rentDisabled: Boolean(rentDisabled),
 
           // Whitelisted personal & secondary fields
           remarks: remarks.trim() || undefined,
@@ -630,8 +709,24 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
           dob: dob || undefined,
           gender: gender || undefined,
           bloodGroup: bloodGroup.trim() || undefined,
-          currentAddress: currentAddress.trim() || undefined,
-          permanentAddress: permanentAddress.trim() || undefined,
+          currentAddress: formattedCurrentAddress || undefined,
+          permanentAddress: formattedPermanentAddress || undefined,
+          permHouseNumber: permHouseNumber.trim() || undefined,
+          permStreet: permStreet.trim() || undefined,
+          permLocality: permLocality.trim() || undefined,
+          permCity: permCity.trim() || undefined,
+          permDistrict: permDistrict.trim() || undefined,
+          permState: permState.trim() || undefined,
+          permCountry: permCountry.trim() || "India",
+          permPincode: permPincode.trim() || undefined,
+          currHouseNumber: (sameAsPermanent ? permHouseNumber : currHouseNumber).trim() || undefined,
+          currStreet: (sameAsPermanent ? permStreet : currStreet).trim() || undefined,
+          currLocality: (sameAsPermanent ? permLocality : currLocality).trim() || undefined,
+          currCity: (sameAsPermanent ? permCity : currCity).trim() || undefined,
+          currDistrict: (sameAsPermanent ? permDistrict : currDistrict).trim() || undefined,
+          currState: (sameAsPermanent ? permState : currState).trim() || undefined,
+          currCountry: (sameAsPermanent ? permCountry : currCountry).trim() || "India",
+          currPincode: (sameAsPermanent ? permPincode : currPincode).trim() || undefined,
           nationality: nationality.trim() || undefined,
           gstNumber: gstNumber.trim() || undefined,
           panNumber: panNumber.trim() || undefined,
@@ -647,6 +742,7 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
           guardianName: guardianName.trim() || undefined,
           guardianPhone: guardianPhone.trim() || undefined,
           guardianAddress: guardianAddress.trim() || undefined,
+          bankName: bankName.trim() || undefined,
           bankAccountNumber: accountNumber.trim() || undefined,
           bankIfscCode: ifscCode.trim() || undefined,
           bankUpiId: upiId.trim() || undefined,
@@ -795,7 +891,7 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
 
               <div className="space-y-2">
                 <Label>
-                  Gender <span className="text-destructive font-bold">*</span>
+                  Gender <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
                 </Label>
                 <Select value={gender} onValueChange={setGender}>
                   <SelectTrigger className="w-full">
@@ -1137,18 +1233,25 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                           </Select>
                         </div>
 
-                        {/* Structured Permanent Address */}
+                        {/* Structured Permanent Address (8 Discrete Fields) */}
                         <div className="space-y-2 border-t pt-3">
-                          <Label className="font-bold text-xs uppercase text-teal-700">Permanent Address</Label>
+                          <div className="flex items-center justify-between">
+                            <Label className="font-bold text-xs uppercase text-teal-700">Permanent Address (8 Discrete Fields)</Label>
+                            <span className="text-[10px] text-muted-foreground">Auto-normalized</span>
+                          </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <Input placeholder="House / Street / Line 1" value={permStreet} onChange={(e) => setPermStreet(e.target.value)} />
-                            <Input placeholder="City / Area" value={permCity} onChange={(e) => setPermCity(e.target.value)} />
+                            <Input placeholder="House / Flat No." value={permHouseNumber} onChange={(e) => setPermHouseNumber(e.target.value)} />
+                            <Input placeholder="Street / Road" value={permStreet} onChange={(e) => setPermStreet(e.target.value)} />
+                            <Input placeholder="Locality / Area" value={permLocality} onChange={(e) => setPermLocality(e.target.value)} />
+                            <Input placeholder="City" value={permCity} onChange={(e) => setPermCity(e.target.value)} />
+                            <Input placeholder="District" value={permDistrict} onChange={(e) => setPermDistrict(e.target.value)} />
                             <Input placeholder="State" value={permState} onChange={(e) => setPermState(e.target.value)} />
-                            <Input placeholder="Pincode (6 digits)" maxLength={6} value={permPincode} onChange={(e) => setPermPincode(e.target.value.replace(/\D/g, "").slice(0, 6))} />
+                            <Input placeholder="Country" value={permCountry} onChange={(e) => setPermCountry(e.target.value)} />
+                            <Input placeholder="PIN Code (6 digits)" maxLength={6} value={permPincode} onChange={(e) => setPermPincode(e.target.value.replace(/\D/g, "").slice(0, 6))} />
                           </div>
                         </div>
 
-                        {/* Structured Current Address */}
+                        {/* Structured Current Address (8 Discrete Fields) */}
                         <div className="space-y-2 border-t pt-3">
                           <div className="flex items-center justify-between">
                             <Label className="font-bold text-xs uppercase text-teal-700">Current Address</Label>
@@ -1164,10 +1267,14 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                           </div>
                           {!sameAsPermanent ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                              <Input placeholder="House / Street / Line 1" value={currStreet} onChange={(e) => setCurrStreet(e.target.value)} />
-                              <Input placeholder="City / Area" value={currCity} onChange={(e) => setCurrCity(e.target.value)} />
+                              <Input placeholder="House / Flat No." value={currHouseNumber} onChange={(e) => setCurrHouseNumber(e.target.value)} />
+                              <Input placeholder="Street / Road" value={currStreet} onChange={(e) => setCurrStreet(e.target.value)} />
+                              <Input placeholder="Locality / Area" value={currLocality} onChange={(e) => setCurrLocality(e.target.value)} />
+                              <Input placeholder="City" value={currCity} onChange={(e) => setCurrCity(e.target.value)} />
+                              <Input placeholder="District" value={currDistrict} onChange={(e) => setCurrDistrict(e.target.value)} />
                               <Input placeholder="State" value={currState} onChange={(e) => setCurrState(e.target.value)} />
-                              <Input placeholder="Pincode (6 digits)" maxLength={6} value={currPincode} onChange={(e) => setCurrPincode(e.target.value.replace(/\D/g, "").slice(0, 6))} />
+                              <Input placeholder="Country" value={currCountry} onChange={(e) => setCurrCountry(e.target.value)} />
+                              <Input placeholder="PIN Code (6 digits)" maxLength={6} value={currPincode} onChange={(e) => setCurrPincode(e.target.value.replace(/\D/g, "").slice(0, 6))} />
                             </div>
                           ) : (
                             <p className="text-xs text-muted-foreground bg-muted p-2 rounded">
@@ -1314,6 +1421,10 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                       </summary>
                       <div className="p-3.5 space-y-3.5 bg-background text-sm">
                         <div className="space-y-1">
+                          <Label>Bank Name</Label>
+                          <Input placeholder="e.g. HDFC Bank, SBI, ICICI" value={bankName} onChange={(e) => setBankName(e.target.value)} />
+                        </div>
+                        <div className="space-y-1">
                           <Label>Account Number</Label>
                           <Input placeholder="Enter account number" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} />
                         </div>
@@ -1396,9 +1507,7 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
               <div className="space-y-2">
-                <Label>
-                  Lock-in Period <span className="text-destructive font-bold">*</span>
-                </Label>
+                <Label>Lock-in Period</Label>
                 <Select value={lockInPeriod} onValueChange={setLockInPeriod}>
                   <SelectTrigger>
                     <SelectValue placeholder="Lock-in Period" />
@@ -1413,9 +1522,7 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>
-                  Notice Period <span className="text-destructive font-bold">*</span>
-                </Label>
+                <Label>Notice Period</Label>
                 <Select value={noticePeriod} onValueChange={setNoticePeriod}>
                   <SelectTrigger>
                     <SelectValue placeholder="Notice Period" />
@@ -1479,9 +1586,11 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label>Add Rent On</Label>
+                  <Label>
+                    Add Rent On <span className="text-destructive font-bold">*</span>
+                  </Label>
                   <Select value={rentDueDate} onValueChange={setRentDueDate}>
                     <SelectTrigger>
                       <SelectValue placeholder="Add Rent On" />
@@ -1490,6 +1599,9 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                       <SelectItem value="1st">1st of every month</SelectItem>
                       <SelectItem value="5th">5th of every month</SelectItem>
                       <SelectItem value="10th">10th of every month</SelectItem>
+                      <SelectItem value="15th">15th of every month</SelectItem>
+                      <SelectItem value="20th">20th of every month</SelectItem>
+                      <SelectItem value="25th">25th of every month</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1507,6 +1619,23 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                       placeholder="e.g. 5000 (enter 0 if none)"
                       value={securityDeposit}
                       onChange={(e) => setSecurityDeposit(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>
+                    Default Electricity Charges <span className="text-destructive font-bold">*</span>
+                  </Label>
+                  <div className="flex gap-2">
+                    <span className="flex items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">
+                      ₹
+                    </span>
+                    <Input
+                      type="number"
+                      min={0}
+                      placeholder="e.g. 500 (0 if in rent)"
+                      value={electricityBill}
+                      onChange={(e) => setElectricityBill(e.target.value)}
                     />
                   </div>
                 </div>
@@ -1530,6 +1659,52 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                     }`}
                   />
                 </button>
+              </div>
+
+              {/* RENT ENGINE INVOICING RULES */}
+              <div className="border-t pt-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-foreground">Rent Engine Invoicing Rules</h4>
+                    <p className="text-xs text-muted-foreground">Automated invoicing parameters and suspension rules</p>
+                  </div>
+                  <Badge variant="outline" className="text-xs font-normal">Optional</Badge>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Invoicing Start Date</Label>
+                    <Input
+                      type="date"
+                      value={billingStartDate}
+                      onChange={(e) => setBillingStartDate(e.target.value)}
+                    />
+                    <p className="text-[11px] text-muted-foreground">No recurring rent invoices generated before this date (defaults to joining date)</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Grace Period (Days)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      placeholder="0"
+                      value={gracePeriodDays}
+                      onChange={(e) => setGracePeriodDays(e.target.value)}
+                    />
+                    <p className="text-[11px] text-muted-foreground">Buffer days before overdue reminder alerts and late penalties apply</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/20">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium">Suppress Automated Rent Invoicing</Label>
+                    <p className="text-xs text-muted-foreground">Completely disables monthly rent generation (for caretakers / complimentary stays)</p>
+                  </div>
+                  <Switch
+                    checked={rentDisabled}
+                    onCheckedChange={setRentDisabled}
+                  />
+                </div>
               </div>
             </div>
           </CardContent>

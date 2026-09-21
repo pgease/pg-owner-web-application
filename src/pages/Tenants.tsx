@@ -20,6 +20,7 @@ import {
   UserMinus,
   AlertCircle,
   Calendar,
+  Clock,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +56,8 @@ import {
   useRoomsList,
   useMoveTenantMutation,
   useSetTenantNoticeMutation,
+  useCancelTenantNoticeMutation,
+  useMoveOutTenantMutation,
 } from "@/hooks/usePropertyOwnerQueries";
 import { FilterBar } from "@/components/common/FilterBar";
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
@@ -70,6 +73,9 @@ import {
   tenantBlock,
   tenantFloor,
   tenantBedNo,
+  tenantStayStatus,
+  tenantStatusDisplay,
+  tenantCode,
 } from "@/lib/tenantDisplay";
 import { cn } from "@/lib/utils";
 
@@ -139,14 +145,30 @@ const Tenants = () => {
   const [transferDeposit, setTransferDeposit] = useState<boolean>(true);
   const [moveRemarks, setMoveRemarks] = useState<string>("");
 
+  // Status Filter State
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "notice" | "moved_out">("all");
+
   // Vacate / Move Out State
   const [vacateModalOpen, setVacateModalOpen] = useState(false);
   const [selectedTenantForVacate, setSelectedTenantForVacate] = useState<PropertyTenant | null>(null);
   const [vacateDate, setVacateDate] = useState<string>("");
   const [vacateReason, setVacateReason] = useState<string>("");
+  const [vacateRemarks, setVacateRemarks] = useState<string>("");
+
+  // Notice Period State
+  const [noticeModalOpen, setNoticeModalOpen] = useState(false);
+  const [selectedTenantForNotice, setSelectedTenantForNotice] = useState<PropertyTenant | null>(null);
+  const [noticeMoveOutDate, setNoticeMoveOutDate] = useState<string>("");
+  const [noticeReason, setNoticeReason] = useState<string>("Standard 30-day notice");
+
+  // Cancel Notice State
+  const [cancelNoticeAlertOpen, setCancelNoticeAlertOpen] = useState(false);
+  const [selectedTenantForCancelNotice, setSelectedTenantForCancelNotice] = useState<PropertyTenant | null>(null);
 
   const moveMutation = useMoveTenantMutation(selectedPgId);
   const setNoticeMutation = useSetTenantNoticeMutation(selectedPgId);
+  const cancelNoticeMutation = useCancelTenantNoticeMutation(selectedPgId);
+  const moveOutMutation = useMoveOutTenantMutation(selectedPgId);
 
   const effectiveTargetPropertyId = targetPropertyId || selectedPgId || "";
   const targetRoomsQuery = useRoomsList(effectiveTargetPropertyId, undefined, undefined, { requireBlockAndFloor: false });
@@ -190,7 +212,8 @@ const Tenants = () => {
   const handleOpenVacateModal = (tenant: PropertyTenant) => {
     setSelectedTenantForVacate(tenant);
     setVacateDate(new Date().toISOString().split("T")[0]);
-    setVacateReason("");
+    setVacateReason("Tenancy completed smoothly");
+    setVacateRemarks("");
     setVacateModalOpen(true);
   };
 
@@ -198,24 +221,88 @@ const Tenants = () => {
     if (!selectedTenantForVacate) return;
     const roomTenantId = selectedTenantForVacate.roomTenant?.id || selectedTenantForVacate.id;
     try {
-      await setNoticeMutation.mutateAsync({
+      await moveOutMutation.mutateAsync({
         roomTenantId,
         body: {
-          vacateOn: vacateDate || new Date().toISOString().split("T")[0],
-          reason: vacateReason.trim() || "Tenant moved out / checkout",
+          moveOutDate: vacateDate || new Date().toISOString().split("T")[0],
+          reason: vacateReason.trim() || "Tenancy completed smoothly",
+          remarks: vacateRemarks.trim() || undefined,
         },
       });
       toast({
-        title: "Tenant Vacate Processed",
-        description: `${tenantDisplayName(selectedTenantForVacate)} has been marked for move out. Bed will be updated.`,
+        title: "Tenant Move-Out Completed 🚪",
+        description: `${tenantDisplayName(selectedTenantForVacate)} has moved out. The bed is now free and recurring rent invoicing is halted.`,
       });
       setVacateModalOpen(false);
       setSelectedTenantForVacate(null);
       tenantsQuery.refetch();
     } catch (e: any) {
       toast({
-        title: "Failed to process vacate",
-        description: e?.message || "Unable to update tenant stay status",
+        title: "Failed to process move-out",
+        description: e?.message || "Unable to complete tenant move-out",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleOpenNoticeModal = (tenant: PropertyTenant) => {
+    setSelectedTenantForNotice(tenant);
+    setNoticeMoveOutDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
+    setNoticeReason("Standard 30-day notice");
+    setNoticeModalOpen(true);
+  };
+
+  const handleConfirmSetNotice = async () => {
+    if (!selectedTenantForNotice || !noticeMoveOutDate) {
+      toast({ title: "Please select an expected move-out date", variant: "destructive" });
+      return;
+    }
+    const roomTenantId = selectedTenantForNotice.roomTenant?.id || selectedTenantForNotice.id;
+    try {
+      await setNoticeMutation.mutateAsync({
+        roomTenantId,
+        body: {
+          expectedMoveOutDate: noticeMoveOutDate,
+          reason: noticeReason.trim() || "Tenant served move-out notice",
+        },
+      });
+      toast({
+        title: "Notice Period Initiated 📅",
+        description: `${tenantDisplayName(selectedTenantForNotice)} is now on notice (scheduled to vacate ${noticeMoveOutDate}).`,
+      });
+      setNoticeModalOpen(false);
+      setSelectedTenantForNotice(null);
+      tenantsQuery.refetch();
+    } catch (e: any) {
+      toast({
+        title: "Failed to initiate notice",
+        description: e?.message || "Unable to set notice period",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleOpenCancelNoticeModal = (tenant: PropertyTenant) => {
+    setSelectedTenantForCancelNotice(tenant);
+    setCancelNoticeAlertOpen(true);
+  };
+
+  const handleConfirmCancelNotice = async () => {
+    if (!selectedTenantForCancelNotice) return;
+    const roomTenantId = selectedTenantForCancelNotice.roomTenant?.id || selectedTenantForCancelNotice.id;
+    try {
+      await cancelNoticeMutation.mutateAsync(roomTenantId);
+      toast({
+        title: "Notice Cancelled Successfully",
+        description: `${tenantDisplayName(selectedTenantForCancelNotice)} has been restored to active stay.`,
+      });
+      setCancelNoticeAlertOpen(false);
+      setSelectedTenantForCancelNotice(null);
+      tenantsQuery.refetch();
+    } catch (e: any) {
+      toast({
+        title: "Failed to cancel notice",
+        description: e?.message || "Unable to cancel notice",
         variant: "destructive",
       });
     }
@@ -282,8 +369,36 @@ const Tenants = () => {
     } else if (kycFilter === "pending") {
       next = next.filter((t) => tenantVerificationLabel(t) !== "verified");
     }
+
+    if (statusFilter === "active") {
+      next = next.filter((t) => tenantStayStatus(t) === "ACTIVE");
+    } else if (statusFilter === "notice") {
+      next = next.filter((t) => tenantStayStatus(t) === "UNDER_NOTICE");
+    } else if (statusFilter === "moved_out") {
+      next = next.filter((t) => tenantStayStatus(t) === "MOVED_OUT");
+    }
+
     return next;
-  }, [tenantsQuery.data, searchQuery, kycFilter, selectedBlockId, selectedFloorId, selectedRoomId]);
+  }, [tenantsQuery.data, searchQuery, kycFilter, statusFilter, selectedBlockId, selectedFloorId, selectedRoomId]);
+
+  const rawTenantsList = tenantsQuery.data ?? [];
+  const statusCounts = useMemo(() => {
+    let active = 0;
+    let notice = 0;
+    let movedOut = 0;
+    for (const t of rawTenantsList) {
+      const st = tenantStayStatus(t);
+      if (st === "UNDER_NOTICE") notice++;
+      else if (st === "MOVED_OUT") movedOut++;
+      else active++;
+    }
+    return {
+      all: rawTenantsList.length,
+      active,
+      notice,
+      movedOut,
+    };
+  }, [rawTenantsList]);
 
   const groupedByBlockTenants = useMemo(() => {
     const map = new Map<
@@ -579,11 +694,17 @@ const Tenants = () => {
     const blockName = roomObj?.block || blocks.find((b) => b.id === (roomObj?.blockId || row.block?.id))?.name || tenantBlock(row);
     const bedNo = tenantBedNo(row);
     const tenantPhoto = (row as any).photoUrl || (row as any).imageUrl || (row as any).profilePhotoUrl;
+    const statusInfo = tenantStatusDisplay(row);
+    const code = tenantCode(row);
 
     return (
       <Card
         key={row.id}
-        className="cursor-pointer hover:shadow-md transition-shadow duration-200 border-border/60 overflow-hidden bg-card"
+        className={cn(
+          "cursor-pointer hover:shadow-md transition-shadow duration-200 border-border/60 overflow-hidden bg-card",
+          statusInfo.status === "UNDER_NOTICE" && "border-amber-300 dark:border-amber-800/60 bg-amber-500/[0.02]",
+          statusInfo.status === "MOVED_OUT" && "opacity-75 bg-muted/20",
+        )}
         onClick={() => navigate(`/tenants/${row.id}`)}
       >
         <CardContent className="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -598,17 +719,29 @@ const Tenants = () => {
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <h3 className="font-bold text-base text-foreground truncate">
                   {tenantDisplayName(row)}
                 </h3>
+                {code && (
+                  <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                    {code}
+                  </span>
+                )}
+                <Badge
+                  variant="outline"
+                  className={cn("text-[10px] py-0 px-2 font-medium flex items-center gap-1", statusInfo.badgeClass)}
+                >
+                  {statusInfo.status === "UNDER_NOTICE" && <Clock className="h-2.5 w-2.5" />}
+                  {statusInfo.label}
+                </Badge>
                 {isVerified ? (
                   <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-50 text-[10px] py-0 px-2 font-medium">
-                    Aadhar verified
+                    Aadhaar verified
                   </Badge>
                 ) : (
                   <Badge className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-50 text-[10px] py-0 px-2 font-medium">
-                    Pending verification
+                    Pending KYC
                   </Badge>
                 )}
               </div>
@@ -639,23 +772,58 @@ const Tenants = () => {
           </div>
 
           {/* Right Quick actions block */}
-          <div className="flex items-center gap-2 shrink-0 justify-end" onClick={(e) => e.stopPropagation()}>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 gap-1.5 rounded-lg border-teal-600/30 text-teal-700 hover:bg-teal-50 font-bold"
-              onClick={() => handleOpenMoveModal(row)}
-            >
-              <ArrowRightLeft className="h-3.5 w-3.5" /> Move
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 gap-1.5 rounded-lg border-rose-200 text-rose-600 hover:bg-rose-50 font-bold"
-              onClick={() => handleOpenVacateModal(row)}
-            >
-              <UserMinus className="h-3.5 w-3.5" /> Vacate
-            </Button>
+          <div className="flex items-center gap-2 shrink-0 justify-end flex-wrap" onClick={(e) => e.stopPropagation()}>
+            {statusInfo.status === "MOVED_OUT" ? (
+              <span className="text-xs font-semibold text-muted-foreground bg-muted/60 px-3 py-1.5 rounded-lg border border-border/60">
+                Stay Completed
+              </span>
+            ) : statusInfo.status === "UNDER_NOTICE" ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 gap-1.5 rounded-lg border-rose-300 text-rose-600 hover:bg-rose-50 font-bold shadow-2xs"
+                  onClick={() => handleOpenVacateModal(row)}
+                >
+                  <UserMinus className="h-3.5 w-3.5" /> Complete Move-Out
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 gap-1 rounded-lg border-amber-300 text-amber-800 hover:bg-amber-50 font-medium"
+                  onClick={() => handleOpenCancelNoticeModal(row)}
+                >
+                  Cancel Notice
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 gap-1.5 rounded-lg border-teal-600/30 text-teal-700 hover:bg-teal-50 font-bold"
+                  onClick={() => handleOpenMoveModal(row)}
+                >
+                  <ArrowRightLeft className="h-3.5 w-3.5" /> Move
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 gap-1.5 rounded-lg border-amber-300 text-amber-700 hover:bg-amber-50 font-medium"
+                  onClick={() => handleOpenNoticeModal(row)}
+                >
+                  <Clock className="h-3.5 w-3.5" /> Notice
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 gap-1.5 rounded-lg border-rose-200 text-rose-600 hover:bg-rose-50 font-bold"
+                  onClick={() => handleOpenVacateModal(row)}
+                >
+                  <UserMinus className="h-3.5 w-3.5" /> Move Out
+                </Button>
+              </>
+            )}
             {tenantPhone(row) !== "—" && (
               <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-lg border-teal-600/30 text-teal-600 hover:bg-teal-50" asChild>
                 <a href={`tel:${phoneDigits(row.phone ?? "")}`}>
@@ -836,6 +1004,64 @@ const Tenants = () => {
               <KpiCard label="KYC verified" value={kpi.verified} icon={ShieldCheck} tone="emerald" />
               <KpiCard label="On notice" value={kpi.onNotice} icon={AlertTriangle} tone="amber" />
               <KpiCard label="New (7 days)" value={kpi.recent} icon={UserPlus} tone="violet" />
+            </div>
+
+            {/* Lifecycle Status Filter Tabs */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              <Button
+                type="button"
+                size="sm"
+                variant={statusFilter === "all" ? "default" : "outline"}
+                onClick={() => setStatusFilter("all")}
+                className={cn(
+                  "h-8 rounded-full text-xs font-semibold gap-1.5 transition-all",
+                  statusFilter === "all" ? "bg-slate-900 text-white hover:bg-slate-800" : "text-slate-600 border-slate-200 hover:bg-slate-50"
+                )}
+              >
+                All Tenants ({statusCounts.all})
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={statusFilter === "active" ? "default" : "outline"}
+                onClick={() => setStatusFilter("active")}
+                className={cn(
+                  "h-8 rounded-full text-xs font-semibold gap-1.5 transition-all",
+                  statusFilter === "active"
+                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                    : "text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                )}
+              >
+                Active ({statusCounts.active})
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={statusFilter === "notice" ? "default" : "outline"}
+                onClick={() => setStatusFilter("notice")}
+                className={cn(
+                  "h-8 rounded-full text-xs font-semibold gap-1.5 transition-all",
+                  statusFilter === "notice"
+                    ? "bg-amber-600 text-white hover:bg-amber-700"
+                    : "text-amber-700 border-amber-200 hover:bg-amber-50"
+                )}
+              >
+                <Clock className="h-3 w-3" /> Under Notice ({statusCounts.notice})
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={statusFilter === "moved_out" ? "default" : "outline"}
+                onClick={() => setStatusFilter("moved_out")}
+                className={cn(
+                  "h-8 rounded-full text-xs font-semibold gap-1.5 transition-all",
+                  statusFilter === "moved_out"
+                    ? "bg-slate-700 text-white hover:bg-slate-800"
+                    : "text-slate-600 border-slate-200 hover:bg-slate-50"
+                )}
+              >
+                Moved Out ({statusCounts.movedOut})
+              </Button>
             </div>
 
             <FilterBar>
@@ -1156,9 +1382,99 @@ const Tenants = () => {
                 size="sm"
                 className="rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white gap-1.5 shadow-xs"
                 onClick={handleConfirmVacate}
-                disabled={setNoticeMutation.isPending}
+                disabled={moveOutMutation.isPending}
               >
-                {setNoticeMutation.isPending ? "Processing..." : "Confirm Vacate & Free Bed"}
+                {moveOutMutation.isPending ? "Processing..." : "Confirm Move-Out & Free Bed"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* MODAL 3: INITIATE NOTICE PERIOD DIALOG */}
+        <Dialog open={noticeModalOpen} onOpenChange={setNoticeModalOpen}>
+          <DialogContent className="max-w-md rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-base flex items-center gap-2 text-amber-700">
+                <Clock className="h-5 w-5 text-amber-600" /> Initiate Notice Period
+              </DialogTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Mark <strong className="text-foreground">{selectedTenantForNotice ? tenantDisplayName(selectedTenantForNotice) : "tenant"}</strong> as vacating. The tenant status will change to <span className="font-semibold text-amber-700">UNDER NOTICE</span>.
+              </p>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2 text-xs">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold">Scheduled Move-Out Date *</Label>
+                <Input
+                  type="date"
+                  value={noticeMoveOutDate}
+                  onChange={(e) => setNoticeMoveOutDate(e.target.value)}
+                  className="h-10 text-xs rounded-xl"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold">Notice Reason / Notes</Label>
+                <Input
+                  value={noticeReason}
+                  onChange={(e) => setNoticeReason(e.target.value)}
+                  placeholder="e.g. Relocating to another city, end of contract"
+                  className="h-10 text-xs rounded-xl"
+                />
+              </div>
+
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200/80 dark:border-amber-900/50 flex gap-2.5 items-start">
+                <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                  The bed will remain allocated to the tenant until the move-out date is reached or Move-Out is finalized. Rent continues to accrue according to invoicing rules. You can cancel this notice at any time.
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" size="sm" onClick={() => setNoticeModalOpen(false)} className="rounded-xl text-xs">
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white gap-1.5 shadow-xs"
+                onClick={handleConfirmSetNotice}
+                disabled={setNoticeMutation.isPending || !noticeMoveOutDate}
+              >
+                {setNoticeMutation.isPending ? "Setting Notice..." : "Initiate Notice"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* MODAL 4: CANCEL NOTICE DIALOG */}
+        <Dialog open={cancelNoticeAlertOpen} onOpenChange={setCancelNoticeAlertOpen}>
+          <DialogContent className="max-w-md rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-base flex items-center gap-2 text-foreground">
+                <AlertCircle className="h-5 w-5 text-amber-600" /> Cancel Notice Period
+              </DialogTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Are you sure you want to cancel the move-out notice for <strong className="text-foreground">{selectedTenantForCancelNotice ? tenantDisplayName(selectedTenantForCancelNotice) : "tenant"}</strong>?
+              </p>
+            </DialogHeader>
+
+            <div className="py-2 text-xs text-muted-foreground">
+              This will return the tenant to normal <span className="font-semibold text-emerald-700">ACTIVE</span> stay status and remove the scheduled vacating deadline.
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" size="sm" onClick={() => setCancelNoticeAlertOpen(false)} className="rounded-xl text-xs">
+                Keep Notice
+              </Button>
+              <Button
+                size="sm"
+                className="rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white shadow-xs"
+                onClick={handleConfirmCancelNotice}
+                disabled={cancelNoticeMutation.isPending}
+              >
+                {cancelNoticeMutation.isPending ? "Cancelling..." : "Confirm Cancel Notice"}
               </Button>
             </DialogFooter>
           </DialogContent>

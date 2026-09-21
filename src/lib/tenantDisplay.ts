@@ -138,3 +138,129 @@ export function tenantVerificationLabel(t?: PropertyTenant | null): "verified" |
   if (t.kycVerified === true || t.aadhaarVerified === true || (t as any).isKycVerified === true) return "verified";
   return "pending";
 }
+
+export type TenantStayState = "ACTIVE" | "UNDER_NOTICE" | "MOVED_OUT";
+
+export function tenantStayStatus(t?: any): TenantStayState {
+  if (!t) return "ACTIVE";
+  const rawStatus = (
+    t.status ||
+    t.roomTenant?.status ||
+    t.currentStay?.status ||
+    ""
+  ).toUpperCase();
+
+  if (rawStatus === "MOVED_OUT" || t.isMovedOut || t.roomTenant?.isMovedOut || t.vacated) {
+    return "MOVED_OUT";
+  }
+
+  if (
+    rawStatus === "UNDER_NOTICE" ||
+    t.isOnNotice === true ||
+    t.roomTenant?.isOnNotice === true ||
+    t.currentStay?.isOnNotice === true ||
+    Boolean(t.noticeRaisedOn || t.roomTenant?.noticeRaisedOn)
+  ) {
+    return "UNDER_NOTICE";
+  }
+
+  return "ACTIVE";
+}
+
+export function tenantMoveOutDate(t?: any): string | null {
+  if (!t) return null;
+  return (
+    t.moveOutDate ||
+    t.roomTenant?.moveOutDate ||
+    t.currentStay?.moveOutDate ||
+    t.vacateOn ||
+    t.roomTenant?.vacateOn ||
+    t.expectedMoveOutDate ||
+    null
+  );
+}
+
+export function tenantNoticeRaisedDate(t?: any): string | null {
+  if (!t) return null;
+  return (
+    t.noticeRaisedOn ||
+    t.roomTenant?.noticeRaisedOn ||
+    t.currentStay?.noticeRaisedOn ||
+    t.noticeGivenAt ||
+    null
+  );
+}
+
+export function tenantCode(t?: any): string {
+  if (!t) return "";
+  return String(t.tenantCode || t.roomTenant?.tenantCode || t.code || "").trim();
+}
+
+export function tenantGender(t?: any): string {
+  if (!t) return "";
+  const g = t.gender || t.roomTenant?.gender;
+  if (!g) return "";
+  return String(g).charAt(0).toUpperCase() + String(g).slice(1).toLowerCase();
+}
+
+export function tenantDob(t?: any): string {
+  if (!t) return "";
+  const d = t.dob || t.dateOfBirth || t.roomTenant?.dob;
+  if (!d) return "";
+  try {
+    const dt = new Date(d);
+    if (!isNaN(dt.getTime())) {
+      return dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    }
+  } catch {
+    // fallback
+  }
+  return String(d);
+}
+
+export function tenantBankName(t?: any): string {
+  if (!t) return "";
+  return String(t.bankName || t.bankDetails?.bankName || t.roomTenant?.bankName || "").trim();
+}
+
+export function tenantStatusDisplay(t?: any): {
+  status: TenantStayState;
+  label: string;
+  badgeClass: string;
+} {
+  const status = tenantStayStatus(t);
+  const moveOut = tenantMoveOutDate(t);
+
+  if (status === "UNDER_NOTICE") {
+    let moveOutFormatted = "";
+    if (moveOut) {
+      try {
+        const dt = new Date(moveOut);
+        if (!isNaN(dt.getTime())) {
+          moveOutFormatted = dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+        }
+      } catch {
+        moveOutFormatted = String(moveOut).split("T")[0];
+      }
+    }
+    return {
+      status: "UNDER_NOTICE",
+      label: moveOutFormatted ? `On Notice (Vacating ${moveOutFormatted})` : "On Notice",
+      badgeClass: "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/80 dark:text-amber-200 dark:border-amber-800",
+    };
+  }
+
+  if (status === "MOVED_OUT") {
+    return {
+      status: "MOVED_OUT",
+      label: "Moved Out",
+      badgeClass: "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700",
+    };
+  }
+
+  return {
+    status: "ACTIVE",
+    label: "Active Stay",
+    badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800",
+  };
+}

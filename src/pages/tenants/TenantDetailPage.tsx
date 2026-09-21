@@ -27,6 +27,7 @@ import {
   ArrowRightLeft,
   History,
   MessageSquare,
+  UserMinus,
 } from "lucide-react";
 import { TenantActivityLogsDrawer } from "@/components/tenants/TenantActivityLogsDrawer";
 import {
@@ -75,6 +76,10 @@ import {
   tenantRentDueLabel,
   tenantRoomNo,
   tenantVerificationLabel,
+  tenantStayStatus,
+  tenantStatusDisplay,
+  tenantCode,
+  tenantMoveOutDate,
 } from "@/lib/tenantDisplay";
 import { useApp } from "@/context/AppContext";
 import {
@@ -90,6 +95,8 @@ import {
   useDeleteElectricityDuesMutation,
   useSetTenantNoticeMutation,
   useClearTenantNoticeMutation,
+  useCancelTenantNoticeMutation,
+  useMoveOutTenantMutation,
   useMoveTenantMutation,
   useRoomsList,
 } from "@/hooks/usePropertyOwnerQueries";
@@ -310,6 +317,72 @@ export default function TenantDetailPage() {
 
   const setNoticeMut = useSetTenantNoticeMutation(currentPropertyId);
   const clearNoticeMut = useClearTenantNoticeMutation(currentPropertyId);
+  const cancelNoticeMut = useCancelTenantNoticeMutation(currentPropertyId);
+  const moveOutMut = useMoveOutTenantMutation(currentPropertyId);
+
+  // Move-Out State
+  const [moveOutModalOpen, setMoveOutModalOpen] = useState(false);
+  const [moveOutDate, setMoveOutDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [moveOutReason, setMoveOutReason] = useState<string>("Tenancy completed smoothly");
+  const [moveOutRemarks, setMoveOutRemarks] = useState<string>("");
+
+  const handleOpenMoveOutModal = () => {
+    setMoveOutDate(new Date().toISOString().split("T")[0]);
+    setMoveOutReason("Tenancy completed smoothly");
+    setMoveOutRemarks("");
+    setMoveOutModalOpen(true);
+  };
+
+  const handleConfirmMoveOut = async () => {
+    const effectiveRtId = roomTenantId || (tenant as any)?.roomTenant?.id || tenant?.id;
+    if (!currentPropertyId || !effectiveRtId) {
+      toast({ title: "Stay assignment not found", variant: "destructive" });
+      return;
+    }
+    try {
+      await moveOutMut.mutateAsync({
+        roomTenantId: effectiveRtId,
+        body: {
+          moveOutDate: moveOutDate || new Date().toISOString().split("T")[0],
+          reason: moveOutReason.trim() || "Tenancy completed smoothly",
+          remarks: moveOutRemarks.trim() || undefined,
+        },
+      });
+      toast({
+        title: "Tenant Move-Out Completed 🚪",
+        description: `${tenantDisplayName(tenant)} has moved out. The bed is now freed and recurring rent invoicing is halted.`,
+      });
+      setMoveOutModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenantDetail(currentPropertyId, tenantId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenants(currentPropertyId) });
+    } catch (e: any) {
+      toast({
+        title: "Failed to complete move-out",
+        description: e?.message || "Unable to process move-out",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleConfirmCancelNotice = async () => {
+    const effectiveRtId = roomTenantId || (tenant as any)?.roomTenant?.id || tenant?.id;
+    if (!effectiveRtId) return;
+    try {
+      await cancelNoticeMut.mutateAsync(effectiveRtId);
+      toast({
+        title: "Notice Cancelled Successfully",
+        description: `${tenantDisplayName(tenant)} has been restored to active stay.`,
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenantDetail(currentPropertyId, tenantId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenants(currentPropertyId) });
+    } catch (e: any) {
+      toast({
+        title: "Failed to cancel notice",
+        description: e?.message || "Unable to cancel notice",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Move Tenant State
   const { properties } = useApp();
@@ -406,6 +479,9 @@ export default function TenantDetailPage() {
     agreementPeriodMonths: "0",
     joiningDate: "",
     expectedMoveOutDate: "",
+    billingStartDate: "",
+    gracePeriodDays: "0",
+    rentDisabled: false,
     referredBy: "",
     bookedBy: "",
     checkinTime: "",
@@ -427,6 +503,22 @@ export default function TenantDetailPage() {
     bloodGroup: "",
     permanentAddress: "",
     currentAddress: "",
+    permHouseNumber: "",
+    permStreet: "",
+    permLocality: "",
+    permCity: "",
+    permDistrict: "",
+    permState: "",
+    permCountry: "India",
+    permPincode: "",
+    currHouseNumber: "",
+    currStreet: "",
+    currLocality: "",
+    currCity: "",
+    currDistrict: "",
+    currState: "",
+    currCountry: "India",
+    currPincode: "",
     nationality: "Indian",
     govtIdNumber: "",
     foodPreference: "",
@@ -453,6 +545,7 @@ export default function TenantDetailPage() {
     businessOwnerName: "",
 
     // Bank Details
+    bankName: "",
     accountHolderName: "",
     accountNumber: "",
     ifscCode: "",
@@ -485,6 +578,15 @@ export default function TenantDetailPage() {
           rt.vacateOn ||
           (tenant as any).notice?.vacateOn
         ),
+        billingStartDate: safeDateInputString(
+          (tenant as any).billingStartDate ||
+          rt.billingStartDate ||
+          tenant.joiningDate ||
+          tenant.moveInDate ||
+          rt.startDate
+        ),
+        gracePeriodDays: String(rt.gracePeriodDays ?? (tenant as any).gracePeriodDays ?? "0"),
+        rentDisabled: Boolean(rt.rentDisabled ?? (tenant as any).rentDisabled ?? false),
         referredBy: rt.referredBy ?? (tenant as any).referredBy ?? "",
         bookedBy: rt.bookedBy ?? (tenant as any).bookedBy ?? "",
         checkinTime: rt.checkinTime ?? (tenant as any).checkinTime ?? "",
@@ -523,6 +625,22 @@ export default function TenantDetailPage() {
           (tenant as any).personalDetails?.address ||
           "",
         currentAddress: (tenant as any).currentAddress ?? "",
+        permHouseNumber: (tenant as any).permHouseNumber ?? (tenant as any).personalDetails?.permHouseNumber ?? "",
+        permStreet: (tenant as any).permStreet ?? (tenant as any).personalDetails?.permStreet ?? "",
+        permLocality: (tenant as any).permLocality ?? (tenant as any).personalDetails?.permLocality ?? "",
+        permCity: (tenant as any).permCity ?? (tenant as any).personalDetails?.permCity ?? "",
+        permDistrict: (tenant as any).permDistrict ?? (tenant as any).personalDetails?.permDistrict ?? "",
+        permState: (tenant as any).permState ?? (tenant as any).personalDetails?.permState ?? "",
+        permCountry: (tenant as any).permCountry ?? (tenant as any).personalDetails?.permCountry ?? "India",
+        permPincode: (tenant as any).permPincode ?? (tenant as any).personalDetails?.permPincode ?? "",
+        currHouseNumber: (tenant as any).currHouseNumber ?? (tenant as any).personalDetails?.currHouseNumber ?? "",
+        currStreet: (tenant as any).currStreet ?? (tenant as any).personalDetails?.currStreet ?? "",
+        currLocality: (tenant as any).currLocality ?? (tenant as any).personalDetails?.currLocality ?? "",
+        currCity: (tenant as any).currCity ?? (tenant as any).personalDetails?.currCity ?? "",
+        currDistrict: (tenant as any).currDistrict ?? (tenant as any).personalDetails?.currDistrict ?? "",
+        currState: (tenant as any).currState ?? (tenant as any).personalDetails?.currState ?? "",
+        currCountry: (tenant as any).currCountry ?? (tenant as any).personalDetails?.currCountry ?? "India",
+        currPincode: (tenant as any).currPincode ?? (tenant as any).personalDetails?.currPincode ?? "",
         nationality: (tenant as any).nationality ?? "Indian",
         govtIdNumber: (tenant as any).govtIdNumber ?? (tenant as any).govtId ?? (tenant as any).aadhaarNumber ?? "",
         foodPreference: (tenant as any).foodPreference ?? (tenant as any).foodPreferences ?? "",
@@ -549,6 +667,7 @@ export default function TenantDetailPage() {
         guardianAddress: (tenant as any).guardianAddress ?? (tenant as any).localGuardianAddress ?? "",
 
         // Bank Details
+        bankName: (tenant as any).bankName ?? (tenant as any).bankDetails?.bankName ?? (tenant as any).bank?.bankName ?? "",
         accountHolderName: (tenant as any).accountHolderName ?? (tenant as any).bankAccountHolderName ?? tenant.name ?? "",
         accountNumber: (tenant as any).accountNumber ?? (tenant as any).bankAccountNumber ?? "",
         ifscCode: (tenant as any).ifscCode ?? (tenant as any).bankIfscCode ?? "",
@@ -587,6 +706,7 @@ export default function TenantDetailPage() {
   const phone = tenantPhone(tenant);
   const name = tenantDisplayName(tenant);
   const initials = tenantInitials(tenant);
+  const stayStatus = tenantStayStatus(tenant);
   const photo = (tenant as any)?.photoUrl || (tenant as any)?.imageUrl || (tenant as any)?.profilePhotoUrl;
   const rawRoomNo = tenantRoomNo(tenant);
   const rawBedNo = tenantBedNo(tenant);
@@ -909,6 +1029,29 @@ export default function TenantDetailPage() {
         lastMeterReading: form.lastMeterReading.trim() || undefined,
         lastReadingDate: form.lastReadingDate || undefined,
 
+        // Rent Engine Invoicing Rules
+        billingStartDate: form.billingStartDate || undefined,
+        gracePeriodDays: form.gracePeriodDays ? Number(form.gracePeriodDays) : 0,
+        rentDisabled: Boolean(form.rentDisabled),
+
+        // Discrete Address Parts
+        permHouseNumber: form.permHouseNumber.trim() || undefined,
+        permStreet: form.permStreet.trim() || undefined,
+        permLocality: form.permLocality.trim() || undefined,
+        permCity: form.permCity.trim() || undefined,
+        permDistrict: form.permDistrict.trim() || undefined,
+        permState: form.permState.trim() || undefined,
+        permCountry: form.permCountry.trim() || undefined,
+        permPincode: form.permPincode.trim() || undefined,
+        currHouseNumber: form.currHouseNumber.trim() || undefined,
+        currStreet: form.currStreet.trim() || undefined,
+        currLocality: form.currLocality.trim() || undefined,
+        currCity: form.currCity.trim() || undefined,
+        currDistrict: form.currDistrict.trim() || undefined,
+        currState: form.currState.trim() || undefined,
+        currCountry: form.currCountry.trim() || undefined,
+        currPincode: form.currPincode.trim() || undefined,
+
         // Personal Details (Whitelisted property names)
         email: form.email.trim() || undefined,
         remarks: form.remarks.trim() || undefined,
@@ -950,6 +1093,7 @@ export default function TenantDetailPage() {
         localGuardianAddress: form.guardianAddress.trim() || undefined,
 
         // Bank Details
+        bankName: form.bankName.trim() || undefined,
         bankAccountHolderName: form.accountHolderName.trim() || undefined,
         bankAccountNumber: form.accountNumber.trim() || undefined,
         bankIfscCode: form.ifscCode.trim() || undefined,
@@ -1243,6 +1387,62 @@ export default function TenantDetailPage() {
           </div>
         </div>
 
+        {/* UNDER_NOTICE LIFECYCLE BANNER */}
+        {stayStatus === "UNDER_NOTICE" && (
+          <div className="p-4 rounded-2xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/60 flex items-center justify-center text-amber-700 dark:text-amber-300 shrink-0">
+                <Clock className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-amber-900 dark:text-amber-200 flex items-center gap-2">
+                  Tenant On Move-Out Notice
+                </p>
+                <p className="text-xs text-amber-800 dark:text-amber-300">
+                  Notice served on <strong>{noticeStartDate ? formatDateText(noticeStartDate) : "Recently"}</strong>. Scheduled to vacate on{" "}
+                  <strong className="underline">{noticeVacateDate ? formatDateText(noticeVacateDate) : "Scheduled date"}</strong>. Room bed remains occupied until move-out.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 border-amber-400 text-amber-900 hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-900/40 text-xs font-semibold"
+                onClick={handleConfirmCancelNotice}
+                disabled={cancelNoticeMut.isPending}
+              >
+                {cancelNoticeMut.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                Cancel Notice
+              </Button>
+              <Button
+                size="sm"
+                className="h-8 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold gap-1.5 shadow-xs"
+                onClick={handleOpenMoveOutModal}
+              >
+                <UserMinus className="h-3.5 w-3.5" /> Complete Move-Out
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* MOVED_OUT LIFECYCLE BANNER */}
+        {stayStatus === "MOVED_OUT" && (
+          <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50 dark:bg-slate-900/40 flex items-center gap-3 shadow-xs">
+            <div className="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 shrink-0">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                Tenant Stay Completed (Moved Out)
+              </p>
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                Tenant moved out on <strong>{tenantMoveOutDate(tenant) ? formatDateText(tenantMoveOutDate(tenant)) : "Recorded Date"}</strong>. Bed allocation has been released and recurring rent stopped.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Tabbed Sections */}
         <Tabs defaultValue="overview" className="w-full">
           <TabsList className="grid w-full grid-cols-4 sm:w-[500px]">
@@ -1271,13 +1471,16 @@ export default function TenantDetailPage() {
                       </Avatar>
                     </div>
 
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-center gap-2">
+                    <div className="space-y-1.5 flex flex-col items-center">
+                      <div className="flex flex-wrap items-center justify-center gap-2">
                         <h2 className="text-lg font-bold text-foreground">{name}</h2>
-                        <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[10px] px-2 py-0.5 border-emerald-300 font-semibold">
-                          Active
-                        </Badge>
+                        {tenantCode(tenant) && (
+                          <Badge variant="outline" className="font-mono text-[10px] bg-muted/60 text-muted-foreground font-semibold px-2 py-0.5">
+                            {tenantCode(tenant)}
+                          </Badge>
+                        )}
                       </div>
+                      <div>{tenantStatusDisplay(tenant)}</div>
                       <p className="text-xs text-muted-foreground font-medium">{phone || "No mobile number"}</p>
                     </div>
 
@@ -1814,6 +2017,70 @@ export default function TenantDetailPage() {
                       </EditField>
                     ) : (
                       <DetailRow label="Agreement Period (Months)" value={form.agreementPeriodMonths || "0"} />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Invoicing Starts Date">
+                        <Input
+                          type="date"
+                          value={form.billingStartDate}
+                          onChange={(e) => setForm({ ...form, billingStartDate: e.target.value })}
+                          className="h-9 text-xs"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow
+                        label="Invoicing Starts Date"
+                        value={form.billingStartDate ? formatDateText(form.billingStartDate) : "Same as Move-in"}
+                      />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Grace Period (Days)">
+                        <Input
+                          type="number"
+                          min="0"
+                          value={form.gracePeriodDays}
+                          onChange={(e) => setForm({ ...form, gracePeriodDays: e.target.value })}
+                          className="h-9 text-xs"
+                          placeholder="0"
+                        />
+                      </EditField>
+                    ) : (
+                      <DetailRow
+                        label="Grace Period"
+                        value={`${form.gracePeriodDays || "0"} Days`}
+                      />
+                    )}
+
+                    {editing ? (
+                      <EditField label="Rent Invoicing Control">
+                        <div className="flex items-center gap-2 pt-1.5">
+                          <Switch
+                            id="rentDisabledToggle"
+                            checked={!form.rentDisabled}
+                            onCheckedChange={(checked) => setForm({ ...form, rentDisabled: !checked })}
+                          />
+                          <Label htmlFor="rentDisabledToggle" className="text-xs font-semibold cursor-pointer">
+                            {!form.rentDisabled ? "Invoicing Active" : "Invoicing Suppressed / Paused"}
+                          </Label>
+                        </div>
+                      </EditField>
+                    ) : (
+                      <DetailRow
+                        label="Invoicing Status"
+                        value={
+                          form.rentDisabled ? (
+                            <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200 text-xs">
+                              Suppressed / Paused
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
+                              Active Auto-Invoicing
+                            </Badge>
+                          )
+                        }
+                      />
                     )}
 
                     {editing ? (
@@ -2476,6 +2743,19 @@ export default function TenantDetailPage() {
                   <div className="p-4 bg-card">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
                       {editing ? (
+                        <EditField label="Bank Name" className="sm:col-span-2">
+                          <Input
+                            value={form.bankName}
+                            onChange={(e) => setForm({ ...form, bankName: e.target.value })}
+                            className="h-9 text-xs"
+                            placeholder="e.g. HDFC Bank, SBI, ICICI"
+                          />
+                        </EditField>
+                      ) : (
+                        <DetailRow label="Bank Name" value={form.bankName || "—"} />
+                      )}
+
+                      {editing ? (
                         <EditField label="Bank Holder Name" className="sm:col-span-2">
                           <Input
                             value={form.accountHolderName}
@@ -2827,7 +3107,16 @@ export default function TenantDetailPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-5 space-y-4">
-                {hasActiveNotice ? (
+                {stayStatus === "MOVED_OUT" ? (
+                  <div className="p-5 rounded-xl border border-slate-200 bg-slate-50 dark:bg-slate-900/30 space-y-2">
+                    <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200 font-bold text-sm">
+                      <CheckCircle2 className="h-5 w-5 text-slate-600" /> Tenancy Completed & Moved Out
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      Tenant vacated on <strong>{tenantMoveOutDate(tenant) ? formatDateText(tenantMoveOutDate(tenant)) : "Recorded date"}</strong>. Room bed has been freed and automatic rent invoices have been stopped.
+                    </p>
+                  </div>
+                ) : hasActiveNotice ? (
                   <div className="p-5 rounded-xl border border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="space-y-1">
@@ -2845,16 +3134,25 @@ export default function TenantDetailPage() {
                           </span>
                         </p>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-amber-300 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40 shrink-0"
-                        onClick={handleClearNotice}
-                        disabled={clearNoticeMut.isPending}
-                      >
-                        {clearNoticeMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
-                        Cancel Notice
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-amber-300 text-amber-900 dark:text-amber-200 hover:bg-amber-100 dark:hover:bg-amber-900/40 shrink-0 text-xs font-semibold"
+                          onClick={handleConfirmCancelNotice}
+                          disabled={cancelNoticeMut.isPending}
+                        >
+                          {cancelNoticeMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+                          Cancel Notice
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="bg-rose-600 hover:bg-rose-700 text-white font-bold gap-1.5 shrink-0 text-xs shadow-xs"
+                          onClick={handleOpenMoveOutModal}
+                        >
+                          <UserMinus className="h-3.5 w-3.5" /> Complete Move-Out
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -2865,20 +3163,30 @@ export default function TenantDetailPage() {
                         Tenant is currently in active stay. When the tenant submits a 30-day move-out notice, record it here to schedule checkout.
                       </p>
                     </div>
-                    <Button
-                      size="sm"
-                      className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5 shrink-0"
-                      onClick={() => {
-                        if (!subAccess.canTrackNotice) {
-                          setGateFeature("Notice Period Tracking");
-                          setGateModalOpen(true);
-                        } else {
-                          setNoticeOpen(true);
-                        }
-                      }}
-                    >
-                      <Calendar className="h-3.5 w-3.5" /> Set Move-Out Notice
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5 shrink-0"
+                        onClick={() => {
+                          if (!subAccess.canTrackNotice) {
+                            setGateFeature("Notice Period Tracking");
+                            setGateModalOpen(true);
+                          } else {
+                            setNoticeOpen(true);
+                          }
+                        }}
+                      >
+                        <Calendar className="h-3.5 w-3.5" /> Set Move-Out Notice
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-rose-300 text-rose-600 hover:bg-rose-50 gap-1.5 shrink-0 text-xs font-semibold"
+                        onClick={handleOpenMoveOutModal}
+                      >
+                        <UserMinus className="h-3.5 w-3.5" /> Direct Move-Out
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -3436,6 +3744,75 @@ export default function TenantDetailPage() {
                 disabled={moveMutation.isPending || !tenant || !targetRoomId}
               >
                 {moveMutation.isPending ? "Relocating..." : "Confirm Tenant Relocation"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* MODAL: VACATE / MOVE-OUT */}
+        <Dialog open={moveOutModalOpen} onOpenChange={setMoveOutModalOpen}>
+          <DialogContent className="max-w-md rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-base flex items-center gap-2 text-rose-600">
+                <UserMinus className="h-5 w-5" /> Complete Move-Out & Free Bed
+              </DialogTitle>
+              <DialogDescription className="text-xs">
+                Check out <strong className="text-foreground">{name}</strong> and release bed allocation. Recurring rent invoices will be halted.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2 text-xs">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold">Move-Out / Vacate Date *</Label>
+                <Input
+                  type="date"
+                  value={moveOutDate}
+                  onChange={(e) => setMoveOutDate(e.target.value)}
+                  className="h-10 text-xs rounded-xl"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold">Exit Reason / Notes (Optional)</Label>
+                <Textarea
+                  value={moveOutReason}
+                  onChange={(e) => setMoveOutReason(e.target.value)}
+                  placeholder="e.g. Job change, tenancy completed, personal reasons"
+                  rows={2}
+                  className="text-xs rounded-xl"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold">Remarks (Optional)</Label>
+                <Input
+                  value={moveOutRemarks}
+                  onChange={(e) => setMoveOutRemarks(e.target.value)}
+                  placeholder="e.g. Deposit refunded, keys handed over"
+                  className="h-9 text-xs rounded-xl"
+                />
+              </div>
+
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200/80 text-[11px] text-amber-800 dark:text-amber-300 flex items-start gap-2.5">
+                <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                <span>
+                  Completing move-out immediately transitions this tenant stay to MOVED_OUT, frees the bed for new allocations, and halts recurring rent invoicing. Historical payment records remain intact.
+                </span>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" size="sm" onClick={() => setMoveOutModalOpen(false)} className="rounded-xl text-xs">
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white gap-1.5 shadow-xs"
+                onClick={handleConfirmMoveOut}
+                disabled={moveOutMut.isPending}
+              >
+                {moveOutMut.isPending ? "Processing..." : "Confirm Move-Out & Free Bed"}
               </Button>
             </DialogFooter>
           </DialogContent>

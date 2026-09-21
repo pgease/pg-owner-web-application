@@ -319,11 +319,15 @@ export interface MyFeaturesResponse {
   subscription?: UnifiedSubscription;
 }
 
-export async function getMyFeatures() {
-  return httpRequest<MyFeaturesResponse>(`${PROPERTY_OWNER_BASE}/my-features`, {
+export async function getMyFeatures(): Promise<MyFeaturesResponse> {
+  const res = await httpRequest<any>(`${PROPERTY_OWNER_BASE}/my-features`, {
     method: "GET",
     auth: true,
   });
+  if (res && typeof res === "object" && "data" in res && res.data) {
+    return res.data as MyFeaturesResponse;
+  }
+  return res as MyFeaturesResponse;
 }
 
 // Legacy alias if code expects Feature[]
@@ -411,6 +415,26 @@ export interface AddTenantPayload {
   bankIfscCode?: string;
   bankName?: string;
   bankUpiId?: string;
+  billingStartDate?: string;
+  gracePeriodDays?: number;
+  rentDisabled?: boolean;
+  permHouseNumber?: string;
+  permStreet?: string;
+  permLocality?: string;
+  permCity?: string;
+  permDistrict?: string;
+  permState?: string;
+  permCountry?: string;
+  permPincode?: string;
+  currHouseNumber?: string;
+  currStreet?: string;
+  currLocality?: string;
+  currCity?: string;
+  currDistrict?: string;
+  currState?: string;
+  currCountry?: string;
+  currPincode?: string;
+  tenantCode?: string;
   paymentDetails?: {
     openingBalance?: Array<{ dueType: string; dueFor?: string; dueAmount: number; collection: number }>;
     otherDues?: Array<{ dueType: string; mode: string; amount?: number | null }>;
@@ -436,8 +460,8 @@ function serializeAddTenantBody(payload: AddTenantPayload): Record<string, unkno
   const floorId = String(payload.floorId ?? "").trim();
   const blockId = String(payload.blockId ?? "").trim();
   const roomId = String(payload.roomId ?? "").trim();
-  if (!floorId || !blockId || !roomId) {
-    throw new Error("floorId, blockId, and roomId are required in the add-tenant body");
+  if (!roomId) {
+    throw new Error("roomId is required in the add-tenant body");
   }
 
   const bed = Math.trunc(Number(payload.bedNumber));
@@ -452,14 +476,15 @@ function serializeAddTenantBody(payload: AddTenantPayload): Record<string, unkno
   const body: Record<string, unknown> = {
     name: String(payload.name).trim(),
     phone: String(payload.phone).trim(),
-    floorId,
-    blockId,
     roomId,
     bedNumber: bed,
     monthlyRent: Number.isFinite(monthlyRent) ? monthlyRent : 0,
     securityDeposit: Number.isFinite(securityDeposit) ? securityDeposit : 0,
     rentDueDate: Number.isFinite(rentDue) ? rentDue : 5,
   };
+
+  if (floorId) body.floorId = floorId;
+  if (blockId) body.blockId = blockId;
 
   // Optional string & number fields
   const optionalFields: (keyof AddTenantPayload)[] = [
@@ -474,7 +499,11 @@ function serializeAddTenantBody(payload: AddTenantPayload): Record<string, unkno
     "referredBy", "bookedBy", "checkinTime", "checkoutTime", "lastMeterReading",
     "lastReadingDate", "rentingType", "collectOnlinePayments", "gstApplicable",
     "gstPercentage", "gstin", "businessName", "bankAccountHolderName",
-    "bankAccountNumber", "bankIfscCode", "bankName", "bankUpiId", "paymentDetails"
+    "bankAccountNumber", "bankIfscCode", "bankName", "bankUpiId", "paymentDetails",
+    "billingStartDate", "gracePeriodDays", "rentDisabled",
+    "permHouseNumber", "permStreet", "permLocality", "permCity", "permDistrict", "permState", "permCountry", "permPincode",
+    "currHouseNumber", "currStreet", "currLocality", "currCity", "currDistrict", "currState", "currCountry", "currPincode",
+    "tenantCode"
   ];
 
   for (const key of optionalFields) {
@@ -920,8 +949,36 @@ export interface UpdatePropertyTenantPayload {
   bankAccountNumber?: string;
   ifscCode?: string;
   bankIfscCode?: string;
+  bankName?: string;
   upiId?: string;
   bankUpiId?: string;
+
+  // Rent Engine Invoicing Rules
+  billingStartDate?: string;
+  gracePeriodDays?: number;
+  rentDisabled?: boolean;
+
+  // Normalized Permanent Address (8 parts)
+  permHouseNumber?: string;
+  permStreet?: string;
+  permLocality?: string;
+  permCity?: string;
+  permDistrict?: string;
+  permState?: string;
+  permCountry?: string;
+  permPincode?: string;
+
+  // Normalized Current Address (8 parts)
+  currHouseNumber?: string;
+  currStreet?: string;
+  currLocality?: string;
+  currCity?: string;
+  currDistrict?: string;
+  currState?: string;
+  currCountry?: string;
+  currPincode?: string;
+
+  tenantCode?: string;
   [key: string]: any;
 }
 
@@ -1935,6 +1992,37 @@ export async function clearTenantNotice(propertyId: string, roomTenantId: string
   );
 }
 
+export async function cancelTenantNotice(propertyId: string, roomTenantId: string) {
+  return httpRequest<{ success: boolean; message: string }>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${roomTenantId}/cancel-notice`,
+    {
+      method: "POST",
+      auth: true,
+    }
+  );
+}
+
+export interface MoveOutTenantBody {
+  moveOutDate: string;
+  reason: string;
+  remarks?: string;
+}
+
+export async function moveOutTenant(
+  propertyId: string,
+  roomTenantId: string,
+  body: MoveOutTenantBody
+) {
+  return httpRequest<{ success: boolean; message: string; status: string }>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${roomTenantId}/move-out`,
+    {
+      method: "POST",
+      auth: true,
+      body,
+    }
+  );
+}
+
 // ==========================================================
 // ELECTRICITY METER DUES MANAGEMENT
 // ==========================================================
@@ -2067,13 +2155,66 @@ export async function deleteElectricityDues(propertyId: string, roomTenantId: st
 // WIFI MANAGEMENT HIERARCHY
 // ==========================================================
 
+export interface FloorWifiHierarchyItem {
+  floorId: string;
+  floorName: string;
+  displayOrder: number;
+  wifiSsid: string;
+  wifiPassword: string;
+  wifiDetails?: {
+    speedMbps?: number;
+    routerModel?: string;
+    band?: string;
+    location?: string;
+    notes?: string;
+    [key: string]: any;
+  };
+}
+
+export interface BlockWifiHierarchyItem {
+  blockId: string;
+  blockName: string;
+  displayOrder: number;
+  wifiSsid: string;
+  wifiPassword: string;
+  floors: FloorWifiHierarchyItem[];
+}
+
+export interface PropertyWifiHierarchyData {
+  propertyId: string;
+  propertyName: string;
+  totalBlocks: number;
+  totalFloors: number;
+  blocks: BlockWifiHierarchyItem[];
+}
+
+export interface PropertyWifiHierarchyResponse {
+  success: boolean;
+  data: PropertyWifiHierarchyData;
+}
+
 export async function getWifiHierarchy(propertyId: string) {
-  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/wifi-details`, {
+  return httpRequest<PropertyWifiHierarchyResponse>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/wifi-details`, {
     auth: true,
   });
 }
 
-export async function updateFloorWifi(propertyId: string, floorId: string, payload: { wifiSsid: string; wifiPassword?: string; wifiDetails?: any }) {
+export async function updateFloorWifi(
+  propertyId: string,
+  floorId: string,
+  payload: {
+    wifiSsid?: string;
+    wifiPassword?: string;
+    wifiDetails?: {
+      speedMbps?: number;
+      routerModel?: string;
+      band?: string;
+      location?: string;
+      notes?: string;
+      [key: string]: any;
+    };
+  }
+) {
   return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/floors/${floorId}/wifi`, {
     method: "PUT",
     body: payload,
@@ -2081,7 +2222,11 @@ export async function updateFloorWifi(propertyId: string, floorId: string, paylo
   });
 }
 
-export async function updateBlockWifi(propertyId: string, blockId: string, payload: { wifiSsid: string; wifiPassword?: string }) {
+export async function updateBlockWifi(
+  propertyId: string,
+  blockId: string,
+  payload: { wifiSsid?: string; wifiPassword?: string }
+) {
   return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/blocks/${blockId}/wifi`, {
     method: "PUT",
     body: payload,
@@ -2089,8 +2234,23 @@ export async function updateBlockWifi(propertyId: string, blockId: string, paylo
   });
 }
 
-export async function updatePropertyWifiHierarchy(propertyId: string, payload: { blocks?: any[]; floors?: any[] }) {
-  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/wifi-details`, {
+export async function updatePropertyWifiHierarchy(
+  propertyId: string,
+  payload: {
+    blocks: Array<{
+      blockId: string;
+      wifiSsid?: string;
+      wifiPassword?: string;
+      floors?: Array<{
+        floorId: string;
+        wifiSsid?: string;
+        wifiPassword?: string;
+        wifiDetails?: Record<string, any>;
+      }>;
+    }>;
+  }
+) {
+  return httpRequest<PropertyWifiHierarchyResponse>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/wifi-details`, {
     method: "PUT",
     body: payload,
     auth: true,

@@ -25,6 +25,23 @@ export const SubscriptionBanner: React.FC = () => {
     }
   };
 
+  const [dismissedLite, setDismissedLite] = useState(() => {
+    try {
+      return sessionStorage.getItem("pgease_dismissed_lite_banner") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const handleDismissLite = () => {
+    setDismissedLite(true);
+    try {
+      sessionStorage.setItem("pgease_dismissed_lite_banner", "true");
+    } catch {
+      // ignore
+    }
+  };
+
   if (isLoading) return null;
 
   // 1. EXPIRED BANNER (Never dismissable, zero data loss notice, quick CTA)
@@ -101,6 +118,49 @@ export const SubscriptionBanner: React.FC = () => {
               type="button"
               onClick={handleDismissTrial}
               className="text-muted-foreground hover:text-foreground p-0.5 rounded"
+              title="Dismiss banner"
+              aria-label="Dismiss banner"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. LITE PLAN BANNER (Highlights ₹29/bed rate, direct UPI, and easy 1-click Pro upgrade)
+  if (status === "LITE" && !dismissedLite) {
+    return (
+      <div className="w-full bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 border-b border-teal-500/30 text-white px-3 py-2 sm:px-4 backdrop-blur-sm transition-all shadow-sm">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-teal-500/20 text-teal-300 shrink-0 font-bold text-[10px]">
+              ⚡
+            </span>
+            <span className="font-bold text-teal-300">
+              Lite Plan Active
+            </span>
+            <span className="text-slate-500 hidden sm:inline">•</span>
+            <span className="text-slate-200 font-medium">
+              ₹29/bed/month. Direct UPI payments (0% fee) and core operations active.
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => navigate("/plans")}
+              className="h-6 px-2.5 text-[11px] font-bold border-teal-400 text-teal-300 bg-teal-950/40 hover:bg-teal-900/60 gap-1 rounded-md"
+            >
+              Upgrade to Pro (₹49/bed)
+              <ArrowRight className="h-3 w-3" />
+            </Button>
+            <button
+              type="button"
+              onClick={handleDismissLite}
+              className="text-slate-400 hover:text-white p-0.5 rounded"
               title="Dismiss banner"
               aria-label="Dismiss banner"
             >

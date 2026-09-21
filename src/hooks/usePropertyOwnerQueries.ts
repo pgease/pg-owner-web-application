@@ -90,6 +90,9 @@ import {
   sendAgreementForEsign,
   setTenantNotice,
   clearTenantNotice,
+  cancelTenantNotice,
+  moveOutTenant,
+  type MoveOutTenantBody,
   getElectricityDues,
   addElectricityDues,
   updateElectricityDues,
@@ -995,6 +998,31 @@ export function useClearTenantNoticeMutation(propertyId: string | null | undefin
   });
 }
 
+export function useCancelTenantNoticeMutation(propertyId: string | null | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (roomTenantId: string) => cancelTenantNotice(propertyId!, roomTenantId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['propertyTenants'] });
+      queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      queryClient.invalidateQueries({ queryKey: ['tenantDetail'] });
+    },
+  });
+}
+
+export function useMoveOutTenantMutation(propertyId: string | null | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ roomTenantId, body }: { roomTenantId: string; body: MoveOutTenantBody }) =>
+      moveOutTenant(propertyId!, roomTenantId, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['propertyTenants'] });
+      queryClient.invalidateQueries({ queryKey: ['tenants'] });
+      queryClient.invalidateQueries({ queryKey: ['tenantDetail'] });
+    },
+  });
+}
+
 // ==========================================================
 // ELECTRICITY METER DUES HOOKS
 // ==========================================================
@@ -1081,7 +1109,7 @@ export function useUpdateBlockWifiMutation(propertyId?: string | null) {
 export function useUpdatePropertyWifiHierarchyMutation(propertyId?: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: { blocks?: any[]; floors?: any[] }) =>
+    mutationFn: (payload: { blocks: any[] }) =>
       updatePropertyWifiHierarchy(propertyId!, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['wifiHierarchy', propertyId] });

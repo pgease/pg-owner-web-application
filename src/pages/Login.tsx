@@ -255,6 +255,29 @@ export default function Login() {
     }
   }, [phone]);
 
+  // Immediately autofocus OTP input when transitioning to OTP screen
+  useEffect(() => {
+    if (step === "otp") {
+      const focusOtpInput = () => {
+        const otpInput = document.querySelector('input[data-input-otp="true"]') as HTMLInputElement;
+        if (otpInput) {
+          otpInput.focus();
+        }
+      };
+
+      focusOtpInput();
+      const t1 = setTimeout(focusOtpInput, 50);
+      const t2 = setTimeout(focusOtpInput, 150);
+      const t3 = setTimeout(focusOtpInput, 350);
+
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
+    }
+  }, [step]);
+
   const triggerShake = useCallback(() => {
     setShaking(true);
     setTimeout(() => setShaking(false), 500);
@@ -345,7 +368,10 @@ export default function Login() {
 
   // Enter key on phone input
   const handlePhoneKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && phoneValid && !isSendingOtp) handleSendOtp();
+    if (e.key === "Enter" && phoneValid && !isSendingOtp) {
+      e.preventDefault();
+      handleSendOtp(channel);
+    }
   };
 
   return (
@@ -563,7 +589,17 @@ export default function Login() {
 
                       <div className="space-y-3">
                         <Label className="text-xs text-white/60">One-time password</Label>
-                        <InputOTP maxLength={4} value={otp} onChange={handleOtpChange}
+                        <InputOTP
+                          autoFocus
+                          maxLength={4}
+                          value={otp}
+                          onChange={handleOtpChange}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && otp.length === 4 && !isVerifyingOtp) {
+                              e.preventDefault();
+                              handleVerifyOtp(otp);
+                            }
+                          }}
                           containerClassName="w-full justify-between"
                           autoComplete="one-time-code"
                         >

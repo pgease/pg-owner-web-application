@@ -13,14 +13,17 @@ import {
   Loader2,
   BedDouble,
   XCircle,
+  UserMinus,
 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import {
   usePropertyTenants,
   useSetTenantNoticeMutation,
   useClearTenantNoticeMutation,
+  useMoveOutTenantMutation,
   queryKeys,
 } from "@/hooks/usePropertyOwnerQueries";
+import { FeatureGuard } from "@/components/common/FeatureGuard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,6 +77,7 @@ export default function NoticePeriodPage() {
   const { data: tenants = [], isLoading, refetch } = usePropertyTenants(currentPropertyId);
   const setNoticeMut = useSetTenantNoticeMutation(currentPropertyId);
   const clearNoticeMut = useClearTenantNoticeMutation(currentPropertyId);
+  const moveOutMut = useMoveOutTenantMutation(currentPropertyId);
 
   // Filter States
   const [search, setSearch] = useState("");
@@ -83,6 +87,10 @@ export default function NoticePeriodPage() {
   const [initiateModalOpen, setInitiateModalOpen] = useState(false);
   const [extendModalOpen, setExtendModalOpen] = useState(false);
   const [cancelAlertOpen, setCancelAlertOpen] = useState(false);
+  const [moveOutModalOpen, setMoveOutModalOpen] = useState(false);
+  const [moveOutDate, setMoveOutDate] = useState(new Date().toISOString().split("T")[0]);
+  const [moveOutReason, setMoveOutReason] = useState("Notice period completed");
+  const [moveOutRemarks, setMoveOutRemarks] = useState("");
 
   // Selected Tenant for Actions
   const [selectedTenant, setSelectedTenant] = useState<PropertyTenant | null>(null);
@@ -290,6 +298,45 @@ export default function NoticePeriodPage() {
     setCancelAlertOpen(true);
   };
 
+  const handleOpenMoveOutModal = (tenant: PropertyTenant) => {
+    setSelectedTenant(tenant);
+    setMoveOutDate(new Date().toISOString().split("T")[0]);
+    setMoveOutReason("Notice period completed");
+    setMoveOutRemarks("");
+    setMoveOutModalOpen(true);
+  };
+
+  const handleConfirmMoveOut = async () => {
+    if (!selectedTenant) return;
+    const roomTenantId = (selectedTenant as any).computedRoomTenantId;
+    if (!roomTenantId) return;
+
+    try {
+      await moveOutMut.mutateAsync({
+        roomTenantId,
+        body: {
+          moveOutDate: moveOutDate || new Date().toISOString().split("T")[0],
+          reason: moveOutReason.trim() || "Notice period completed",
+          remarks: moveOutRemarks.trim() || undefined,
+        },
+      });
+      toast({
+        title: "Tenant Move-Out Completed 🚪",
+        description: `${selectedTenant.name} has moved out. The bed is now freed and recurring rent invoicing is halted.`,
+      });
+      setMoveOutModalOpen(false);
+      setSelectedTenant(null);
+      queryClient.invalidateQueries({ queryKey: queryKeys.tenants(currentPropertyId) });
+      refetch();
+    } catch (e: any) {
+      toast({
+        title: "Failed to complete move-out",
+        description: e?.message || "Unable to process move-out",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleConfirmCancelNotice = async () => {
     if (!selectedTenant) return;
     const roomTenantId = (selectedTenant as any).computedRoomTenantId;
@@ -315,9 +362,14 @@ export default function NoticePeriodPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6 pb-20 animate-in fade-in duration-300">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <FeatureGuard
+      feature="notice_period_tracker"
+      fallbackTitle="Notice Period Tracker is Locked"
+      fallbackDescription="Notice Period Tracking is a premium capability not currently enabled on your subscription plan. Please enable it in the Admin Panel or upgrade your plan to unlock."
+    >
+      <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6 pb-20 animate-in fade-in duration-300">
+        {/* Top Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2.5">
             <Clock className="h-6 w-6 text-amber-500" /> Notice Period Tracker
@@ -643,6 +695,13 @@ export default function NoticePeriodPage() {
                               <>
                                 <Button
                                   size="sm"
+                                  className="h-7 text-xs px-2.5 gap-1 bg-rose-600 hover:bg-rose-700 text-white font-semibold shadow-2xs"
+                                  onClick={() => handleOpenMoveOutModal(t)}
+                                >
+                                  <UserMinus className="h-3 w-3" /> Move Out
+                                </Button>
+                                <Button
+                                  size="sm"
                                   variant="outline"
                                   className="h-7 text-xs px-2 gap-1"
                                   onClick={() => handleOpenExtendModal(t)}
@@ -855,6 +914,74 @@ export default function NoticePeriodPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* MODAL: COMPLETE MOVE-OUT */}
+      <Dialog open={moveOutModalOpen} onOpenChange={setMoveOutModalOpen}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-base flex items-center gap-2 text-rose-600">
+              <UserMinus className="h-5 w-5" /> Complete Move-Out & Free Bed
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Finalize departure for <strong className="text-foreground">{selectedTenant?.name}</strong>. This will free the allocated bed and halt recurring rent generation.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 text-xs">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold">Actual Move-Out Date *</Label>
+              <Input
+                type="date"
+                value={moveOutDate}
+                onChange={(e) => setMoveOutDate(e.target.value)}
+                className="h-9 text-xs rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold">Departure Reason / Notes</Label>
+              <Input
+                value={moveOutReason}
+                onChange={(e) => setMoveOutReason(e.target.value)}
+                placeholder="e.g. Completed 30-day notice, relocated"
+                className="h-9 text-xs rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold">Remarks (Optional)</Label>
+              <Input
+                value={moveOutRemarks}
+                onChange={(e) => setMoveOutRemarks(e.target.value)}
+                placeholder="e.g. Keys returned, security deposit refunded"
+                className="h-9 text-xs rounded-xl"
+              />
+            </div>
+
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 text-[11px] text-amber-800 dark:text-amber-300 flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+              <span>
+                Moving out immediately sets tenant status to MOVED_OUT, frees the bed for new check-ins, and stops automatic rent invoicing.
+              </span>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" size="sm" onClick={() => setMoveOutModalOpen(false)} className="rounded-xl text-xs">
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white gap-1.5 shadow-xs"
+              onClick={handleConfirmMoveOut}
+              disabled={moveOutMut.isPending}
+            >
+              {moveOutMut.isPending ? "Processing..." : "Confirm Move-Out & Free Bed"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+  </FeatureGuard>
   );
 }
