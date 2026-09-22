@@ -1499,7 +1499,22 @@ export default function TenantDetailPage() {
                           </Badge>
                         )}
                       </div>
-                      <div>{tenantStatusDisplay(tenant)}</div>
+
+                      {(() => {
+                        const statusInfo = tenantStatusDisplay(tenant);
+                        return (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[11px] py-0.5 px-2.5 font-medium flex items-center gap-1.5",
+                              statusInfo.badgeClass
+                            )}
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                            {statusInfo.label}
+                          </Badge>
+                        );
+                      })()}
                       <p className="text-xs text-muted-foreground font-medium">{phone || "No mobile number"}</p>
                     </div>
 
