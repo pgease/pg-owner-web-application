@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   Receipt,
   FileText,
+  Link as LinkIcon,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,7 @@ import {
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
 import { sendWhatsAppRentReminder, type RentDashboardTenantRow } from "@/api/propertyOwner";
 import { amountFromRow, formatInr, parseRentTenantRow } from "@/lib/rentDashboard";
+import { SharePaymentLinkDialog } from "@/components/tenants/SharePaymentLinkDialog";
 import { cn } from "@/lib/utils";
 
 function TenantTable({
@@ -67,12 +69,14 @@ function TenantTable({
   emptyLabel,
   isUnpaid = false,
   onRecordPay,
+  onSharePaymentLink,
   propertyId,
 }: {
   rows: RentDashboardTenantRow[];
   emptyLabel: string;
   isUnpaid?: boolean;
   onRecordPay?: (row: RentDashboardTenantRow) => void;
+  onSharePaymentLink?: (row: RentDashboardTenantRow) => void;
   propertyId?: string | null;
 }) {
   if (rows.length === 0) {
@@ -148,6 +152,20 @@ function TenantTable({
                       >
                         <MessageSquare className="h-3 w-3" /> WhatsApp
                       </Button>
+                      {onSharePaymentLink && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[11px] px-2.5 rounded-lg border-teal-300 text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-950/30 gap-1 font-semibold"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSharePaymentLink(row);
+                          }}
+                          title="View dues breakdown and copy payment link"
+                        >
+                          <LinkIcon className="h-3 w-3" /> Pay Link
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="default"
@@ -277,6 +295,33 @@ const RentPayments = () => {
       if (amt != null) setAmountPaid(String(amt));
     }
     setManualPaymentOpen(true);
+  };
+
+  // Share payment link state
+  const [paymentLinkTenant, setPaymentLinkTenant] = useState<{
+    propertyId: string;
+    roomTenantId: string;
+    tenantName?: string;
+    roomNumber?: string;
+    phone?: string;
+  } | null>(null);
+
+  const openPaymentLinkForTenant = (row: RentDashboardTenantRow) => {
+    const p = parseRentTenantRow(row);
+    const targetRoomTenantId = p?.roomTenantId || (row as any)?.roomTenantId || (row as any)?.id;
+    const tenantName = p?.label ?? String(row.tenantName ?? row.name ?? row.tenant_name ?? "Tenant");
+    const roomNumber = String(row.roomNumber ?? row.room_number ?? "—");
+    const phone = row.phone || row.mobile || "";
+
+    if (selectedPgId && targetRoomTenantId) {
+      setPaymentLinkTenant({
+        propertyId: selectedPgId,
+        roomTenantId: targetRoomTenantId,
+        tenantName,
+        roomNumber,
+        phone,
+      });
+    }
   };
 
   // Synthesize payment transactions ledger based on paid tenants & tenant data
@@ -597,6 +642,7 @@ const RentPayments = () => {
                   emptyLabel="All active tenants have cleared rent for this period! 🎉"
                   isUnpaid={true}
                   onRecordPay={openManualForTenant}
+                  onSharePaymentLink={openPaymentLinkForTenant}
                 />
               </div>
             </div>
@@ -973,8 +1019,33 @@ const RentPayments = () => {
                                 </Button>
                                 <Button
                                   size="sm"
-                                  variant="default"
-                                  className="h-7 text-[11px] px-2.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold"
+                                  variant="outline"
+                                  className="h-7 text-[11px] px-2.5 rounded-lg border-teal-300 text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-950/30 gap-1 font-semibold"
+                                  onClick={() => {
+                                    const raw = item.rawRow;
+                                    const targetRoomTenantId =
+                                      (raw as any)?.roomTenantId ||
+                                      parseRentTenantRow(raw)?.roomTenantId ||
+                                      (raw as any)?.id;
+
+                                    if (selectedPgId && targetRoomTenantId) {
+                                      setPaymentLinkTenant({
+                                        propertyId: selectedPgId,
+                                        roomTenantId: targetRoomTenantId,
+                                        tenantName: item.tenantName,
+                                        roomNumber: item.roomNumber,
+                                        phone: item.phone,
+                                      });
+                                    }
+                                  }}
+                                  title="View dues breakdown and payment link"
+                                >
+                                  <LinkIcon className="h-3 w-3" /> Pay Link
+                                </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    className="h-7 text-[11px] px-2.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold"
                                   onClick={() => openManualForTenant(item.rawRow)}
                                 >
                                   Record
@@ -1136,6 +1207,21 @@ const RentPayments = () => {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Share Payment Link & Outstanding Dues Modal */}
+        {paymentLinkTenant && (
+          <SharePaymentLinkDialog
+            open={Boolean(paymentLinkTenant)}
+            onOpenChange={(open) => {
+              if (!open) setPaymentLinkTenant(null);
+            }}
+            propertyId={paymentLinkTenant.propertyId}
+            roomTenantId={paymentLinkTenant.roomTenantId}
+            tenantName={paymentLinkTenant.tenantName}
+            roomNumber={paymentLinkTenant.roomNumber}
+            phone={paymentLinkTenant.phone}
+          />
+        )}
       </div>
     </CanAccessPage>
   );

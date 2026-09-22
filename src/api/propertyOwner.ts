@@ -2721,4 +2721,186 @@ export async function sendWhatsAppAgreementReminder(
   );
 }
 
+/**
+ * ==================== SETTLEMENT BANK ACCOUNT APIS ====================
+ */
+
+export interface SettlementBankAccount {
+  id?: string;
+  accountHolderName: string;
+  accountNumber: string;
+  ifscCode: string;
+  bankName: string;
+  branch?: string;
+  city?: string;
+  state?: string;
+  upiId?: string;
+  accountType: "savings" | "current";
+  isVerified: boolean;
+  updatedAt?: string | null;
+}
+
+export interface UpdateSettlementBankAccountDto {
+  accountHolderName: string;
+  accountNumber: string;
+  ifscCode: string;
+  bankName?: string;
+  branch?: string;
+  upiId?: string;
+  accountType?: "savings" | "current";
+}
+
+export interface IfscLookupResponse {
+  valid: boolean;
+  ifsc: string;
+  bank?: string;
+  branch?: string;
+  city?: string;
+  state?: string;
+  micr?: string;
+  message?: string;
+}
+
+export interface SettlementBankAccountResponse {
+  success: boolean;
+  bankAccount: SettlementBankAccount | null;
+  message?: string;
+}
+
+/**
+ * Fetch registered settlement bank account details for the authenticated property owner
+ */
+export async function getSettlementBankAccount(): Promise<SettlementBankAccountResponse> {
+  return httpRequest<SettlementBankAccountResponse>(`${PROPERTY_OWNER_BASE}/bank-account`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+/**
+ * Save or update registered settlement bank account details
+ */
+export async function updateSettlementBankAccount(
+  dto: UpdateSettlementBankAccountDto
+): Promise<{ success: boolean; message: string; bankAccount: SettlementBankAccount }> {
+  return httpRequest<{ success: boolean; message: string; bankAccount: SettlementBankAccount }>(
+    `${PROPERTY_OWNER_BASE}/bank-account`,
+    {
+      method: "PUT",
+      auth: true,
+      body: dto,
+    }
+  );
+}
+
+/**
+ * Real-time Indian IFSC code verification and bank branch lookup
+ */
+export async function lookupIfsc(ifscCode: string): Promise<IfscLookupResponse> {
+  return httpRequest<IfscLookupResponse>(
+    `${PROPERTY_OWNER_BASE}/bank-account/lookup-ifsc/${encodeURIComponent(ifscCode.trim().toUpperCase())}`,
+    {
+      method: "GET",
+      auth: true,
+    }
+  );
+}
+
+/**
+ * ==================== TENANT PAYMENT LINK & OUTSTANDING DUES ====================
+ */
+
+export interface TenantPaymentBreakdown {
+  monthlyRent: number;
+  amountPaid: number;
+  securityDeposit: number;
+  isSecurityDepositPaid: boolean;
+  miscellaneousFees: number;
+  electricityAmount: number;
+  totalOutstanding: number;
+}
+
+export interface TenantPaymentLinkData {
+  paymentLink: string;
+  directPayUrl: string;
+  rentCollectionId: string;
+  roomTenantId: string;
+  tenantId: string;
+  tenant: {
+    id: string;
+    name: string;
+    phone: string;
+    email: string;
+  };
+  room: {
+    id: string;
+    roomNumber: string;
+  };
+  property: {
+    id: string;
+    name: string;
+  };
+  period: {
+    month: number;
+    year: number;
+    label: string;
+  };
+  status: string;
+  breakdown: TenantPaymentBreakdown;
+  whatsAppMessage: string;
+}
+
+export interface TenantPaymentLinkResponse {
+  success: boolean;
+  data: TenantPaymentLinkData;
+}
+
+/**
+ * Fetch direct payment links, itemized dues breakdown, and pre-formatted WhatsApp message for a tenant
+ */
+export async function getTenantPaymentLink(
+  propertyId: string,
+  roomTenantId: string
+): Promise<TenantPaymentLinkResponse> {
+  return httpRequest<TenantPaymentLinkResponse>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${roomTenantId}/payment-link`,
+    {
+      method: "GET",
+      auth: true,
+    }
+  );
+}
+
+/* ─── Tutorials / Video Guides Hub ───────────────────────────────────────── */
+
+export interface TutorialItem {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  videoUrl: string;
+  thumbnailUrl?: string | null;
+  duration?: string | null;
+  displayOrder?: number;
+  badge?: string | null;
+}
+
+/**
+ * Fetch public video tutorials for PG Owners Learning Hub
+ */
+export async function getTutorials(category?: string): Promise<TutorialItem[]> {
+  const query = category && category !== "All" ? `?category=${encodeURIComponent(category)}` : "";
+  return httpRequest<TutorialItem[]>(`/tutorials${query}`, {
+    method: "GET",
+  });
+}
+
+/**
+ * Fetch distinct tutorial categories
+ */
+export async function getTutorialCategories(): Promise<string[]> {
+  return httpRequest<string[]>("/tutorials/categories", {
+    method: "GET",
+  });
+}
 

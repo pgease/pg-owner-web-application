@@ -28,8 +28,10 @@ import {
   History,
   MessageSquare,
   UserMinus,
+  Link2,
 } from "lucide-react";
 import { TenantActivityLogsDrawer } from "@/components/tenants/TenantActivityLogsDrawer";
+import { SharePaymentLinkDialog } from "@/components/tenants/SharePaymentLinkDialog";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -464,6 +466,8 @@ export default function TenantDetailPage() {
     agreementStartDate: new Date().toISOString().split("T")[0],
     houseRules: "1. No loud music after 10 PM.\n2. Guests allowed until 8 PM.\n3. Keep common areas clean.",
   });
+
+  const [paymentLinkOpen, setPaymentLinkOpen] = useState(false);
 
   // Edit Profile form matching RentOk comprehensive fields
   const [form, setForm] = useState({
@@ -1282,6 +1286,12 @@ export default function TenantDetailPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem
+                  onClick={() => setPaymentLinkOpen(true)}
+                  className="cursor-pointer gap-2"
+                >
+                  <Link2 className="h-3.5 w-3.5 text-teal-600" /> Share Payment Link & Dues
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   onClick={() => handleSendWhatsAppReminder("rent")}
                   className="cursor-pointer gap-2"
                 >
@@ -1301,6 +1311,15 @@ export default function TenantDetailPage() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPaymentLinkOpen(true)}
+              className="gap-1.5 border-teal-300 text-teal-700 dark:text-teal-300 dark:border-teal-800 hover:bg-teal-50 dark:hover:bg-teal-950 font-bold shadow-xs"
+            >
+              <Link2 className="h-4 w-4 text-teal-600" /> Payment Link
+            </Button>
 
             {editing ? (
               <div className="flex items-center gap-2">
@@ -3830,6 +3849,18 @@ export default function TenantDetailPage() {
           tenant={tenant}
           propertyId={currentPropertyId}
         />
+
+        {currentPropertyId && roomTenantId && (
+          <SharePaymentLinkDialog
+            open={paymentLinkOpen}
+            onOpenChange={setPaymentLinkOpen}
+            propertyId={currentPropertyId}
+            roomTenantId={roomTenantId}
+            tenantName={tenant?.name}
+            roomNumber={tenant?.roomNumber || (tenant as any)?.room_number}
+            phone={tenant?.mobileNumber || tenant?.phone}
+          />
+        )}
       </div>
     </CanAccessPage>
   );

@@ -84,6 +84,7 @@ import { CelebrationDialog } from "@/components/CelebrationDialog";
 import { useSubscriptionAccess } from "@/hooks/useSubscriptionAccess";
 import { TrialExpiredGateModal } from "@/components/common/TrialExpiredGateModal";
 import { toast } from "@/components/ui/use-toast";
+import { QRCodeSVG } from "qrcode.react";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -101,6 +102,7 @@ const Dashboard = () => {
 
   // Interactive Modals
   const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [qrMode, setQrMode] = useState<"upi" | "onboarding">("upi");
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [publicListingModalOpen, setPublicListingModalOpen] = useState(false);
   const [customiseModalOpen, setCustomiseModalOpen] = useState(false);
@@ -952,37 +954,66 @@ const Dashboard = () => {
                 <QrCode className="h-5 w-5 text-teal-600" /> Property QR Codes
               </DialogTitle>
               <DialogDescription className="text-xs">
-                Official QR code for direct tenant UPI rent payments and entry registration.
+                Official scannable QR code for direct tenant UPI rent payments or instant check-in.
               </DialogDescription>
             </DialogHeader>
+
+            <div className="flex p-1 bg-muted rounded-xl gap-1 w-full max-w-xs mx-auto mt-1">
+              <button
+                type="button"
+                onClick={() => setQrMode("upi")}
+                className={cn(
+                  "flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all",
+                  qrMode === "upi"
+                    ? "bg-white text-teal-700 shadow-xs dark:bg-slate-800 dark:text-teal-300"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                UPI Rent QR
+              </button>
+              <button
+                type="button"
+                onClick={() => setQrMode("onboarding")}
+                className={cn(
+                  "flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all",
+                  qrMode === "onboarding"
+                    ? "bg-white text-teal-700 shadow-xs dark:bg-slate-800 dark:text-teal-300"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Tenant Check-in
+              </button>
+            </div>
+
             <div className="flex flex-col items-center justify-center p-4 space-y-4">
-              <div className="p-4 rounded-2xl bg-white border-2 border-dashed border-teal-300 shadow-md">
-                <svg width="180" height="180" viewBox="0 0 100 100" className="mx-auto">
-                  <rect width="100" height="100" fill="white" />
-                  <rect x="5" y="5" width="26" height="26" fill="#0f766e" rx="4" />
-                  <rect x="9" y="9" width="18" height="18" fill="white" rx="2" />
-                  <rect x="13" y="13" width="10" height="10" fill="#0f766e" rx="1" />
-                  <rect x="69" y="5" width="26" height="26" fill="#0f766e" rx="4" />
-                  <rect x="73" y="9" width="18" height="18" fill="white" rx="2" />
-                  <rect x="77" y="13" width="10" height="10" fill="#0f766e" rx="1" />
-                  <rect x="5" y="69" width="26" height="26" fill="#0f766e" rx="4" />
-                  <rect x="9" y="73" width="18" height="18" fill="white" rx="2" />
-                  <rect x="13" y="77" width="10" height="10" fill="#0f766e" rx="1" />
-                  <rect x="36" y="8" width="6" height="6" fill="#0f766e" rx="1" />
-                  <rect x="46" y="8" width="6" height="6" fill="#0f766e" rx="1" />
-                  <rect x="56" y="8" width="6" height="6" fill="#0f766e" rx="1" />
-                  <rect x="36" y="36" width="10" height="10" fill="#0f766e" rx="2" />
-                  <rect x="42" y="52" width="12" height="12" fill="#0f766e" rx="2" />
-                </svg>
+              <div className="p-4 rounded-2xl bg-white border-2 border-dashed border-teal-300 shadow-md flex items-center justify-center">
+                <QRCodeSVG
+                  value={
+                    qrMode === "upi"
+                      ? `upi://pay?pa=${encodeURIComponent(
+                          (selectedPg as any)?.bankAccount?.upiId ||
+                            (selectedPg?.propertyCode ? `${selectedPg.propertyCode.toLowerCase()}@okaxis` : "pgease@icici")
+                        )}&pn=${encodeURIComponent(pgDisplayName)}&cu=INR`
+                      : `https://pgease.com/onboarding/${selectedPgId}`
+                  }
+                  size={180}
+                  level="M"
+                  includeMargin={true}
+                  className="rounded-lg mx-auto"
+                />
               </div>
               <div className="text-center space-y-1">
                 <p className="font-extrabold text-sm text-foreground">{pgDisplayName}</p>
-                <p className="text-xs text-muted-foreground">{pgCityState}</p>
+                <p className="text-xs text-muted-foreground">
+                  {qrMode === "upi"
+                    ? `UPI: ${(selectedPg as any)?.bankAccount?.upiId || (selectedPg?.propertyCode ? `${selectedPg.propertyCode.toLowerCase()}@okaxis` : "pgease@icici")}`
+                    : "Scan with camera to open tenant self check-in"}
+                </p>
               </div>
               <div className="flex gap-2 w-full">
                 <Button
                   className="flex-1 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs gap-1.5"
-                  onClick={() => toast({ title: "Standee Downloaded", description: "PG QR code standee PDF saved." })}
+                  onClick={() => toast({ title: "Standee Ready 📄", description: "Standee ready for reception display." })}
                 >
                   <Download className="h-3.5 w-3.5" /> Download Standee
                 </Button>
@@ -991,6 +1022,7 @@ const Dashboard = () => {
                   size="icon"
                   className="rounded-xl"
                   onClick={() => window.print()}
+                  title="Print Standee"
                 >
                   <Printer className="h-4 w-4" />
                 </Button>
