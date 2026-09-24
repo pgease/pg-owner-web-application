@@ -22,7 +22,7 @@ import { getPermissionDisplayName } from "@/constants/permissions";
 import { PermissionEditor } from "@/components/team/PermissionEditor";
 import { createStaff as createOwnerStaff, updateStaffPermissions } from "@/api/propertyOwner";
 import { toast } from "@/components/ui/use-toast";
-import { cn } from "@/lib/utils";
+import { cn, cleanPhoneInput } from "@/lib/utils";
 
 const ROLES = ["manager", "caretaker", "cleaner", "warden"] as const;
 type RoleKey = (typeof ROLES)[number];
@@ -79,7 +79,7 @@ export default function AddStaff() {
   };
 
   const handleSave = async () => {
-    const digits = phone.replace(/\D/g, "").slice(0, 10);
+    const digits = cleanPhoneInput(phone);
     if (!name.trim() || digits.length !== 10 || !role || !pgId) {
       toast({ title: "Fill name, 10-digit mobile, role, and select a PG", variant: "destructive" });
       return;
@@ -137,10 +137,9 @@ export default function AddStaff() {
                 <span className="text-sm text-muted-foreground shrink-0">+91</span>
                 <Input
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  onChange={(e) => setPhone(cleanPhoneInput(e.target.value))}
                   inputMode="numeric"
                   placeholder="10-digit number"
-                  maxLength={10}
                 />
               </div>
             </div>

@@ -20,6 +20,19 @@ type Lang = "en" | "hi";
 
 const LAST_PHONE_KEY = "pgEase_lastPhone";
 const clampDigits = (v: string, max: number) => v.replace(/\D/g, "").slice(0, max);
+const cleanPhoneInput = (v: string): string => {
+  const digits = v.replace(/\D/g, "");
+  if (digits.length > 10) {
+    if (digits.startsWith("91")) {
+      return digits.slice(2, 12);
+    }
+    if (digits.startsWith("0")) {
+      return digits.slice(1, 11);
+    }
+    return digits.slice(-10);
+  }
+  return digits.slice(0, 10);
+};
 const EASE_SMOOTH = cubicBezier(0.16, 1, 0.3, 1);
 const EASE_FAST = cubicBezier(0.2, 0.9, 0.2, 1);
 
@@ -474,7 +487,7 @@ export default function Login() {
                           </div>
                           <Input
                             value={phone}
-                            onChange={(e) => setPhone(clampDigits(e.target.value, 10))}
+                            onChange={(e) => setPhone(cleanPhoneInput(e.target.value))}
                             onKeyDown={handlePhoneKeyDown}
                             placeholder="Enter 10-digit number"
                             inputMode="numeric"

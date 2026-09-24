@@ -29,6 +29,7 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { useBlocks, useFloors, useRoomsList, usePropertyTenants, queryKeys } from "@/hooks/usePropertyOwnerQueries";
 import { Check, Search, ChevronRight, ChevronLeft, Plus, Minus, DoorOpen, Bed as BedIcon, Lock, Layers, Building, Phone } from "lucide-react";
+import { cleanPhoneInput } from "@/lib/utils";
 
 function idStr(id: unknown): string {
   if (id === undefined || id === null) return "";
@@ -854,9 +855,8 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                   </span>
                   <Input
                     placeholder="10-digit contact number"
-                    maxLength={10}
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                    onChange={(e) => setPhone(cleanPhoneInput(e.target.value))}
                   />
                 </div>
                 <div className="flex items-center gap-2 pt-1">
@@ -1190,9 +1190,8 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                             </span>
                             <Input
                               placeholder="10-digit alternate contact"
-                              maxLength={10}
                               value={alternatePhone}
-                              onChange={(e) => setAlternatePhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                              onChange={(e) => setAlternatePhone(cleanPhoneInput(e.target.value))}
                             />
                           </div>
                         </div>
@@ -1346,9 +1345,8 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                             </span>
                             <Input
                               placeholder="10-digit father contact"
-                              maxLength={10}
                               value={fatherPhone}
-                              onChange={(e) => setFatherPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                              onChange={(e) => setFatherPhone(cleanPhoneInput(e.target.value))}
                             />
                           </div>
                         </div>
@@ -1368,9 +1366,8 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                             </span>
                             <Input
                               placeholder="10-digit mother contact"
-                              maxLength={10}
                               value={motherPhone}
-                              onChange={(e) => setMotherPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                              onChange={(e) => setMotherPhone(cleanPhoneInput(e.target.value))}
                             />
                           </div>
                         </div>
@@ -1400,9 +1397,8 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                             </span>
                             <Input
                               placeholder="10-digit guardian contact"
-                              maxLength={10}
                               value={guardianPhone}
-                              onChange={(e) => setGuardianPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                              onChange={(e) => setGuardianPhone(cleanPhoneInput(e.target.value))}
                             />
                           </div>
                         </div>
