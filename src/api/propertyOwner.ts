@@ -410,6 +410,7 @@ export interface AddTenantPayload {
   gstPercentage?: number;
   gstin?: string;
   businessName?: string;
+  bankAccountId?: string;
   bankAccountHolderName?: string;
   bankAccountNumber?: string;
   bankIfscCode?: string;
@@ -498,7 +499,7 @@ function serializeAddTenantBody(payload: AddTenantPayload): Record<string, unkno
     "stayType", "lockinPeriodMonths", "noticePeriodDays", "agreementPeriodMonths",
     "referredBy", "bookedBy", "checkinTime", "checkoutTime", "lastMeterReading",
     "lastReadingDate", "rentingType", "collectOnlinePayments", "gstApplicable",
-    "gstPercentage", "gstin", "businessName", "bankAccountHolderName",
+    "gstPercentage", "gstin", "businessName", "bankAccountId", "bankAccountHolderName",
     "bankAccountNumber", "bankIfscCode", "bankName", "bankUpiId", "paymentDetails",
     "billingStartDate", "gracePeriodDays", "rentDisabled",
     "permHouseNumber", "permStreet", "permLocality", "permCity", "permDistrict", "permState", "permCountry", "permPincode",
@@ -943,6 +944,7 @@ export interface UpdatePropertyTenantPayload {
   localGuardianAddress?: string;
 
   // Bank Details
+  bankAccountId?: string;
   accountHolderName?: string;
   bankAccountHolderName?: string;
   accountNumber?: string;
@@ -2761,10 +2763,106 @@ export interface IfscLookupResponse {
   message?: string;
 }
 
+export interface SettlementBankAccountItem extends SettlementBankAccount {
+  id: string;
+  isPrimary?: boolean;
+  createdAt?: string;
+}
+
 export interface SettlementBankAccountResponse {
   success: boolean;
-  bankAccount: SettlementBankAccount | null;
+  bankAccount: SettlementBankAccount | SettlementBankAccountItem | null;
   message?: string;
+}
+
+export interface SettlementBankAccountsResponse {
+  success: boolean;
+  accounts: SettlementBankAccountItem[];
+  primaryAccount: SettlementBankAccountItem | null;
+  message?: string;
+}
+
+export interface AddSettlementBankAccountDto extends UpdateSettlementBankAccountDto {
+  isPrimary?: boolean;
+}
+
+/**
+ * Fetch all registered settlement bank accounts & UPI IDs for the authenticated property owner
+ */
+export async function getSettlementBankAccounts(): Promise<SettlementBankAccountsResponse> {
+  return httpRequest<SettlementBankAccountsResponse>(`${PROPERTY_OWNER_BASE}/bank-accounts`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+/**
+ * Add a new settlement bank account or UPI ID
+ */
+export async function addSettlementBankAccount(
+  dto: AddSettlementBankAccountDto
+): Promise<{
+  success: boolean;
+  message: string;
+  account: SettlementBankAccountItem;
+  accounts: SettlementBankAccountItem[];
+  primaryAccount: SettlementBankAccountItem | null;
+}> {
+  return httpRequest<{
+    success: boolean;
+    message: string;
+    account: SettlementBankAccountItem;
+    accounts: SettlementBankAccountItem[];
+    primaryAccount: SettlementBankAccountItem | null;
+  }>(`${PROPERTY_OWNER_BASE}/bank-accounts`, {
+    method: "POST",
+    auth: true,
+    body: dto,
+  });
+}
+
+/**
+ * Set an account as the primary settlement account
+ */
+export async function setPrimarySettlementBankAccount(
+  accountId: string
+): Promise<{
+  success: boolean;
+  message: string;
+  accounts: SettlementBankAccountItem[];
+  primaryAccount: SettlementBankAccountItem | null;
+}> {
+  return httpRequest<{
+    success: boolean;
+    message: string;
+    accounts: SettlementBankAccountItem[];
+    primaryAccount: SettlementBankAccountItem | null;
+  }>(`${PROPERTY_OWNER_BASE}/bank-accounts/${accountId}/primary`, {
+    method: "PUT",
+    auth: true,
+  });
+}
+
+/**
+ * Delete a registered settlement bank account
+ */
+export async function deleteSettlementBankAccount(
+  accountId: string
+): Promise<{
+  success: boolean;
+  message: string;
+  accounts: SettlementBankAccountItem[];
+  primaryAccount: SettlementBankAccountItem | null;
+}> {
+  return httpRequest<{
+    success: boolean;
+    message: string;
+    accounts: SettlementBankAccountItem[];
+    primaryAccount: SettlementBankAccountItem | null;
+  }>(`${PROPERTY_OWNER_BASE}/bank-accounts/${accountId}`, {
+    method: "DELETE",
+    auth: true,
+  });
 }
 
 /**

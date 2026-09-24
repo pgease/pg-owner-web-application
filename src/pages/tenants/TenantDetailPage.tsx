@@ -59,12 +59,13 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/components/ui/use-toast";
-import type { PropertyTenant } from "@/api/propertyOwner";
+import type { PropertyTenant, SettlementBankAccountItem } from "@/api/propertyOwner";
 import {
   updatePropertyTenant,
   sendWhatsAppRentReminder,
   sendWhatsAppKycReminder,
   sendWhatsAppAgreementReminder,
+  getSettlementBankAccounts,
 } from "@/api/propertyOwner";
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
 import {
@@ -469,6 +470,24 @@ export default function TenantDetailPage() {
 
   const [paymentLinkOpen, setPaymentLinkOpen] = useState(false);
 
+  // Linked settlement accounts for bank assignment
+  const [ownerBankAccounts, setOwnerBankAccounts] = useState<SettlementBankAccountItem[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    getSettlementBankAccounts()
+      .then((res) => {
+        if (!isMounted) return;
+        if (res?.success && Array.isArray(res.accounts)) {
+          setOwnerBankAccounts(res.accounts);
+        }
+      })
+      .catch((e) => console.warn("Could not load owner bank accounts:", e));
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Edit Profile form matching RentOk comprehensive fields
   const [form, setForm] = useState({
     // Renting Details
@@ -549,6 +568,7 @@ export default function TenantDetailPage() {
     businessOwnerName: "",
 
     // Bank Details
+    bankAccountId: "",
     bankName: "",
     accountHolderName: "",
     accountNumber: "",
@@ -671,6 +691,7 @@ export default function TenantDetailPage() {
         guardianAddress: (tenant as any).guardianAddress ?? (tenant as any).localGuardianAddress ?? "",
 
         // Bank Details
+        bankAccountId: (tenant as any).bankAccountId ?? (tenant as any).bankDetails?.bankAccountId ?? "",
         bankName: (tenant as any).bankName ?? (tenant as any).bankDetails?.bankName ?? (tenant as any).bank?.bankName ?? "",
         accountHolderName: (tenant as any).accountHolderName ?? (tenant as any).bankAccountHolderName ?? tenant.name ?? "",
         accountNumber: (tenant as any).accountNumber ?? (tenant as any).bankAccountNumber ?? "",
@@ -1097,6 +1118,7 @@ export default function TenantDetailPage() {
         localGuardianAddress: form.guardianAddress.trim() || undefined,
 
         // Bank Details
+        bankAccountId: form.bankAccountId || undefined,
         bankName: form.bankName.trim() || undefined,
         bankAccountHolderName: form.accountHolderName.trim() || undefined,
         bankAccountNumber: form.accountNumber.trim() || undefined,
@@ -2776,6 +2798,50 @@ export default function TenantDetailPage() {
 
                   <div className="p-4 bg-card">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                      {editing && ownerBankAccounts.length > 0 && (
+                        <div className="sm:col-span-2 space-y-1 pb-2">
+                          <Label className="text-xs font-semibold">Assign Settlement Account for this Tenant</Label>
+                          <Select
+                            value={form.bankAccountId || "custom"}
+                            onValueChange={(accId) => {
+                              if (accId === "custom") {
+                                setForm((prev) => ({ ...prev, bankAccountId: "" }));
+                                return;
+                              }
+                              const matched = ownerBankAccounts.find((a) => a.id === accId);
+                              if (matched) {
+                                setForm((prev) => ({
+                                  ...prev,
+                                  bankAccountId: accId,
+                                  bankName: matched.bankName || "",
+                                  accountHolderName: matched.accountHolderName || prev.name || "",
+                                  accountNumber: matched.accountNumber || "",
+                                  ifscCode: matched.ifscCode || "",
+                                  upiId: matched.upiId || "",
+                                }));
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="h-9 text-xs rounded-xl">
+                              <SelectValue placeholder="Select Bank / UPI Account" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ownerBankAccounts.map((acc) => (
+                                <SelectItem key={acc.id} value={acc.id}>
+                                  {acc.bankName || "Bank Account"} (••••{acc.accountNumber?.slice(-4)})
+                                  {acc.isPrimary ? " [Owner Primary]" : ""}
+                                  {acc.upiId ? ` — UPI: ${acc.upiId}` : ""}
+                                </SelectItem>
+                              ))}
+                              <SelectItem value="custom">Custom Account Details (Manual Entry)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-[10px] text-muted-foreground">
+                            Tenant's rent payments and UPI links will be settled into this chosen account.
+                          </p>
+                        </div>
+                      )}
+
                       {editing ? (
                         <EditField label="Bank Name" className="sm:col-span-2">
                           <Input

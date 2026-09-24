@@ -23,6 +23,8 @@ import {
   createFloor,
   createRoom,
   updateRoom,
+  getSettlementBankAccounts,
+  type SettlementBankAccountItem,
   type BlockItem,
   type FloorItem,
 } from "@/api/propertyOwner";
@@ -149,10 +151,54 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
   const [guardianAddress, setGuardianAddress] = useState("");
 
   // Bank Details
+  const [ownerBankAccounts, setOwnerBankAccounts] = useState<SettlementBankAccountItem[]>([]);
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>("");
   const [bankName, setBankName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [ifscCode, setIfscCode] = useState("");
   const [upiId, setUpiId] = useState("");
+
+  // Load owner's bank accounts on mount
+  useEffect(() => {
+    let isMounted = true;
+    getSettlementBankAccounts()
+      .then((res) => {
+        if (!isMounted) return;
+        if (res?.success && Array.isArray(res.accounts) && res.accounts.length > 0) {
+          setOwnerBankAccounts(res.accounts);
+          const prim = res.primaryAccount || res.accounts.find((a) => a.isPrimary) || res.accounts[0];
+          if (prim) {
+            setSelectedBankAccountId(prim.id);
+            setBankName(prim.bankName || "");
+            setAccountNumber(prim.accountNumber || "");
+            setIfscCode(prim.ifscCode || "");
+            setUpiId(prim.upiId || "");
+          }
+        }
+      })
+      .catch((e) => console.warn("Could not load owner bank accounts:", e));
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleBankSelectionChange = (accId: string) => {
+    setSelectedBankAccountId(accId);
+    if (accId === "custom") {
+      setBankName("");
+      setAccountNumber("");
+      setIfscCode("");
+      setUpiId("");
+      return;
+    }
+    const matched = ownerBankAccounts.find((a) => a.id === accId);
+    if (matched) {
+      setBankName(matched.bankName || "");
+      setAccountNumber(matched.accountNumber || "");
+      setIfscCode(matched.ifscCode || "");
+      setUpiId(matched.upiId || "");
+    }
+  };
 
   // Stay timing
   const [checkinTime, setCheckinTime] = useState("12:00 PM");
@@ -652,6 +698,7 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
         guardianContact: guardianPhone ? `+91${guardianPhone.replace(/\D/g, "")}` : undefined,
         guardianPhone: guardianPhone ? `+91${guardianPhone.replace(/\D/g, "")}` : undefined,
         guardianAddress: guardianAddress.trim() || undefined,
+        bankAccountId: selectedBankAccountId && selectedBankAccountId !== "custom" ? selectedBankAccountId : undefined,
         bankName: bankName.trim() || undefined,
         bankAccountHolderName: name.trim() || undefined,
         bankAccountNumber: accountNumber.trim() || undefined,
@@ -743,6 +790,7 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
           guardianName: guardianName.trim() || undefined,
           guardianPhone: guardianPhone.trim() || undefined,
           guardianAddress: guardianAddress.trim() || undefined,
+          bankAccountId: selectedBankAccountId && selectedBankAccountId !== "custom" ? selectedBankAccountId : undefined,
           bankName: bankName.trim() || undefined,
           bankAccountNumber: accountNumber.trim() || undefined,
           bankIfscCode: ifscCode.trim() || undefined,
@@ -1412,10 +1460,37 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
                     {/* (E) Bank Details */}
                     <details className="group border rounded-lg overflow-hidden bg-card/50">
                       <summary className="flex justify-between items-center p-3 font-semibold text-xs cursor-pointer bg-muted/15 select-none border-b">
-                        <span>Bank Details</span>
+                        <span>Bank / UPI Settlement Details</span>
                         <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90 text-muted-foreground" />
                       </summary>
                       <div className="p-3.5 space-y-3.5 bg-background text-sm">
+                        {ownerBankAccounts.length > 0 && (
+                          <div className="space-y-1">
+                            <Label className="text-xs font-semibold">Assign Settlement Account for this Tenant</Label>
+                            <Select
+                              value={selectedBankAccountId}
+                              onValueChange={handleBankSelectionChange}
+                            >
+                              <SelectTrigger className="h-9 text-xs rounded-xl">
+                                <SelectValue placeholder="Select Bank / UPI Account" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ownerBankAccounts.map((acc) => (
+                                  <SelectItem key={acc.id} value={acc.id}>
+                                    {acc.bankName || "Bank Account"} (••••{acc.accountNumber?.slice(-4)})
+                                    {acc.isPrimary ? " [Owner Primary]" : ""}
+                                    {acc.upiId ? ` — UPI: ${acc.upiId}` : ""}
+                                  </SelectItem>
+                                ))}
+                                <SelectItem value="custom">Custom Account Details (Manual Entry)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p className="text-[10px] text-muted-foreground">
+                              Select which of your bank accounts this tenant will pay rent into.
+                            </p>
+                          </div>
+                        )}
+
                         <div className="space-y-1">
                           <Label>Bank Name</Label>
                           <Input placeholder="e.g. HDFC Bank, SBI, ICICI" value={bankName} onChange={(e) => setBankName(e.target.value)} />
