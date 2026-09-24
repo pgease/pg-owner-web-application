@@ -90,6 +90,9 @@ const FEATURE_EQUIVALENCE_GROUPS: string[][] = [
   // Advanced Reports & Analytics
   ["advanced_reports", "advanced_analytics", "financial_reports", "occupancy_reports", "collection_reports"],
 
+  // Pro PG Group Chat
+  ["pg_group_chat", "group_chat", "chat_group", "pg_chat", "community_chat"],
+
   // Core PG Operations
   ["pg_management", "pg_profile", "floor_management", "room_management", "bed_management", "occupancy_dashboard", "vacancy_dashboard"],
   ["tenant_management", "tenant_add", "manual_tenant_add", "bulk_tenant_import", "tenant_room_mapping", "tenant_profile", "tenant_history", "tenant_app_access"],
@@ -121,6 +124,7 @@ const EXPIRED_READONLY_ALLOWED_FEATURES = new Set([
 
 /** Pro-only features that Lite does not have */
 const PRO_EXCLUSIVE_FEATURES = new Set([
+  "pg_group_chat",
   "notice_period_tracker",
   "payment_gateway_collection",
   "automated_settlement",

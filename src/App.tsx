@@ -47,6 +47,7 @@ import RestrictionsPage from "./pages/property/RestrictionsPage";
 import ReferralsPage from "./pages/ReferralsPage";
 import ApiCatalogPage from "./pages/reference/ApiCatalogPage";
 import PublicListingPage from "./pages/property/PublicListingPage";
+import GroupChatPage from "./pages/chat/GroupChatPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -119,6 +120,8 @@ const App = () => (
                         <Route path="/rent-payments/dues" element={<RentPayments />} />
                         <Route path="/staff" element={<Staff />} />
                         <Route path="/complaints" element={<Complaints />} />
+                        <Route path="/group-chat" element={<GroupChatPage />} />
+                        <Route path="/chat" element={<GroupChatPage />} />
                         <Route path="/staff/roles" element={<Staff />} />
                         <Route path="/expenses" element={<Expenses />} />
                         <Route path="/expenses/categories" element={<Expenses />} />

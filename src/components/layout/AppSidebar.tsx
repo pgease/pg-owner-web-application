@@ -114,6 +114,7 @@ const navItems: NavItem[] = [
     icon: Wrench,
     children: [
       { title: "Complaints Desk", url: "/complaints", permissionKey: "complaint_view_all" },
+      { title: "PG Group Chat", url: "/group-chat", permissionKey: "chat_view", featureKey: "pg_group_chat" },
       { title: "Food & Dining", url: "/food", permissionKey: "food_view_edit", featureKey: "food_menu_planner" },
       { title: "Night Out Passes", url: "/nightout", permissionKey: "nightout_view", featureKey: "nightout_guest_requests" },
       { title: "Eviction", url: "/eviction", permissionKey: "eviction_approve" },

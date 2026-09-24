@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { MapPin, CheckCircle2, Building2, ArrowLeft, ArrowRight, Shield, Globe, Loader2, Plus, ChevronRight } from "lucide-react";
+import { MapPin, CheckCircle2, Building2, ArrowLeft, ArrowRight, Shield, Globe, Loader2, Plus, ChevronRight, Sparkles } from "lucide-react";
 import pgeaseLogo from "@/assets/pgease-logo.jpg";
 import { toast } from "@/components/ui/use-toast";
 import {
@@ -443,6 +443,21 @@ const Onboarding = () => {
                       <p className="text-xs text-white/50 mt-1">
                         {lang === "en" ? "We only need these details to create your property." : "प्रॉपर्टी बनाने के लिए इतनी जानकारी ही चाहिए।"}
                       </p>
+                    </div>
+
+                    {/* 45-Day Pro Trial Active Announcement */}
+                    <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-transparent p-3 text-xs text-amber-200 shadow-sm flex items-start gap-2.5">
+                      <Sparkles className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                      <div>
+                        <div className="font-bold text-amber-300">
+                          {lang === "en" ? "✨ 45-Day Free Pro Trial Included" : "✨ 45 दिनों का मुफ़्त Pro ट्रायल शुरू"}
+                        </div>
+                        <p className="text-[11px] text-white/80 mt-0.5">
+                          {lang === "en"
+                            ? "From the day you create your account, enjoy 45 days of Pro features including Private PG Group Chat, automated UPI, and your branded website."
+                            : "खाता बनाने के पहले दिन से 45 दिनों तक प्राइवेट PG ग्रुप चैट और संपूर्ण Pro फीचर्स का मुफ़्त लाभ उठाएं।"}
+                        </p>
+                      </div>
                     </div>
 
                   <div className="space-y-1.5">

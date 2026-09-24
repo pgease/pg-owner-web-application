@@ -70,6 +70,7 @@ const features = [
   { name: "Digital Rental Agreement eSign", featureKey: "RENTAL_AGREEMENT", free: false, lite: false, pro: true },
   { name: "Automated WhatsApp Alerts & Reminders", featureKey: "WHATSAPP_AUTOMATION", free: false, lite: false, pro: true },
   { name: "Notice Period Tracking & Bed Vacate Timeline", featureKey: "notice_period_tracker", free: false, lite: false, pro: true },
+  { name: "Private PG Group Chat (Owner + Staff + Tenants)", featureKey: "pg_group_chat", free: false, lite: false, pro: true },
 ];
 
 export default function Plans() {
@@ -155,6 +156,7 @@ export default function Plans() {
       features: [
         "₹49 / bed / month (45-Day Pro Trial)",
         "Everything included in Lite Plan",
+        "Private PG Group Chat (Owner + Staff + Tenants)",
         "Automated Payment Gateway collection",
         "Automated Settlement (T+2 bank transfer)",
         "Dedicated PG Website ({pgname}.pgease.in)",

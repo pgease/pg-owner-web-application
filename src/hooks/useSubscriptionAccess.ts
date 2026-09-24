@@ -22,6 +22,7 @@ export interface SubscriptionAccessInfo {
   hasAutomatedGateway: boolean;
   hasPgWebsite: boolean;
   hasDedicatedAccountManager: boolean;
+  hasGroupChat: boolean;
   subdomainUrl: string;
   isLoading: boolean;
   setDemoPlan: (mode: "trial" | "expired" | "pro" | "lite" | "reset") => void;
@@ -52,6 +53,7 @@ export function useSubscriptionAccess(): SubscriptionAccessInfo {
     const hasAutomatedGateway = entitlements.hasFeature("payment_gateway_collection");
     const hasPgWebsite = entitlements.hasFeature("pg_website");
     const hasDedicatedAccountManager = true;
+    const hasGroupChat = entitlements.hasFeature("pg_group_chat");
 
     // Subdomain generation
     const ownerNameSlug = (owner?.name || "pg")
@@ -77,6 +79,7 @@ export function useSubscriptionAccess(): SubscriptionAccessInfo {
       hasAutomatedGateway,
       hasPgWebsite,
       hasDedicatedAccountManager,
+      hasGroupChat,
       subdomainUrl,
       isLoading: entitlements.isLoading,
       setDemoPlan: entitlements.setDemoPlan,

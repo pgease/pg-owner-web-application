@@ -161,4 +161,19 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: "team_property_access", name: "View property access", desc: "See which properties each staff can access", tier: "pro" },
     ],
   },
+  {
+    id: "group_chat",
+    label: "PG Group Chat (PRO)",
+    permissions: [
+      { key: "chat_view", name: "View group chat", desc: "Access the PG group chat and read messages", tier: "pro" },
+      { key: "chat_send", name: "Send chat messages", desc: "Send text messages in the PG group chat", tier: "pro" },
+      { key: "chat_reply", name: "Reply to messages", desc: "Reply directly to specific messages in the chat", tier: "pro" },
+      { key: "chat_media_upload", name: "Upload images & files", desc: "Share photos, documents, and attachments in chat", tier: "pro" },
+      { key: "chat_delete_own", name: "Delete own messages", desc: "Remove own messages from the chat", tier: "pro" },
+      { key: "chat_delete_any", name: "Delete any message", desc: "Moderate chat and remove inappropriate messages", tier: "pro" },
+      { key: "chat_pin", name: "Pin announcements", desc: "Pin important announcements to the group banner", tier: "pro" },
+      { key: "chat_member_view", name: "View member list", desc: "View PG group member roster and roles", tier: "pro" },
+      { key: "chat_group_settings", name: "Manage group settings", desc: "Control PG group chat access and settings", tier: "pro" },
+    ],
+  },
 ];

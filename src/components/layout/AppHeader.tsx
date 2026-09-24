@@ -10,6 +10,7 @@ import {
   Building2,
   Plus,
   Keyboard,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,6 +87,16 @@ const AppHeader = ({ onMenuToggle }: AppHeaderProps) => {
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/group-chat")}
+              className="h-9 w-9 text-slate-300 hover:text-white hover:bg-white/5 relative"
+              title="PG Group Chat (PRO)"
+            >
+              <MessageSquare className="h-4 w-4" />
+              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary" />
+            </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

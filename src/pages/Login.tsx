@@ -13,7 +13,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { requestOtp, verifyOtp, type OtpChannel } from "@/api/propertyOwner";
 import pgeaseLogo from "@/assets/pgease-logo.jpg";
 import loginLottie from "@/assets/lottie/login.json";
-import { Shield, Lock, Users, Pencil, Linkedin, MessageCircle, MessageSquare } from "lucide-react";
+import { Shield, Lock, Users, Pencil, Linkedin, MessageCircle, MessageSquare, Sparkles, Gift } from "lucide-react";
 
 type Step = "phone" | "otp";
 type Lang = "en" | "hi";
@@ -200,6 +200,9 @@ const TEXTS = {
     secureLogin: "Secure OTP-based login",
     consentWhatsapp: "By continuing, you agree to receive verification OTP on WhatsApp.",
     consentSms: "By continuing, you agree to receive verification SMS for login.",
+    trialBadge: "45-Day Free Pro Trial",
+    trialHeadline: "Get 45 days of full Pro access from the day you create your account.",
+    trialSub: "Enjoy Private PG Group Chat, automated UPI collection, and your branded PG website free. No credit card required.",
   },
   hi: {
     title: "अपना PG स्मार्ट तरीके से मैनेज करें",
@@ -235,6 +238,9 @@ const TEXTS = {
     secureLogin: "सुरक्षित OTP लॉगिन",
     consentWhatsapp: "जारी रखकर, आप WhatsApp पर सत्यापन संदेश प्राप्त करने की सहमति देते हैं।",
     consentSms: "जारी रखकर, आप लॉगिन हेतु सत्यापन SMS प्राप्त करने की सहमति देते हैं।",
+    trialBadge: "45 दिनों का मुफ़्त Pro ट्रायल",
+    trialHeadline: "खाता बनाने के दिन से 45 दिनों तक मुफ़्त Pro ऐक्सेस पाएं।",
+    trialSub: "इसमें प्राइवेट PG ग्रुप चैट, ऑटोमेटेड UPI कलेक्शन और आपकी PG वेबसाइट शामिल है। किसी क्रेडिट कार्ड की आवश्यकता नहीं।",
   },
 };
 
@@ -430,7 +436,11 @@ export default function Login() {
           </p>
 
           {/* Trust badges */}
-          <div className="mt-8 flex flex-wrap items-center justify-center lg:justify-start gap-4">
+          <div className="mt-8 flex flex-wrap items-center justify-center lg:justify-start gap-3">
+            <div className="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2">
+              <Gift className="h-3.5 w-3.5 text-amber-400" />
+              <span className="text-xs text-amber-200 font-semibold">45-Day Pro Trial Free</span>
+            </div>
             <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2">
               <Shield className="h-3.5 w-3.5 text-primary" />
               <span className="text-xs text-white/65">{T.encryption}</span>
@@ -474,9 +484,30 @@ export default function Login() {
                   {step === "phone" ? (
                     <motion.div key="phone" {...stepMotion} className="space-y-5">
                       <div className="space-y-1.5">
-                        <div className="text-[11px] uppercase tracking-[0.2em] text-white/50">Login</div>
-                        <div className="text-lg font-semibold tracking-tight">Sign in to continue</div>
-                        <div className="text-[13px] text-white/55">Use your registered mobile number</div>
+                        <div className="text-[11px] uppercase tracking-[0.2em] text-white/50">Login / Sign Up</div>
+                        <div className="text-lg font-semibold tracking-tight">Sign in or Register</div>
+                        <div className="text-[13px] text-white/55">Use your mobile number to get started</div>
+                      </div>
+
+                      {/* 45-Day Free Pro Trial Highlight Banner */}
+                      <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-amber-500/10 to-transparent p-3.5 text-xs text-amber-200 shadow-sm relative overflow-hidden">
+                        <div className="flex items-start gap-2.5">
+                          <Sparkles className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-extrabold text-amber-300 text-xs">{T.trialBadge}</span>
+                              <span className="text-[9px] bg-amber-500/25 text-amber-300 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                                FREE
+                              </span>
+                            </div>
+                            <p className="text-[12px] font-semibold text-white/95 leading-snug">
+                              {T.trialHeadline}
+                            </p>
+                            <p className="text-[11px] text-white/60 leading-normal">
+                              {T.trialSub}
+                            </p>
+                          </div>
+                        </div>
                       </div>
 
                       <div className="space-y-2">
