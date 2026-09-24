@@ -86,6 +86,7 @@ const navItems: NavItem[] = [
       { title: "Notice Period", url: "/tenants/notice-period", permissionKey: "tenant_view", featureKey: "notice_period_tracker" },
       { title: "Guest Log & Requests", url: "/tenants/guests", permissionKey: "guest_log", featureKey: "nightout_guest_requests" },
       { title: "Team List", url: "/team", permissionKey: "team_view_members", featureKey: "staff_roles_permissions" },
+      { title: "Permission Matrix", url: "/team/permissions-matrix", permissionKey: "team_view_members", featureKey: "staff_roles_permissions" },
     ],
   },
   {

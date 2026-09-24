@@ -31,6 +31,7 @@ import { PermissionProvider } from "./context/PermissionContext";
 import TeamIndex from "./pages/team/TeamIndex";
 import AddStaff from "./pages/team/AddStaff";
 import EditStaffPermissions from "./pages/team/EditStaffPermissions";
+import PermissionsMatrixPage from "./pages/team/PermissionsMatrixPage";
 import { FeaturePlaceholder } from "./pages/FeaturePlaceholder";
 import LeadsPage from "./pages/tenants/LeadsPage";
 import WifiManagementPage from "./pages/property/WifiManagementPage";
@@ -148,6 +149,9 @@ const App = () => (
                         <Route path="/team" element={<TeamIndex />} />
                         <Route path="/team/add-staff" element={<AddStaff />} />
                         <Route path="/team/:staffId/permissions" element={<EditStaffPermissions />} />
+                        <Route path="/team/permissions" element={<PermissionsMatrixPage />} />
+                        <Route path="/team/permissions-matrix" element={<PermissionsMatrixPage />} />
+                        <Route path="/settings/permissions" element={<PermissionsMatrixPage />} />
                         <Route path="/food" element={<FoodDiningPage />} />
                         <Route path="/nightout" element={<NightOutRequestsPage />} />
                         <Route

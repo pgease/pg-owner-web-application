@@ -44,11 +44,18 @@ function TeamIndexInner() {
         description="Manage property team members, roles, and administrative access privileges."
         actions={
           isOwner ? (
-            <Button size="sm" className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm" asChild>
-              <Link to="/team/add-staff">
-                <Plus className="h-4 w-4" /> Add staff
-              </Link>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" className="gap-1.5" asChild>
+                <Link to="/team/permissions-matrix">
+                  <Shield className="h-4 w-4 text-primary" /> Permission Matrix
+                </Link>
+              </Button>
+              <Button size="sm" className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm" asChild>
+                <Link to="/team/add-staff">
+                  <Plus className="h-4 w-4" /> Add staff
+                </Link>
+              </Button>
+            </div>
           ) : null
         }
       />
