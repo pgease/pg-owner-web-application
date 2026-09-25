@@ -1,7 +1,7 @@
 import type { HttpMethod } from "@/api/http";
 
 /** Mirrors `API_BASE_URL` in `src/api/http.ts` (display only). */
-export const DOCUMENTED_API_BASE = "https://pg-ease-nest.vercel.app/api";
+export const DOCUMENTED_API_BASE = "https://am4eey3lmk.execute-api.ap-south-1.amazonaws.com/api";
 
 export interface ImplementedApiRow {
   clientExport: string;

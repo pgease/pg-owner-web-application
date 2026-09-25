@@ -6,9 +6,9 @@ This guide explains how to test the **Property Owner (PG Owner)** web applicatio
 
 ## 1. Prerequisites
 
-- **Backend**: Property owner API running (e.g. `https://pg-ease-nest.vercel.app` or your base URL).
+- **Backend**: Property owner API running (e.g. `https://am4eey3lmk.execute-api.ap-south-1.amazonaws.com/api` or your base URL).
 - **Env**: In `.env` or `.env.local`, set:
-  - `VITE_API_BASE_URL=https://pg-ease-nest.vercel.app` (or your API base).
+  - `VITE_API_BASE_URL=https://am4eey3lmk.execute-api.ap-south-1.amazonaws.com/api` (or your API base).
 
 ```sh
 npm i
