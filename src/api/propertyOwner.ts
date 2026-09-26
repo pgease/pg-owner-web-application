@@ -134,6 +134,20 @@ export interface CreatePropertyPayload {
   locationPin: string;
   bedRange: string;
   propertyTypeId: string;
+  cityId?: string;
+  totalRooms?: number;
+  totalBeds?: number;
+  singleSharingPrice?: number;
+  doubleSharingPrice?: number;
+  tripleSharingPrice?: number;
+  fourSharingPrice?: number;
+  securityDepositCycle?: number;
+  facilities?: string[];
+  nearbyPlaces?: string[];
+  photos?: Array<{ url: string; key?: string; order?: number } | string>;
+  active?: boolean;
+  status?: string;
+  isPublishedListing?: boolean;
 }
 
 export interface PropertyResponse {
@@ -180,14 +194,27 @@ export async function getProperties() {
 
 /** PUT /property-owners/properties/:propertyId — Postman "edit-properties" */
 export interface UpdatePropertyPayload {
-  name: string;
-  address: string;
-  latitude: number;
-  longitude: number;
-  locationPin: string;
-  bedRange: string;
-  propertyTypeId: string;
-  photos?: unknown[];
+  name?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  locationPin?: string;
+  bedRange?: string;
+  propertyTypeId?: string;
+  cityId?: string;
+  totalRooms?: number;
+  totalBeds?: number;
+  singleSharingPrice?: number;
+  doubleSharingPrice?: number;
+  tripleSharingPrice?: number;
+  fourSharingPrice?: number;
+  securityDepositCycle?: number;
+  facilities?: string[];
+  nearbyPlaces?: string[];
+  photos?: Array<{ url: string; key?: string; order?: number } | string>;
+  active?: boolean;
+  status?: string;
+  isPublishedListing?: boolean;
 }
 
 export async function updateProperty(propertyId: string, payload: UpdatePropertyPayload) {
@@ -1640,6 +1667,84 @@ export async function getRentCollectionDashboard(
   );
 }
 
+export interface RentCollectionHistoryItem {
+  id: string;
+  roomTenantId: string;
+  tenantId: string;
+  tenantName: string;
+  tenantPhone: string;
+  roomId: string | null;
+  roomNumber: string;
+  rentAmount: string;
+  amountPaid: string;
+  periodMonth: number;
+  periodYear: number;
+  paidAt: string;
+  status: "paid" | "partial" | "pending";
+  paymentMethod: string | null;
+  reference: string | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+export interface RentCollectionHistoryParams {
+  page?: number;
+  limit?: number;
+  sortOrder?: "asc" | "desc";
+  sortBy?: "paidAt" | "createdAt" | "periodMonth";
+  roomTenantId?: string;
+  tenantId?: string;
+  status?: "paid" | "partial" | "pending";
+  periodMonth?: number;
+  periodYear?: number;
+  startDate?: string;
+  endDate?: string;
+  search?: string;
+}
+
+export interface RentCollectionHistoryResponse {
+  data: RentCollectionHistoryItem[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  summary: {
+    totalAmountCollected: number;
+  };
+}
+
+export async function getRentCollectionHistory(
+  propertyId: string,
+  params: RentCollectionHistoryParams = {}
+) {
+  const q = new URLSearchParams();
+  if (params.page !== undefined) q.set("page", String(params.page));
+  if (params.limit !== undefined) q.set("limit", String(params.limit));
+  if (params.sortOrder) q.set("sortOrder", params.sortOrder);
+  if (params.sortBy) q.set("sortBy", params.sortBy);
+  if (params.roomTenantId) q.set("roomTenantId", params.roomTenantId);
+  if (params.tenantId) q.set("tenantId", params.tenantId);
+  if (params.status) q.set("status", params.status);
+  if (params.periodMonth !== undefined) q.set("periodMonth", String(params.periodMonth));
+  if (params.periodYear !== undefined) q.set("periodYear", String(params.periodYear));
+  if (params.startDate) q.set("startDate", params.startDate);
+  if (params.endDate) q.set("endDate", params.endDate);
+  if (params.search) q.set("search", params.search);
+
+  const queryStr = q.toString();
+  const url = `${PROPERTY_OWNER_BASE}/properties/${propertyId}/rent-collections/history${
+    queryStr ? `?${queryStr}` : ""
+  }`;
+
+  return httpRequest<RentCollectionHistoryResponse>(url, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+
 // ─── Analytics ──────────────────────────────────────────────────────────────
 
 export async function getAnalyticsPgGrowth(propertyId?: string) {
@@ -2787,6 +2892,8 @@ export interface AddSettlementBankAccountDto extends UpdateSettlementBankAccount
   isPrimary?: boolean;
 }
 
+export type AddSettlementBankAccountPayload = AddSettlementBankAccountDto;
+
 /**
  * Fetch all registered settlement bank accounts & UPI IDs for the authenticated property owner
  */
@@ -2867,7 +2974,7 @@ export async function deleteSettlementBankAccount(
 }
 
 /**
- * Fetch registered settlement bank account details for the authenticated property owner
+ * Fetch registered settlement bank account details for the authenticated property owner (Legacy)
  */
 export async function getSettlementBankAccount(): Promise<SettlementBankAccountResponse> {
   return httpRequest<SettlementBankAccountResponse>(`${PROPERTY_OWNER_BASE}/bank-account`, {
@@ -2877,7 +2984,7 @@ export async function getSettlementBankAccount(): Promise<SettlementBankAccountR
 }
 
 /**
- * Save or update registered settlement bank account details
+ * Save or update registered settlement bank account details (Legacy)
  */
 export async function updateSettlementBankAccount(
   dto: UpdateSettlementBankAccountDto
@@ -2919,50 +3026,103 @@ export interface TenantPaymentBreakdown {
   totalOutstanding: number;
 }
 
+export interface TenantPaymentSettlement {
+  accountHolderName: string;
+  accountNumber: string;
+  ifscCode: string;
+  bankName?: string;
+  branch?: string;
+  upiId?: string;
+  upiQrString?: string;
+}
+
 export interface TenantPaymentLinkData {
   paymentLink: string;
-  directPayUrl: string;
-  rentCollectionId: string;
-  roomTenantId: string;
-  tenantId: string;
-  tenant: {
+  directPayUrl?: string;
+  rentCollectionId?: string;
+  roomTenantId?: string;
+  tenantId?: string;
+  balanceDue?: number;
+  settlement?: TenantPaymentSettlement;
+  tenant?: {
     id: string;
     name: string;
     phone: string;
     email: string;
   };
-  room: {
+  room?: {
     id: string;
     roomNumber: string;
   };
-  property: {
+  property?: {
     id: string;
     name: string;
   };
-  period: {
+  period?: {
     month: number;
     year: number;
     label: string;
   };
-  status: string;
-  breakdown: TenantPaymentBreakdown;
-  whatsAppMessage: string;
+  status?: string;
+  breakdown?: TenantPaymentBreakdown;
+  whatsAppMessage?: string;
 }
 
 export interface TenantPaymentLinkResponse {
   success: boolean;
+  tenantId?: string;
+  paymentLink?: string;
+  rentCollectionId?: string;
+  balanceDue?: number;
+  settlement?: TenantPaymentSettlement;
   data: TenantPaymentLinkData;
 }
 
 /**
- * Fetch direct payment links, itemized dues breakdown, and pre-formatted WhatsApp message for a tenant
+ * Fetch direct payment links, itemized dues breakdown, and pre-formatted WhatsApp message for a tenant.
+ * Supports both /tenants/:tenantId/payment-link and legacy /room-tenants/:roomTenantId/payment-link.
  */
 export async function getTenantPaymentLink(
   propertyId: string,
-  roomTenantId: string
+  tenantIdOrRoomTenantId: string
 ): Promise<TenantPaymentLinkResponse> {
+  try {
+    const res = await httpRequest<any>(
+      `${PROPERTY_OWNER_BASE}/properties/${propertyId}/tenants/${tenantIdOrRoomTenantId}/payment-link`,
+      {
+        method: "GET",
+        auth: true,
+      }
+    );
+    if (res?.success) {
+      const data: TenantPaymentLinkData = res.data || {
+        paymentLink: res.paymentLink,
+        directPayUrl: res.paymentLink,
+        rentCollectionId: res.rentCollectionId,
+        tenantId: res.tenantId,
+        balanceDue: res.balanceDue,
+        settlement: res.settlement,
+      };
+      if (res.settlement && !data.settlement) {
+        data.settlement = res.settlement;
+      }
+      return {
+        success: true,
+        tenantId: res.tenantId,
+        paymentLink: res.paymentLink || data.paymentLink,
+        rentCollectionId: res.rentCollectionId || data.rentCollectionId,
+        balanceDue: res.balanceDue ?? data.balanceDue,
+        settlement: res.settlement || data.settlement,
+        data,
+      };
+    }
+  } catch (err) {
+    console.warn("GET /tenants/:tenantId/payment-link failed, trying fallback to /room-tenants:", err);
+  }
+
+  // Fallback to room-tenants endpoint
   return httpRequest<TenantPaymentLinkResponse>(
-    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${roomTenantId}/payment-link`,
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${tenantIdOrRoomTenantId}/payment-link`,
     {
       method: "GET",
       auth: true,

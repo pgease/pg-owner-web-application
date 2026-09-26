@@ -49,6 +49,7 @@ import ReferralsPage from "./pages/ReferralsPage";
 import ApiCatalogPage from "./pages/reference/ApiCatalogPage";
 import PublicListingPage from "./pages/property/PublicListingPage";
 import GroupChatPage from "./pages/chat/GroupChatPage";
+import FeatureCataloguePage from "./pages/FeatureCataloguePage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -132,6 +133,7 @@ const App = () => (
                         <Route path="/reports/export" element={<Reports />} />
                         <Route path="/plans" element={<Plans />} />
                         <Route path="/referrals" element={<ReferralsPage />} />
+                        <Route path="/feature-catalogue" element={<FeatureCataloguePage />} />
                         <Route path="/api-catalog" element={<ApiCatalogPage />} />
                         <Route path="/reference/api-catalog" element={<ApiCatalogPage />} />
                         <Route path="/refer-and-earn" element={<ReferralsPage />} />

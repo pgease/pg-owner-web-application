@@ -307,17 +307,25 @@ export function SharePaymentLinkDialog({
               {showQr && (
                 <div className="p-4 bg-white dark:bg-slate-900 border-2 border-dashed border-teal-300 dark:border-teal-700/60 rounded-2xl flex flex-col items-center justify-center text-center space-y-2 my-2 shadow-xs">
                   <QRCodeSVG
-                    value={data.paymentLink}
+                    value={data.settlement?.upiQrString || data.paymentLink}
                     size={160}
                     level="M"
                     includeMargin={true}
                     className="rounded-lg mx-auto"
                   />
                   <p className="text-[11px] font-bold text-teal-800 dark:text-teal-300">
-                    Scan to Open Rent Payment Portal
+                    {data.settlement?.upiQrString
+                      ? "Scan with GPay / PhonePe / Paytm to Pay"
+                      : "Scan to Open Rent Payment Portal"}
                   </p>
+                  {data.settlement && (
+                    <div className="text-[10px] text-muted-foreground flex flex-col items-center gap-0.5">
+                      <span>Direct Payout to: <strong className="text-foreground">{data.settlement.bankName || "Settlement Bank"}</strong></span>
+                      {data.settlement.upiId && <span className="font-mono">{data.settlement.upiId}</span>}
+                    </div>
+                  )}
                   <p className="text-[10px] text-muted-foreground">
-                    Tenants can scan this directly using their mobile camera or UPI app.
+                    Tenants can scan this directly using their mobile camera or any UPI app.
                   </p>
                 </div>
               )}

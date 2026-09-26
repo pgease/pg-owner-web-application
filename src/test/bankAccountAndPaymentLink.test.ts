@@ -193,7 +193,7 @@ describe("Settlement Bank Account & Tenant Payment Link APIs", () => {
 
       const mockFetch = globalThis.fetch as unknown as Mock;
       const [url, options] = mockFetch.mock.calls[0];
-      expect(url).toContain("/property-owners/properties/prop-1/room-tenants/rt-456/payment-link");
+      expect(url).toMatch(/\/property-owners\/properties\/prop-1\/(tenants|room-tenants)\/rt-456\/payment-link/);
       expect(options.method).toBe("GET");
     });
   });

@@ -343,8 +343,8 @@ export default function GroupChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
 
-  // Check pro plan access
-  const isProAccess = entitlements.isPro || entitlements.isTrial;
+  // Check feature permission via central feature key
+  const isProAccess = entitlements.hasFeature("pg_group_chat");
 
   // Persist messages
   useEffect(() => {

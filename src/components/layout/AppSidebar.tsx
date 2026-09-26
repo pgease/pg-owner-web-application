@@ -128,6 +128,7 @@ const navItems: NavItem[] = [
     children: [
       { title: "Plans & Pricing", url: "/plans" },
       { title: "Refer & Earn (₹1,000)", url: "/referrals" },
+      { title: "Feature Catalogue", url: "/feature-catalogue" },
       { title: "Activity Audit Logs", url: "/activity-logs", featureKey: "audit_logs" },
       { title: "Profile Settings", url: "/settings" },
       { title: "Support Help", url: "/support" },

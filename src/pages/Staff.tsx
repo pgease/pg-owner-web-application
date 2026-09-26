@@ -38,6 +38,7 @@ import {
   useMyFeaturesQuery,
   useCreateStaffMutation,
 } from "@/hooks/usePropertyOwnerQueries";
+import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import StaffRoles from "./StaffRoles";
 
 const INITIAL_FORM = {
@@ -66,14 +67,12 @@ const StaffListContent = () => {
   } = useStaffList(selectedPgId);
 
   const { data: designations = [] } = useDesignationsQuery();
-  const { data: featuresData } = useMyFeaturesQuery();
+  const { hasFeature } = useFeatureAccess();
 
   const createStaffMutation = useCreateStaffMutation(selectedPgId);
 
-  const isFreePlan =
-    featuresData &&
-    (/free/i.test(featuresData.planDisplayName ?? "") ||
-      /free/i.test(featuresData.planName ?? ""));
+  // Check staff management feature access via central feature key
+  const isFreePlan = !hasFeature("staff_roles_permissions");
 
   const handleAddStaff = async () => {
     if (

@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCurrentPlan, useMyFeaturesQuery, queryKeys } from "./usePropertyOwnerQueries";
 import { authStorage } from "@/api/http";
+import { FEATURE_CATALOGUE, getFeatureDefinition } from "@/config/featureCatalogue";
 
 export type SubscriptionStatus = "TRIAL" | "LITE" | "PRO" | "EXPIRED";
 
