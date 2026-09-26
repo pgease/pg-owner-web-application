@@ -400,26 +400,42 @@ export default function ReferralsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="p-5 pt-2">
-              <form onSubmit={handleApply} className="space-y-3">
-                <Input
-                  placeholder="Code, Link, or Mobile Number"
-                  value={inputCode}
-                  onChange={(e) => setInputCode(e.target.value)}
-                  maxLength={120}
-                  className="text-center h-10 rounded-xl font-semibold text-xs sm:text-sm"
-                />
-                <Button
-                  type="submit"
-                  disabled={applyMutation.isPending || !inputCode.trim()}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold h-9"
-                >
-                  {applyMutation.isPending ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    "Apply Code"
-                  )}
-                </Button>
-              </form>
+              {summaryQuery.data?.referredBy ? (
+                <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-4 flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-xs font-bold text-foreground">Referral Code Applied</p>
+                    <p className="text-[11px] text-muted-foreground leading-snug">
+                      Your account is linked to referrer{" "}
+                      <span className="font-mono font-bold text-emerald-600">
+                        {summaryQuery.data.referredBy}
+                      </span>
+                      . Cash rewards will be activated automatically upon plan purchase.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleApply} className="space-y-3">
+                  <Input
+                    placeholder="Code, Link, or Mobile Number"
+                    value={inputCode}
+                    onChange={(e) => setInputCode(e.target.value)}
+                    maxLength={120}
+                    className="text-center h-10 rounded-xl font-semibold text-xs sm:text-sm"
+                  />
+                  <Button
+                    type="submit"
+                    disabled={applyMutation.isPending || !inputCode.trim()}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold h-9"
+                  >
+                    {applyMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      "Apply Code"
+                    )}
+                  </Button>
+                </form>
+              )}
             </CardContent>
           </Card>
 

@@ -2581,6 +2581,7 @@ export async function applyReferralCode(referralCode: string) {
 export interface OwnerReferralSummary {
   referralCode: string;
   shareableLink: string;
+  referredBy?: string | null;
   totalEarned: number;
   pendingRewards: number;
   totalReferees: number;
