@@ -12,6 +12,7 @@ import {
   CreditCard,
   Wifi,
   ChevronRight,
+  Globe,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -117,26 +118,45 @@ const MyPGs = () => {
       icon: CreditCard,
       color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40",
     },
+    {
+      title: "Post PG / Public Search",
+      desc: "Publish photos, with/without food pricing, Google Map & rules on PG Search portal",
+      url: "/post-pg",
+      icon: Globe,
+      color: "text-sky-600 bg-sky-50 dark:bg-sky-950/40",
+    },
   ];
 
   return (
     <CanAccessPage permission="room_view">
       <div className="space-y-8 animate-fade-in max-w-5xl pb-16">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
-              <Building2 className="h-6 w-6 text-blue-600" />
-              PG Details & Configuration
-            </h1>
-            {selectedPg && (
-              <Badge className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border-blue-200 text-xs font-bold">
-                Active Property
-              </Badge>
-            )}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
+                <Building2 className="h-6 w-6 text-blue-600" />
+                PG Details & Configuration
+              </h1>
+              {selectedPg && (
+                <Badge className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border-blue-200 text-xs font-bold">
+                  Active Property
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              Manage primary information and access property modules for {selectedPg?.name ?? "your PG"}
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage primary information and access property modules for {selectedPg?.name ?? "your PG"}
-          </p>
+          {selectedPgId && (
+            <Button
+              type="button"
+              onClick={() => navigate("/post-pg")}
+              className="rounded-xl font-bold bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-700 hover:to-sky-700 text-white gap-2 shadow-xs shrink-0 self-start sm:self-auto"
+            >
+              <Globe className="h-4 w-4" />
+              Post PG / Search Listing
+            </Button>
+          )}
         </div>
 
         {!selectedPgId ? (

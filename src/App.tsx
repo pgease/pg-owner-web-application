@@ -137,6 +137,7 @@ const App = () => (
                         <Route path="/api-catalog" element={<ApiCatalogPage />} />
                         <Route path="/reference/api-catalog" element={<ApiCatalogPage />} />
                         <Route path="/refer-and-earn" element={<ReferralsPage />} />
+                        <Route path="/post-pg" element={<PublicListingPage />} />
                         <Route path="/my-pgs/public-listing" element={<PublicListingPage />} />
                         <Route path="/public-listing" element={<PublicListingPage />} />
                         <Route path="/activity-logs" element={<ActivityLogsPage />} />

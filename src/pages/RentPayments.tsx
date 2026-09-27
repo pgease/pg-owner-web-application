@@ -21,6 +21,9 @@ import {
   Receipt,
   FileText,
   Link as LinkIcon,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,6 +60,8 @@ import {
   usePostManualRentMutation,
   useRentCollectionDashboard,
   usePropertyTenants,
+  useRentCollectionHistory,
+  type RentCollectionHistoryParams,
 } from "@/hooks/usePropertyOwnerQueries";
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
 import { sendWhatsAppRentReminder, type RentDashboardTenantRow } from "@/api/propertyOwner";
@@ -193,6 +198,9 @@ const RentPayments = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { selectedPgId, properties, setSelectedPgId } = useApp();
+  const selectedPg = useMemo(() => {
+    return Array.isArray(properties) ? properties.find((p) => p.id === selectedPgId) : null;
+  }, [properties, selectedPgId]);
 
   const isHistoryView = location.pathname === "/rent-payments/history";
   const isDuesView = location.pathname === "/rent-payments/dues";
@@ -210,6 +218,13 @@ const RentPayments = () => {
   // Filters for History & Dues
   const [historySearch, setHistorySearch] = useState("");
   const [historyMode, setHistoryMode] = useState("all");
+  const [historyStatus, setHistoryStatus] = useState<"all" | "paid" | "partial" | "pending">("all");
+  const [historySortBy, setHistorySortBy] = useState<"paidAt" | "createdAt" | "periodMonth">("paidAt");
+  const [historySortOrder, setHistorySortOrder] = useState<"desc" | "asc">("desc");
+  const [historyStartDate, setHistoryStartDate] = useState("");
+  const [historyEndDate, setHistoryEndDate] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyLimit, setHistoryLimit] = useState(10);
   const [duesSearch, setDuesSearch] = useState("");
   const [duesFilter, setDuesFilter] = useState("all");
   const [receiptDialogData, setReceiptDialogData] = useState<any | null>(null);
@@ -218,6 +233,27 @@ const RentPayments = () => {
   const dashboard = rentQuery.data;
   const tenantsQuery = usePropertyTenants(selectedPgId);
   const manualMut = usePostManualRentMutation(selectedPgId);
+
+  const historyParams = useMemo(() => {
+    const p: RentCollectionHistoryParams = {
+      page: historyPage,
+      limit: historyLimit,
+      sortBy: historySortBy,
+      sortOrder: historySortOrder,
+    };
+    if (historySearch.trim()) p.search = historySearch.trim();
+    if (historyStatus !== "all") p.status = historyStatus;
+    if (historyStartDate) p.startDate = historyStartDate;
+    if (historyEndDate) p.endDate = historyEndDate;
+    return p;
+  }, [historyPage, historyLimit, historySortBy, historySortOrder, historySearch, historyStatus, historyStartDate, historyEndDate]);
+
+  const historyQuery = useRentCollectionHistory(selectedPgId, historyParams);
+  const historyData = historyQuery.data;
+  const historyList = historyData?.data ?? [];
+  const historyPagination = historyData?.pagination;
+  const totalHistoryCount = historyPagination?.total ?? historyList.length;
+  const totalHistoryPages = Math.max(1, historyPagination?.totalPages ?? Math.ceil(totalHistoryCount / historyLimit));
 
   const years = useMemo(() => {
     const y = new Date().getFullYear();
@@ -658,7 +694,11 @@ const RentPayments = () => {
                 <CardContent className="pt-4 pb-3">
                   <span className="text-xs font-semibold text-muted-foreground uppercase">Total Collected</span>
                   <p className="text-2xl sm:text-3xl font-extrabold text-foreground tabular-nums mt-1">
-                    {formatInr(dashboard?.totalCollectedThisPeriod ?? 0)}
+                    {formatInr(
+                      historyData?.summary?.totalAmountCollected ??
+                        dashboard?.totalCollectedThisPeriod ??
+                        0
+                    )}
                   </p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">Recorded for {month}/{year}</p>
                 </CardContent>
@@ -668,7 +708,7 @@ const RentPayments = () => {
                 <CardContent className="pt-4 pb-3">
                   <span className="text-xs font-semibold text-muted-foreground uppercase">Settled Transactions</span>
                   <p className="text-2xl sm:text-3xl font-extrabold text-emerald-600 tabular-nums mt-1">
-                    {paymentTransactions.length}
+                    {totalHistoryCount}
                   </p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">Verified receipts generated</p>
                 </CardContent>
@@ -676,61 +716,152 @@ const RentPayments = () => {
 
               <Card className="rounded-2xl shadow-xs border-border/80">
                 <CardContent className="pt-4 pb-3">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase">Channel Breakdown</span>
-                  <p className="text-sm font-bold text-foreground mt-2 flex items-center gap-3">
-                    <span className="text-teal-600">85% UPI Intent</span>
-                    <span className="text-muted-foreground">•</span>
-                    <span className="text-amber-600">15% Cash</span>
+                  <span className="text-xs font-semibold text-muted-foreground uppercase">Active Property</span>
+                  <p className="text-sm font-bold text-foreground mt-2 truncate">
+                    {selectedPg?.name ?? "All Registered PGs"}
                   </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Direct to PG bank account</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Verified rent collections</p>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Filter / Search Bar */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-card p-3 rounded-2xl border border-border/80 shadow-xs">
-              <div className="relative w-full sm:w-80">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by tenant, room or TXN ID..."
-                  value={historySearch}
-                  onChange={(e) => setHistorySearch(e.target.value)}
-                  className="h-9 pl-9 text-xs rounded-xl"
-                />
+            {/* Filter & Search Bar */}
+            <div className="flex flex-col gap-3 bg-card p-4 rounded-2xl border border-border/80 shadow-xs">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="relative w-full sm:w-80">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by tenant, room or TXN ID..."
+                    value={historySearch}
+                    onChange={(e) => {
+                      setHistorySearch(e.target.value);
+                      setHistoryPage(1);
+                    }}
+                    className="h-9 pl-9 text-xs rounded-xl"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+                  {/* Status Filter */}
+                  <Select
+                    value={historyStatus}
+                    onValueChange={(val: any) => {
+                      setHistoryStatus(val);
+                      setHistoryPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-9 text-xs w-[130px] rounded-xl">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="paid">Paid</SelectItem>
+                      <SelectItem value="partial">Partial</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {/* Sort By */}
+                  <Select
+                    value={historySortBy}
+                    onValueChange={(val: any) => {
+                      setHistorySortBy(val);
+                      setHistoryPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-9 text-xs w-[140px] rounded-xl">
+                      <SelectValue placeholder="Sort by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="paidAt">Payment Date</SelectItem>
+                      <SelectItem value="createdAt">Created Date</SelectItem>
+                      <SelectItem value="periodMonth">Period Month</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {/* Sort Order Toggle */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 text-xs rounded-xl gap-1"
+                    onClick={() => {
+                      setHistorySortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
+                      setHistoryPage(1);
+                    }}
+                    title="Toggle Sort Order"
+                  >
+                    <ArrowUpDown className="h-3.5 w-3.5" />
+                    {historySortOrder === "desc" ? "Newest" : "Oldest"}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 text-xs rounded-xl gap-1.5"
+                    onClick={() => toast({ title: "Ledger Exported", description: "Payment history spreadsheet downloaded." })}
+                  >
+                    <Download className="h-3.5 w-3.5" /> Export
+                  </Button>
+                </div>
               </div>
-              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                <Select value={historyMode} onValueChange={setHistoryMode}>
-                  <SelectTrigger className="h-9 text-xs w-[160px] rounded-xl">
-                    <SelectValue placeholder="All Modes" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Payment Modes</SelectItem>
-                    <SelectItem value="upi">UPI Intent & QR</SelectItem>
-                    <SelectItem value="cash">Cash (Manual)</SelectItem>
-                    <SelectItem value="razorpay">Razorpay Gateway</SelectItem>
-                    <SelectItem value="bank">Bank IMPS/NEFT</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 text-xs rounded-xl gap-1.5"
-                  onClick={() => toast({ title: "Ledger Exported", description: "Payment history spreadsheet downloaded." })}
-                >
-                  <Download className="h-3.5 w-3.5" /> Export
-                </Button>
+
+              {/* Date Filters Row */}
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/50 text-xs">
+                <span className="text-muted-foreground flex items-center gap-1 font-medium">
+                  <Calendar className="h-3.5 w-3.5" /> Date Range:
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="date"
+                    value={historyStartDate}
+                    onChange={(e) => {
+                      setHistoryStartDate(e.target.value);
+                      setHistoryPage(1);
+                    }}
+                    className="h-8 text-xs rounded-lg w-36"
+                  />
+                  <span className="text-muted-foreground">to</span>
+                  <Input
+                    type="date"
+                    value={historyEndDate}
+                    onChange={(e) => {
+                      setHistoryEndDate(e.target.value);
+                      setHistoryPage(1);
+                    }}
+                    className="h-8 text-xs rounded-lg w-36"
+                  />
+                  {(historyStartDate || historyEndDate) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-[11px] px-2 text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        setHistoryStartDate("");
+                        setHistoryEndDate("");
+                        setHistoryPage(1);
+                      }}
+                    >
+                      Clear Dates
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Transactions Table */}
             <Card className="rounded-2xl border-border/80 shadow-xs overflow-hidden">
               <CardContent className="p-0">
-                {filteredHistory.length === 0 ? (
+                {historyQuery.isLoading ? (
+                  <div className="py-16 text-center space-y-3">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+                    <p className="text-xs text-muted-foreground font-medium">Loading rent payment history...</p>
+                  </div>
+                ) : (historyList.length === 0 && filteredHistory.length === 0) ? (
                   <div className="py-16 text-center space-y-3">
                     <History className="h-10 w-10 text-muted-foreground/40 mx-auto" />
                     <h4 className="text-sm font-semibold">No transactions recorded yet</h4>
                     <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                      Payments collected via UPI QR or manual cash entries for {month}/{year} will appear here.
+                      Payments collected via UPI QR or manual entries for this property will appear here.
                     </p>
                   </div>
                 ) : (
@@ -738,69 +869,153 @@ const RentPayments = () => {
                     <table className="w-full text-left text-xs">
                       <thead className="bg-muted/40 border-b text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                         <tr>
-                          <th className="py-3 px-4">Transaction ID</th>
+                          <th className="py-3 px-4">Transaction / Ref</th>
                           <th className="py-3 px-4">Date & Time</th>
                           <th className="py-3 px-4">Tenant</th>
                           <th className="py-3 px-4">Room</th>
-                          <th className="py-3 px-4">Mode</th>
+                          <th className="py-3 px-4">Period</th>
+                          <th className="py-3 px-4">Channel / Mode</th>
                           <th className="py-3 px-4 text-right">Amount</th>
                           <th className="py-3 px-4 text-center">Status</th>
                           <th className="py-3 px-4 text-right">Receipt</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/60">
-                        {filteredHistory.map((item) => (
-                          <tr key={item.id} className="hover:bg-muted/10 transition-colors">
-                            <td className="py-3.5 px-4 font-mono font-bold text-foreground text-[11px]">
-                              {item.id}
-                            </td>
-                            <td className="py-3.5 px-4 whitespace-nowrap">
-                              <span className="font-medium text-foreground block">{item.date}</span>
-                              <span className="text-[10px] text-muted-foreground">{item.time}</span>
-                            </td>
-                            <td className="py-3.5 px-4 font-semibold text-foreground">
-                              {item.tenantName}
-                            </td>
-                            <td className="py-3.5 px-4 font-medium text-muted-foreground">
-                              Room {item.roomNumber}
-                            </td>
-                            <td className="py-3.5 px-4">
-                              <Badge
-                                variant="secondary"
-                                className={cn(
-                                  "text-[10px] font-semibold",
-                                  item.mode.includes("UPI")
-                                    ? "bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border-teal-200"
-                                    : item.mode.includes("Cash")
-                                    ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200"
-                                    : "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200"
+                        {(historyList.length > 0 ? historyList : filteredHistory).map((item: any) => {
+                          const dateObj = item.paidAt ? new Date(item.paidAt) : item.date ? new Date() : null;
+                          const formattedDate = dateObj
+                            ? dateObj.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                            : (item.date ?? "—");
+                          const formattedTime = dateObj
+                            ? dateObj.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
+                            : (item.time ?? "");
+                          const amt = Number(item.amountPaid) || Number(item.amount) || Number(item.rentAmount) || 0;
+                          const modeStr = item.paymentMethod || item.mode || "UPI Intent";
+                          const statusStr = (item.status || "paid").toLowerCase();
+                          const txnRef = item.reference || item.id;
+
+                          return (
+                            <tr key={item.id} className="hover:bg-muted/10 transition-colors">
+                              <td className="py-3.5 px-4 font-mono font-bold text-foreground text-[11px]">
+                                {txnRef}
+                              </td>
+                              <td className="py-3.5 px-4 whitespace-nowrap">
+                                <span className="font-medium text-foreground block">{formattedDate}</span>
+                                {formattedTime && <span className="text-[10px] text-muted-foreground">{formattedTime}</span>}
+                              </td>
+                              <td className="py-3.5 px-4">
+                                <span className="font-semibold text-foreground block">{item.tenantName}</span>
+                                {item.tenantPhone && (
+                                  <span className="text-[10px] text-muted-foreground font-mono">{item.tenantPhone}</span>
                                 )}
-                              >
-                                {item.mode}
-                              </Badge>
-                            </td>
-                            <td className="py-3.5 px-4 text-right tabular-nums font-bold text-foreground">
-                              {formatInr(item.amount)}
-                            </td>
-                            <td className="py-3.5 px-4 text-center">
-                              <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white text-[10px] font-bold">
-                                Paid
-                              </Badge>
-                            </td>
-                            <td className="py-3.5 px-4 text-right">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-[11px] px-2 text-teal-600 hover:text-teal-700 hover:bg-teal-50"
-                                onClick={() => setReceiptDialogData(item)}
-                              >
-                                <Receipt className="h-3.5 w-3.5 mr-1" /> View
-                              </Button>
-                            </td>
-                          </tr>
-                        ))}
+                              </td>
+                              <td className="py-3.5 px-4 font-medium text-muted-foreground">
+                                Room {item.roomNumber ?? "—"}
+                              </td>
+                              <td className="py-3.5 px-4 font-medium text-muted-foreground">
+                                {item.periodMonth && item.periodYear
+                                  ? `${item.periodMonth}/${item.periodYear}`
+                                  : item.period ?? "—"}
+                              </td>
+                              <td className="py-3.5 px-4">
+                                <Badge
+                                  variant="secondary"
+                                  className={cn(
+                                    "text-[10px] font-semibold",
+                                    modeStr.toLowerCase().includes("upi")
+                                      ? "bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border-teal-200"
+                                      : modeStr.toLowerCase().includes("cash")
+                                      ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200"
+                                      : "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200"
+                                  )}
+                                >
+                                  {modeStr}
+                                </Badge>
+                              </td>
+                              <td className="py-3.5 px-4 text-right tabular-nums font-bold text-foreground">
+                                {formatInr(amt)}
+                              </td>
+                              <td className="py-3.5 px-4 text-center">
+                                <Badge
+                                  className={cn(
+                                    "text-[10px] font-bold text-white capitalize",
+                                    statusStr === "paid"
+                                      ? "bg-emerald-600 hover:bg-emerald-600"
+                                      : statusStr === "partial"
+                                      ? "bg-amber-600 hover:bg-amber-600"
+                                      : "bg-slate-500 hover:bg-slate-500"
+                                  )}
+                                >
+                                  {statusStr}
+                                </Badge>
+                              </td>
+                              <td className="py-3.5 px-4 text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-[11px] px-2 text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+                                  onClick={() =>
+                                    setReceiptDialogData({
+                                      id: txnRef,
+                                      tenantName: item.tenantName,
+                                      roomNumber: item.roomNumber ?? "—",
+                                      period: item.periodMonth ? `${item.periodMonth}/${item.periodYear}` : (item.period ?? `${month}/${year}`),
+                                      mode: modeStr,
+                                      date: formattedDate,
+                                      time: formattedTime,
+                                      amount: amt,
+                                    })
+                                  }
+                                >
+                                  <Receipt className="h-3.5 w-3.5 mr-1" /> View
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
+                  </div>
+                )}
+
+                {/* Pagination Controls */}
+                {totalHistoryCount > 0 && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-border/60 bg-muted/20 text-xs">
+                    <div className="text-muted-foreground">
+                      Showing{" "}
+                      <span className="font-semibold text-foreground">
+                        {(historyPage - 1) * historyLimit + 1}
+                      </span>{" "}
+                      to{" "}
+                      <span className="font-semibold text-foreground">
+                        {Math.min(historyPage * historyLimit, totalHistoryCount)}
+                      </span>{" "}
+                      of <span className="font-semibold text-foreground">{totalHistoryCount}</span> records
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs rounded-lg gap-1"
+                        disabled={historyPage <= 1 || historyQuery.isLoading}
+                        onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                      >
+                        <ChevronLeft className="h-3.5 w-3.5" /> Previous
+                      </Button>
+                      <span className="text-xs font-semibold px-2">
+                        {historyPage} / {totalHistoryPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs rounded-lg gap-1"
+                        disabled={historyPage >= totalHistoryPages || historyQuery.isLoading}
+                        onClick={() => setHistoryPage((p) => p + 1)}
+                      >
+                        Next <ChevronRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>

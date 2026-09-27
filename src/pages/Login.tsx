@@ -1,19 +1,29 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import Lottie from "lottie-react";
 import { motion, AnimatePresence, cubicBezier } from "framer-motion";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 import { requestOtp, verifyOtp, type OtpChannel } from "@/api/propertyOwner";
 import pgeaseLogo from "@/assets/pgease-logo.jpg";
-import loginLottie from "@/assets/lottie/login.json";
-import { Shield, Lock, Users, Pencil, Linkedin, MessageCircle, MessageSquare, Sparkles, Gift } from "lucide-react";
+import {
+  Shield,
+  Lock,
+  Users,
+  Pencil,
+  Linkedin,
+  MessageCircle,
+  MessageSquare,
+  Sparkles,
+  Gift,
+  Building2,
+  TrendingUp,
+  CheckCircle2,
+} from "lucide-react";
 
 type Step = "phone" | "otp";
 type Lang = "en" | "hi";
@@ -33,6 +43,7 @@ const cleanPhoneInput = (v: string): string => {
   }
   return digits.slice(0, 10);
 };
+
 const EASE_SMOOTH = cubicBezier(0.16, 1, 0.3, 1);
 const EASE_FAST = cubicBezier(0.2, 0.9, 0.2, 1);
 
@@ -108,10 +119,10 @@ function ShimmerButton({
       onClick={onClick}
       disabled={disabled || loading}
       style={style}
-      className={`relative w-full h-12 rounded-2xl font-medium text-white shadow-lg overflow-hidden transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 ${className}`}
+      className={`relative w-full h-11 rounded-xl font-medium text-white shadow-md overflow-hidden transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 ${className}`}
     >
       <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
-      <span className="relative z-10 flex items-center justify-center gap-2 text-sm">
+      <span className="relative z-10 flex items-center justify-center gap-2 text-sm font-semibold">
         {loading ? (
           <>
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -125,25 +136,6 @@ function ShimmerButton({
   );
 }
 
-/* ---------- Floating background shapes ---------- */
-function FloatingShapes() {
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute -top-40 -left-40 h-96 w-96 rounded-full bg-gradient-to-br from-primary/20 via-primary/5 to-transparent blur-3xl" />
-      <div className="absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-gradient-to-tl from-primary/15 via-primary/5 to-transparent blur-3xl" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full bg-radial from-primary/[0.04] to-transparent blur-2xl" />
-      {/* Subtle grid pattern */}
-      <div
-        className="absolute inset-0 opacity-[0.03]"
-        style={{
-          backgroundImage: `radial-gradient(circle at 1px 1px, white 1px, transparent 0)`,
-          backgroundSize: "32px 32px",
-        }}
-      />
-    </div>
-  );
-}
-
 /* ---------- Animation variants ---------- */
 const pageEnter = {
   initial: { opacity: 0, y: 16 },
@@ -152,95 +144,95 @@ const pageEnter = {
 };
 
 const cardMotion = {
-  initial: { opacity: 0, scale: 0.96, y: 12 },
+  initial: { opacity: 0, scale: 0.98, y: 10 },
   animate: { opacity: 1, scale: 1, y: 0 },
-  transition: { duration: 0.4, ease: EASE_SMOOTH },
+  transition: { duration: 0.35, ease: EASE_SMOOTH },
 };
 
 const stepMotion = {
-  initial: { opacity: 0, x: 14 },
+  initial: { opacity: 0, x: 12 },
   animate: { opacity: 1, x: 0 },
-  exit: { opacity: 0, x: -14 },
-  transition: { duration: 0.3, ease: EASE_FAST },
+  exit: { opacity: 0, x: -12 },
+  transition: { duration: 0.25, ease: EASE_FAST },
 };
 
 /* ---------- i18n ---------- */
 const TEXTS = {
   en: {
-    title: "Manage your PG smarter",
-    subtitle: "Track occupancy, rent, staff, and multiple properties in one secure dashboard.",
-    owner: "PG Ease Owner",
-    phoneLabel: "Mobile number",
-    phoneHintWhatsapp: "We'll send an OTP to your WhatsApp.",
-    phoneHintSms: "We'll send an OTP via SMS to verify your number.",
-    sendVia: "Receive OTP via",
+    title: "Executive PG Management",
+    subtitle: "Complete control over occupancy, rent reconciliation, tenant KYC, and team operations.",
+    owner: "PG Ease Owner Portal",
+    phoneLabel: "Mobile Number",
+    phoneHintWhatsapp: "We'll send an OTP to your WhatsApp account.",
+    phoneHintSms: "We'll send an OTP via SMS to verify your mobile.",
+    sendVia: "Receive Verification Code via",
     whatsapp: "WhatsApp",
     sms: "SMS",
     fastBadge: "Instant",
     sendOtp: "Send OTP",
-    sendOtpWhatsapp: "Send OTP on WhatsApp",
-    sendOtpSms: "Send OTP via SMS",
-    sending: "Sending...",
-    verifyTitle: "Verify OTP",
+    sendOtpWhatsapp: "Send Code on WhatsApp",
+    sendOtpSms: "Send Code via SMS",
+    sending: "Transmitting...",
+    verifyTitle: "Verify Mobile",
     verifySubWhatsapp: "Enter the 4-digit code sent via WhatsApp to",
     verifySubSms: "Enter the 4-digit code sent via SMS to",
     verifyBtn: "Verify & Continue",
-    verifying: "Verifying...",
+    verifying: "Authenticating...",
     editNumber: "Edit",
     resendWhatsapp: "Resend on WhatsApp",
     resendSms: "Resend via SMS",
     resendIn: "Resend in",
     switchChannelPrompt: "Didn't receive the code?",
-    otpWarn: "Do not share this code with anyone.",
+    otpWarn: "Never share your authentication code with anyone.",
     lang: "Language",
     english: "English",
-    hindi: "Hindi",
+    hindi: "हिंदी",
     trust: "Trusted by 2,000+ PG owners",
-    encryption: "Bank-grade encryption",
-    secureLogin: "Secure OTP-based login",
-    consentWhatsapp: "By continuing, you agree to receive verification OTP on WhatsApp.",
-    consentSms: "By continuing, you agree to receive verification SMS for login.",
-    trialBadge: "45-Day Free Pro Trial",
-    trialHeadline: "Get 45 days of full Pro access from the day you create your account.",
-    trialSub: "Enjoy Private PG Group Chat, automated UPI collection, and your branded PG website free. No credit card required.",
+    encryption: "Bank-grade 256-bit encryption",
+    secureLogin: "Secure OTP Authentication",
+    consentWhatsapp: "By proceeding, you consent to receive communication on WhatsApp.",
+    consentSms: "By proceeding, you consent to receive a one-time verification SMS.",
+    trialBadge: "45-Day Free Pro Trial Included",
+    trialHeadline: "Get 45 days of complimentary Pro tier access upon sign up.",
+    trialSub: "Includes automated payment ledger, custom PG portal, and digital tenant onboarding.",
   },
   hi: {
-    title: "अपना PG स्मार्ट तरीके से मैनेज करें",
-    subtitle: "ऑक्यूपेंसी, रेंट, स्टाफ और कई प्रॉपर्टीज़ एक ही सुरक्षित डैशबोर्ड में।",
-    owner: "PG Ease Owner",
+    title: "स्मार्ट पीजी प्रबंधन",
+    subtitle: "कमरों की उपलब्धता, किराया संग्रह और कर्मचारियों का संचालन एक ही सुरक्षित डैशबोर्ड में।",
+    owner: "पीजी ईज़ ओनर पोर्टल",
     phoneLabel: "मोबाइल नंबर",
-    phoneHintWhatsapp: "हम आपके WhatsApp पर OTP भेजेंगे।",
-    phoneHintSms: "हम सत्यापन के लिए SMS भेजेंगे।",
-    sendVia: "OTP यहाँ प्राप्त करें",
-    whatsapp: "WhatsApp",
-    sms: "SMS",
-    fastBadge: "तुरंत",
-    sendOtp: "OTP भेजें",
-    sendOtpWhatsapp: "WhatsApp पर OTP भेजें",
-    sendOtpSms: "SMS द्वारा OTP भेजें",
+    phoneHintWhatsapp: "हम आपके व्हाट्सएप पर एक ओटीपी भेजेंगे।",
+    phoneHintSms: "हम आपके नंबर पर एसएमएस के माध्यम से ओटीपी भेजेंगे।",
+    sendVia: "ओटीपी प्राप्त करने का माध्यम",
+    whatsapp: "व्हाट्सएप",
+    sms: "एसएमएस",
+    fastBadge: "तत्काल",
+    sendOtp: "ओटीपी भेजें",
+    sendOtpWhatsapp: "व्हाट्सएप पर ओटीपी भेजें",
+    sendOtpSms: "एसएमएस द्वारा ओटीपी भेजें",
     sending: "भेज रहे हैं...",
-    verifyTitle: "OTP सत्यापित करें",
-    verifySubWhatsapp: "WhatsApp पर भेजा गया 4 अंकों का कोड दर्ज करें:",
-    verifySubSms: "SMS पर भेजा गया 4 अंकों का कोड दर्ज करें:",
-    verifyBtn: "Verify & Continue",
-    verifying: "जाँच रहे हैं...",
+    verifyTitle: "ओटीपी सत्यापित करें",
+    verifySubWhatsapp: "व्हाट्सएप पर भेजा गया 4-अंकीय कोड दर्ज करें",
+    verifySubSms: "एसएमएस द्वारा भेजा गया 4-अंकीय कोड दर्ज करें",
+    verifyBtn: "सत्यापित करें और आगे बढ़ें",
+    verifying: "सत्यापित कर रहे हैं...",
     editNumber: "बदलें",
-    resendWhatsapp: "WhatsApp पर फिर से भेजें",
-    resendSms: "SMS द्वारा फिर से भेजें",
-    resendIn: "फिर से भेजें",
+    resendWhatsapp: "व्हाट्सएप पर पुनः भेजें",
+    resendSms: "एसएमएस द्वारा पुनः भेजें",
+    resendIn: "पुनः भेजें",
     switchChannelPrompt: "कोड प्राप्त नहीं हुआ?",
-    otpWarn: "OTP किसी से साझा न करें।",
+    otpWarn: "यह कोड किसी के साथ साझा न करें।",
     lang: "भाषा",
     english: "English",
-    hindi: "हिन्दी",
-    trust: "2,000+ PG मालिकों का भरोसा",
+    hindi: "हिंदी",
+    trust: "2,000+ पीजी मालिकों का भरोसा",
     encryption: "बैंक-ग्रेड एन्क्रिप्शन",
-    secureLogin: "सुरक्षित OTP लॉगिन",
-    consentWhatsapp: "जारी रखकर, आप WhatsApp पर सत्यापन संदेश प्राप्त करने की सहमति देते हैं।",
+    secureLogin: "सुरक्षित ओटीपी लॉगिन",
+    consentWhatsapp: "जारी रखकर, आप व्हाट्सएप पर संचार प्राप्त करने की सहमति देते हैं।",
     consentSms: "जारी रखकर, आप लॉगिन हेतु सत्यापन SMS प्राप्त करने की सहमति देते हैं।",
     trialBadge: "45 दिनों का मुफ़्त Pro ट्रायल",
-    trialHeadline: "खाता बनाने के दिन से 45 दिनों तक मुफ़्त Pro ऐक्सेस पाएं।",
-    trialSub: "इसमें प्राइवेट PG ग्रुप चैट, ऑटोमेटेड UPI कलेक्शन और आपकी PG वेबसाइट शामिल है। किसी क्रेडिट कार्ड की आवश्यकता नहीं।",
+    trialHeadline: "खाता बनाने पर 45 दिनों तक मुफ़्त Pro ऐक्सेस पाएं।",
+    trialSub: "इसमें ऑटोमेटेड यूपीआई कलेक्शन, वेबसाइट और डिजिटल ऑनबोर्डिंग शामिल है।",
   },
 };
 
@@ -252,7 +244,11 @@ export default function Login() {
   const [step, setStep] = useState<Step>("phone");
   const [channel, setChannel] = useState<OtpChannel>("whatsapp");
   const [phone, setPhone] = useState(() => {
-    try { return localStorage.getItem(LAST_PHONE_KEY) ?? ""; } catch { return ""; }
+    try {
+      return localStorage.getItem(LAST_PHONE_KEY) ?? "";
+    } catch {
+      return "";
+    }
   });
   const [otp, setOtp] = useState("");
   const [shaking, setShaking] = useState(false);
@@ -262,7 +258,6 @@ export default function Login() {
   const [showSuccess, setShowSuccess] = useState(false);
 
   const { secondsLeft, start, reset, canResend } = useResendTimer(30);
-  const lottieRef = useRef<any>(null);
   const phoneValid = phone.length === 10;
 
   const T = TEXTS[lang];
@@ -270,7 +265,9 @@ export default function Login() {
   // Remember last phone
   useEffect(() => {
     if (phone.length === 10) {
-      try { localStorage.setItem(LAST_PHONE_KEY, phone); } catch {}
+      try {
+        localStorage.setItem(LAST_PHONE_KEY, phone);
+      } catch {}
     }
   }, [phone]);
 
@@ -278,47 +275,66 @@ export default function Login() {
   useEffect(() => {
     if (step === "otp") {
       const focusOtpInput = () => {
-        const otpInput = document.querySelector('input[data-input-otp="true"]') as HTMLInputElement;
-        if (otpInput) {
-          otpInput.focus();
+        const firstOtpSlot = document.querySelector<HTMLInputElement>(
+          '[data-input-otp-slot="0"], input[autocomplete="one-time-code"]'
+        );
+        if (firstOtpSlot) {
+          firstOtpSlot.focus();
+        } else {
+          const anyInput = document.querySelector<HTMLInputElement>("input[inputmode='numeric']");
+          anyInput?.focus();
         }
       };
 
-      focusOtpInput();
-      const t1 = setTimeout(focusOtpInput, 50);
-      const t2 = setTimeout(focusOtpInput, 150);
-      const t3 = setTimeout(focusOtpInput, 350);
-
+      const timer = setTimeout(focusOtpInput, 60);
+      const timer2 = setTimeout(focusOtpInput, 200);
       return () => {
-        clearTimeout(t1);
-        clearTimeout(t2);
-        clearTimeout(t3);
+        clearTimeout(timer);
+        clearTimeout(timer2);
       };
     }
   }, [step]);
 
   const triggerShake = useCallback(() => {
     setShaking(true);
-    setTimeout(() => setShaking(false), 500);
+    setTimeout(() => setShaking(false), 600);
   }, []);
 
   const handleSendOtp = async (targetChannel: OtpChannel = channel) => {
-    if (!phoneValid) return;
+    if (!phoneValid) {
+      toast({
+        title: "Invalid phone number",
+        description: "Please enter a valid 10-digit mobile number.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setIsSendingOtp(true);
       const res = await requestOtp(phone, targetChannel);
       setChannel(targetChannel);
-      toast({
-        title: targetChannel === "whatsapp" ? "OTP sent to WhatsApp" : "OTP sent via SMS",
-        description: `Expires in ${Math.round(res.expiresIn / 60)} min`,
-      });
       setStep("otp");
       start(30);
-      try { lottieRef.current?.goToAndPlay?.(0, true); } catch {}
+
+      toast({
+        title: targetChannel === "whatsapp" ? "WhatsApp Code Sent" : "SMS Code Sent",
+        description:
+          targetChannel === "whatsapp"
+            ? `A 4-digit code was sent to +91 ${phone} via WhatsApp.`
+            : `A 4-digit code was sent to +91 ${phone} via SMS.`,
+      });
+
+      if (res?.devOtp) {
+        toast({
+          title: "Dev Mode OTP",
+          description: `Use code: ${res.devOtp}`,
+        });
+      }
     } catch (error: any) {
       toast({
-        title: "Failed to send OTP",
-        description: error?.message ?? "Please try again.",
+        title: "Could not send OTP",
+        description: error?.message ?? "Please verify your mobile number and try again.",
         variant: "destructive",
       });
     } finally {
@@ -326,66 +342,58 @@ export default function Login() {
     }
   };
 
-  const handleResend = async (targetChannel: OtpChannel = channel) => {
-    if (!canResend || !phoneValid) return;
-    try {
-      setIsSendingOtp(true);
-      const res = await requestOtp(phone, targetChannel);
-      setChannel(targetChannel);
-      toast({
-        title: targetChannel === "whatsapp" ? "OTP resent to WhatsApp" : "OTP resent via SMS",
-        description: `Expires in ${Math.round(res.expiresIn / 60)} min`,
-      });
-      start(30);
-    } catch (error: any) {
-      toast({
-        title: "Failed to resend",
-        description: error?.message ?? "Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSendingOtp(false);
-    }
+  const handleResend = (targetChannel: OtpChannel = channel) => {
+    if (!canResend || isSendingOtp) return;
+    setOtp("");
+    handleSendOtp(targetChannel);
   };
 
-  const handleVerifyOtp = useCallback(async (otpValue: string) => {
-    if (otpValue.length !== 4) return;
-    try {
-      setIsVerifyingOtp(true);
-      const data = await verifyOtp(phone, otpValue);
+  const handleVerifyOtp = useCallback(
+    async (otpValue: string) => {
+      if (otpValue.length !== 4) return;
+      try {
+        setIsVerifyingOtp(true);
+        const data = await verifyOtp(phone, otpValue);
 
-      setShowSuccess(true);
-      toast({
-        title: "Logged in successfully",
-        description: data.isNewUser ? "Let's set up your first PG." : "Welcome back!",
-      });
+        setShowSuccess(true);
+        toast({
+          title: "Authenticated Successfully",
+          description: data.isNewUser ? "Welcome! Let's set up your property." : "Welcome back to PG Ease.",
+        });
 
-      setTimeout(() => {
-        if (data.isNewUser || !data.hasProperties) {
-          navigate("/onboarding", { replace: true });
-        } else {
-          navigate("/dashboard", { replace: true });
-        }
-      }, 800);
-    } catch (error: any) {
-      triggerShake();
-      setOtp("");
-      toast({ title: "Invalid OTP", description: error?.message ?? "Please double-check and try again.", variant: "destructive" });
-    } finally {
-      setIsVerifyingOtp(false);
-    }
-  }, [phone, navigate, triggerShake]);
+        setTimeout(() => {
+          if (data.isNewUser || !data.hasProperties) {
+            navigate("/onboarding", { replace: true });
+          } else {
+            navigate("/dashboard", { replace: true });
+          }
+        }, 800);
+      } catch (error: any) {
+        triggerShake();
+        setOtp("");
+        toast({
+          title: "Invalid Verification Code",
+          description: error?.message ?? "Please verify the 4-digit code and try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsVerifyingOtp(false);
+      }
+    },
+    [phone, navigate, triggerShake]
+  );
 
-  // Auto-submit when 4 digits entered
-  const handleOtpChange = useCallback((value: string) => {
-    const cleaned = clampDigits(value, 4);
-    setOtp(cleaned);
-    if (cleaned.length === 4) {
-      handleVerifyOtp(cleaned);
-    }
-  }, [handleVerifyOtp]);
+  const handleOtpChange = useCallback(
+    (value: string) => {
+      const cleaned = clampDigits(value, 4);
+      setOtp(cleaned);
+      if (cleaned.length === 4) {
+        handleVerifyOtp(cleaned);
+      }
+    },
+    [handleVerifyOtp]
+  );
 
-  // Enter key on phone input
   const handlePhoneKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && phoneValid && !isSendingOtp) {
       e.preventDefault();
@@ -394,126 +402,161 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen relative bg-[hsl(180,50%,5%)] text-white overflow-hidden">
-      <FloatingShapes />
+    <div className="min-h-screen flex bg-background text-foreground overflow-hidden">
+      {/* ================= LEFT EXECUTIVE PANEL ================= */}
+      <div className="hidden lg:flex lg:w-[46%] bg-[#081214] text-white relative overflow-hidden flex-col justify-between p-12 border-r border-border/40 select-none">
+        {/* Subtle executive geometry accents */}
+        <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3 pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 border border-primary/10 rounded-full pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[520px] border border-primary/5 rounded-full pointer-events-none" />
 
-      <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col items-center justify-center px-5 py-8 lg:flex-row lg:gap-20">
+        {/* Top Header */}
+        <div className="relative z-10 flex items-center gap-3.5">
+          <img src={pgeaseLogo} className="h-11 w-11 rounded-xl shadow-md border border-white/10 object-cover" alt="PG Ease" />
+          <div>
+            <span className="text-base font-bold tracking-tight text-white block">PG Ease</span>
+            <span className="text-[11px] uppercase tracking-wider text-primary font-medium">Owner Portal</span>
+          </div>
+        </div>
 
-        {/* ---- Left: branding ---- */}
-        <motion.div {...pageEnter} transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full max-w-xl text-center lg:text-left mb-8 lg:mb-0">
-
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <img src={pgeaseLogo} className="h-10 w-10 rounded-xl shadow-md" alt="PG Ease" />
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.2em] text-white/60">{T.owner}</div>
-                <div className="text-xs text-white/70">{T.secureLogin}</div>
-              </div>
-            </div>
-
-            {/* Language toggle */}
-            <div className="flex items-center gap-1.5">
-              <div className="rounded-full border border-white/10 bg-white/[0.04] p-0.5 flex">
-                {(["en", "hi"] as Lang[]).map((l) => (
-                  <button key={l} onClick={() => setLang(l)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                      lang === l ? "bg-white/[0.12] text-white shadow-sm" : "text-white/55 hover:text-white/80"
-                    }`}>
-                    {l === "en" ? T.english : T.hindi}
-                  </button>
-                ))}
-              </div>
-            </div>
+        {/* Center Pitch */}
+        <div className="relative z-10 space-y-7 my-auto py-8">
+          <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3.5 py-1.5 text-xs text-amber-300 font-semibold shadow-xs">
+            <Gift className="h-3.5 w-3.5 text-amber-400" />
+            <span>45-Day Complimentary Pro Trial</span>
           </div>
 
-          <h1 className="mt-10 text-3xl font-bold leading-tight sm:text-4xl lg:text-[2.75rem] lg:leading-[1.15]">
-            {T.title.split(" ").slice(0, -1).join(" ")}{" "}
-            <span className="text-primary">{T.title.split(" ").slice(-1)}</span>
-          </h1>
-          <p className="mt-4 text-sm text-white/60 sm:text-[15px] leading-relaxed max-w-md mx-auto lg:mx-0">
-            {T.subtitle}
-          </p>
-
-          {/* Trust badges */}
-          <div className="mt-8 flex flex-wrap items-center justify-center lg:justify-start gap-3">
-            <div className="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2">
-              <Gift className="h-3.5 w-3.5 text-amber-400" />
-              <span className="text-xs text-amber-200 font-semibold">45-Day Pro Trial Free</span>
-            </div>
-            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2">
-              <Shield className="h-3.5 w-3.5 text-primary" />
-              <span className="text-xs text-white/65">{T.encryption}</span>
-            </div>
-            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2">
-              <Users className="h-3.5 w-3.5 text-primary" />
-              <span className="text-xs text-white/65">{T.trust}</span>
-            </div>
+          <div className="space-y-3">
+            <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight leading-tight text-white">
+              Intelligent Management <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-teal-400">
+                for Modern PG Businesses
+              </span>
+            </h1>
+            <p className="text-sm text-white/65 max-w-md leading-relaxed">
+              Automate rent tracking, room assignments, tenant onboarding, and team operations with an enterprise-grade platform.
+            </p>
           </div>
 
-          {/* Desktop Lottie */}
-          <div className="mt-10 hidden lg:block">
-            <div className="relative rounded-3xl border border-white/[0.08] bg-white/[0.03] p-6 shadow-2xl shadow-black/20 backdrop-blur-sm">
-              <div className="absolute -inset-1 rounded-3xl bg-gradient-to-br from-primary/10 via-transparent to-primary/5 blur-xl pointer-events-none" />
-              <Lottie lottieRef={lottieRef} animationData={loginLottie} loop className="h-56 w-full relative z-10" />
-              <div className="mt-3 text-xs text-white/50 text-center relative z-10">
-                Secure onboarding • Faster setup • Multi-property ready
+          <div className="space-y-3.5 pt-2">
+            {[
+              {
+                icon: Building2,
+                title: "Live Multi-Property Grid",
+                desc: "Real-time room occupancy, vacant bed status, and meal plan yields.",
+              },
+              {
+                icon: TrendingUp,
+                title: "Automated UPI Rent Collections",
+                desc: "Direct-to-bank settlements with automated tenant WhatsApp reminders.",
+              },
+              {
+                icon: Shield,
+                title: "Enterprise Security & KYC",
+                desc: "Verified tenant government IDs, digital agreements, and 256-bit encryption.",
+              },
+            ].map(({ icon: Icon, title, desc }, idx) => (
+              <div key={idx} className="flex items-start gap-3.5 p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                <div className="h-8 w-8 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0 mt-0.5">
+                  <Icon className="h-4 w-4 text-primary" />
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-xs font-semibold text-white/90">{title}</p>
+                  <p className="text-[11px] text-white/55 leading-normal">{desc}</p>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
-        </motion.div>
+        </div>
 
-        {/* ---- Right: Auth card ---- */}
-        <motion.div {...cardMotion} className="w-full max-w-md">
-          <Card className="rounded-3xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-2xl shadow-2xl shadow-black/30">
+        {/* Footer */}
+        <div className="relative z-10 flex items-center justify-between text-xs text-white/40 pt-4 border-t border-white/5">
+          <span>© {new Date().getFullYear()} PG Ease Solutions Pvt. Ltd.</span>
+          <span className="flex items-center gap-1.5 text-white/50">
+            <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> SOC2 Compliant
+          </span>
+        </div>
+      </div>
+
+      {/* ================= RIGHT AUTHENTICATION PANEL ================= */}
+      <div className="flex-1 flex flex-col justify-between p-6 sm:p-12 min-h-screen bg-card/40 relative">
+        {/* Top Navbar: Mobile Logo & Language Switcher */}
+        <div className="flex items-center justify-between w-full max-w-[420px] mx-auto">
+          <div className="flex items-center gap-2.5 lg:hidden">
+            <img src={pgeaseLogo} className="h-8 w-8 rounded-lg shadow-sm" alt="PG Ease" />
+            <span className="text-sm font-bold text-foreground">PG Ease Owner</span>
+          </div>
+
+          <div className="ml-auto flex items-center gap-1 bg-muted/60 p-1 rounded-lg border border-border/50 text-xs">
+            {(["en", "hi"] as Lang[]).map((l) => (
+              <button
+                key={l}
+                onClick={() => setLang(l)}
+                className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+                  lang === l
+                    ? "bg-background text-foreground shadow-2xs font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {l === "en" ? T.english : T.hindi}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Auth Form Card */}
+        <div className="w-full max-w-[420px] mx-auto my-auto py-6">
+          <Card className="border-border/80 shadow-lg bg-card rounded-2xl">
             <CardContent className="p-6 sm:p-8">
-
               {showSuccess ? (
-                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-                  className="flex flex-col items-center gap-4 py-10 text-center">
-                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
-                    transition={{ type: "spring", stiffness: 200, damping: 12 }}
-                    className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/20">
-                    <Lock className="h-7 w-7 text-primary" />
-                  </motion.div>
-                  <p className="text-lg font-semibold">Login successful</p>
-                  <p className="text-sm text-white/50">Redirecting to your dashboard...</p>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex flex-col items-center gap-4 py-8 text-center"
+                >
+                  <div className="h-16 w-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+                    <Lock className="h-8 w-8 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-foreground">Authentication Successful</h3>
+                    <p className="text-xs text-muted-foreground mt-1">Connecting to your property portfolio...</p>
+                  </div>
                 </motion.div>
               ) : (
                 <AnimatePresence mode="wait">
                   {step === "phone" ? (
                     <motion.div key="phone" {...stepMotion} className="space-y-5">
-                      <div className="space-y-1.5">
-                        <div className="text-[11px] uppercase tracking-[0.2em] text-white/50">Login / Sign Up</div>
-                        <div className="text-lg font-semibold tracking-tight">Sign in or Register</div>
-                        <div className="text-[13px] text-white/55">Use your mobile number to get started</div>
+                      <div className="space-y-1">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-primary">
+                          Owner Sign In
+                        </span>
+                        <h2 className="text-xl font-bold text-foreground tracking-tight">Access Your Dashboard</h2>
+                        <p className="text-xs text-muted-foreground">
+                          Enter your mobile number to sign in or create an owner account.
+                        </p>
                       </div>
 
                       {/* 45-Day Free Pro Trial Highlight Banner */}
-                      <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/15 via-amber-500/10 to-transparent p-3.5 text-xs text-amber-200 shadow-sm relative overflow-hidden">
+                      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-900 dark:text-amber-200">
                         <div className="flex items-start gap-2.5">
-                          <Sparkles className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
-                          <div className="space-y-1">
+                          <Sparkles className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                          <div className="space-y-0.5">
                             <div className="flex items-center gap-1.5">
-                              <span className="font-extrabold text-amber-300 text-xs">{T.trialBadge}</span>
-                              <span className="text-[9px] bg-amber-500/25 text-amber-300 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                                FREE
+                              <span className="font-bold text-xs">{T.trialBadge}</span>
+                              <span className="text-[9px] bg-amber-500/20 text-amber-600 dark:text-amber-300 px-1.5 py-0.2 rounded font-bold uppercase">
+                                PRO
                               </span>
                             </div>
-                            <p className="text-[12px] font-semibold text-white/95 leading-snug">
-                              {T.trialHeadline}
-                            </p>
-                            <p className="text-[11px] text-white/60 leading-normal">
-                              {T.trialSub}
-                            </p>
+                            <p className="text-[11px] opacity-80 leading-snug">{T.trialHeadline}</p>
                           </div>
                         </div>
                       </div>
 
                       <div className="space-y-2">
-                        <Label className="text-xs text-white/60">{T.phoneLabel}</Label>
-                        <div className="flex">
-                          <div className="flex h-12 items-center rounded-l-2xl border border-r-0 border-white/[0.08] bg-white/[0.04] px-4 text-sm font-medium text-white/80">
+                        <Label className="text-xs font-semibold text-foreground">{T.phoneLabel}</Label>
+                        <div className="flex rounded-xl overflow-hidden border border-input shadow-2xs focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
+                          <div className="flex items-center bg-muted/70 px-3.5 text-xs font-semibold text-muted-foreground border-r border-border">
                             +91
                           </div>
                           <Input
@@ -523,46 +566,40 @@ export default function Login() {
                             placeholder="Enter 10-digit number"
                             inputMode="numeric"
                             autoComplete="tel"
-                            className={`h-12 rounded-l-none rounded-r-2xl border-white/[0.08] bg-white/[0.04] text-white placeholder:text-white/30 focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:border-primary/40 transition-colors ${
-                              phone.length > 0 && phone.length < 10
-                                ? "border-destructive/50"
-                                : phone.length === 10
-                                ? "border-primary/40"
-                                : ""
-                            }`}
+                            className="h-11 rounded-none border-0 shadow-none text-sm font-medium focus-visible:ring-0 focus-visible:ring-offset-0"
                           />
                         </div>
-                        <p className="text-[11px] text-white/40">
+                        <p className="text-[11px] text-muted-foreground">
                           {channel === "whatsapp" ? T.phoneHintWhatsapp : T.phoneHintSms}
                         </p>
                       </div>
 
                       {/* Channel Selector: WhatsApp vs SMS */}
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-white/60">{T.sendVia}</Label>
-                        <div className="grid grid-cols-2 gap-2 rounded-2xl bg-white/[0.03] p-1 border border-white/[0.08]">
+                        <Label className="text-xs font-semibold text-muted-foreground">{T.sendVia}</Label>
+                        <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-muted/40 border border-border/60">
                           <button
                             type="button"
                             onClick={() => setChannel("whatsapp")}
-                            className={`relative flex items-center justify-center gap-2 rounded-xl py-2 px-3 text-xs font-medium transition-all ${
+                            className={`flex items-center justify-center gap-2 rounded-lg py-2 px-3 text-xs font-semibold transition-all ${
                               channel === "whatsapp"
-                                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm"
-                                : "text-white/55 hover:text-white/85 hover:bg-white/[0.04]"
+                                ? "bg-card text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shadow-xs"
+                                : "text-muted-foreground hover:text-foreground"
                             }`}
                           >
-                            <MessageCircle className="h-3.5 w-3.5 text-emerald-400" />
+                            <MessageCircle className="h-3.5 w-3.5 text-emerald-500" />
                             <span>{T.whatsapp}</span>
-                            <span className="rounded bg-emerald-500/25 px-1 py-0.2 text-[9px] font-semibold text-emerald-300">
+                            <span className="rounded bg-emerald-500/20 px-1 py-0.2 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
                               {T.fastBadge}
                             </span>
                           </button>
                           <button
                             type="button"
                             onClick={() => setChannel("sms")}
-                            className={`relative flex items-center justify-center gap-2 rounded-xl py-2 px-3 text-xs font-medium transition-all ${
+                            className={`flex items-center justify-center gap-2 rounded-lg py-2 px-3 text-xs font-semibold transition-all ${
                               channel === "sms"
-                                ? "bg-primary/20 text-primary border border-primary/40 shadow-sm"
-                                : "text-white/55 hover:text-white/85 hover:bg-white/[0.04]"
+                                ? "bg-card text-primary border border-primary/30 shadow-xs"
+                                : "text-muted-foreground hover:text-foreground"
                             }`}
                           >
                             <MessageSquare className="h-3.5 w-3.5 text-primary" />
@@ -575,9 +612,7 @@ export default function Login() {
                         loading={isSendingOtp}
                         onClick={() => handleSendOtp(channel)}
                         disabled={!phoneValid}
-                        style={{
-                          backgroundColor: channel === "whatsapp" ? "#059669" : "hsl(var(--primary))",
-                        }}
+                        className={channel === "whatsapp" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-primary hover:bg-primary/90"}
                       >
                         <div className="flex items-center justify-center gap-2">
                           {channel === "whatsapp" ? (
@@ -595,44 +630,45 @@ export default function Login() {
                         </div>
                       </ShimmerButton>
 
-                      <p className="text-center text-[11px] text-white/35 leading-relaxed">
+                      <p className="text-center text-[11px] text-muted-foreground leading-relaxed">
                         {channel === "whatsapp" ? T.consentWhatsapp : T.consentSms}
                       </p>
 
-                      {/* Security badge */}
-                      <div className="flex items-center justify-center gap-1.5 pt-1">
-                        <Lock className="h-3 w-3 text-white/30" />
-                        <span className="text-[10px] text-white/30">Your data is 256-bit encrypted</span>
+                      <div className="flex items-center justify-center gap-1.5 pt-1 text-[11px] text-muted-foreground">
+                        <Lock className="h-3 w-3 text-primary" />
+                        <span>Protected by 256-bit bank-grade encryption</span>
                       </div>
                     </motion.div>
                   ) : (
-                    <motion.div key="otp" {...stepMotion}
-                      className={`space-y-5 ${shaking ? "animate-shake" : ""}`}>
-                      <div className="space-y-1.5">
-                        <div className="text-[11px] uppercase tracking-[0.2em] text-white/50">{T.verifyTitle}</div>
-                        <div className="text-[13px] text-white/70">
+                    <motion.div key="otp" {...stepMotion} className={`space-y-5 ${shaking ? "animate-shake" : ""}`}>
+                      <div className="space-y-1">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-primary">
+                          Verification
+                        </span>
+                        <h2 className="text-xl font-bold text-foreground tracking-tight">{T.verifyTitle}</h2>
+                        <div className="text-xs text-muted-foreground leading-relaxed">
                           {channel === "whatsapp" ? T.verifySubWhatsapp : T.verifySubSms}{" "}
-                          <span className="font-semibold text-white/90 inline-flex items-center gap-1 ml-1">
-                            {channel === "whatsapp" ? (
-                              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 text-emerald-300 text-xs">
-                                <MessageCircle className="h-3 w-3" /> +91 {phone}
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 rounded-md bg-primary/15 border border-primary/30 px-1.5 py-0.5 text-primary text-xs">
-                                <MessageSquare className="h-3 w-3" /> +91 {phone}
-                              </span>
-                            )}
+                          <span className="font-semibold text-foreground inline-flex items-center gap-1">
+                            +91 {phone}
                           </span>
-                          <button type="button" onClick={() => { setOtp(""); setStep("phone"); reset(); }}
-                            className="ml-2 inline-flex items-center gap-1 text-primary text-xs hover:underline">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOtp("");
+                              setStep("phone");
+                              reset();
+                            }}
+                            className="ml-2 inline-flex items-center gap-0.5 text-primary text-xs hover:underline font-semibold"
+                          >
                             <Pencil className="h-3 w-3" /> {T.editNumber}
                           </button>
                         </div>
-                        <div className="text-[11px] text-white/40">{T.otpWarn}</div>
                       </div>
 
-                      <div className="space-y-3">
-                        <Label className="text-xs text-white/60">One-time password</Label>
+                      <div className="space-y-2.5">
+                        <Label className="text-xs font-semibold text-muted-foreground">
+                          Enter 4-Digit Security Code
+                        </Label>
                         <InputOTP
                           autoFocus
                           maxLength={4}
@@ -649,35 +685,43 @@ export default function Login() {
                         >
                           <InputOTPGroup className="w-full justify-between gap-3">
                             {[0, 1, 2, 3].map((i) => (
-                              <InputOTPSlot key={i} index={i}
-                                className="h-14 w-14 rounded-2xl border border-white/[0.1] bg-white/[0.04] text-lg font-bold text-white shadow-inner"
+                              <InputOTPSlot
+                                key={i}
+                                index={i}
+                                className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl border border-input bg-muted/30 text-lg font-bold text-foreground shadow-2xs"
                               />
                             ))}
                           </InputOTPGroup>
                         </InputOTP>
                       </div>
 
-                      <ShimmerButton loading={isVerifyingOtp} onClick={() => handleVerifyOtp(otp)}
+                      <ShimmerButton
+                        loading={isVerifyingOtp}
+                        onClick={() => handleVerifyOtp(otp)}
                         disabled={otp.length !== 4}
-                        style={{ backgroundColor: "hsl(var(--primary))" }}>
+                        className="bg-primary hover:bg-primary/90"
+                      >
                         {isVerifyingOtp ? T.verifying : T.verifyBtn}
                       </ShimmerButton>
 
-                      {/* Resend row */}
+                      {/* Resend Controls */}
                       <div className="space-y-2 pt-1">
                         <div className="flex items-center justify-between">
-                          <div className="text-xs text-white/40">
+                          <div className="text-xs text-muted-foreground">
                             {!canResend && <CircularTimer seconds={secondsLeft} total={30} />}
                           </div>
-                          <button type="button" onClick={() => handleResend(channel)}
+                          <button
+                            type="button"
+                            onClick={() => handleResend(channel)}
                             disabled={!canResend || isSendingOtp}
-                            className={`text-xs font-medium inline-flex items-center gap-1.5 transition ${
+                            className={`text-xs font-semibold inline-flex items-center gap-1.5 transition ${
                               canResend && !isSendingOtp
                                 ? channel === "whatsapp"
-                                  ? "text-emerald-400 hover:text-emerald-300"
-                                  : "text-primary hover:text-primary/80"
-                                : "text-white/25 cursor-not-allowed"
-                            }`}>
+                                  ? "text-emerald-600 dark:text-emerald-400 hover:underline"
+                                  : "text-primary hover:underline"
+                                : "text-muted-foreground/50 cursor-not-allowed"
+                            }`}
+                          >
                             {channel === "whatsapp" ? (
                               <MessageCircle className="h-3.5 w-3.5" />
                             ) : (
@@ -687,21 +731,20 @@ export default function Login() {
                               ? channel === "whatsapp"
                                 ? T.resendWhatsapp
                                 : T.resendSms
-                              : `${T.resendIn}`}
+                              : `${T.resendIn} (${secondsLeft}s)`}
                           </button>
                         </div>
 
-                        {/* Switch channel prompt if user hasn't received code */}
                         {canResend && (
-                          <div className="text-center pt-2 border-t border-white/[0.06]">
+                          <div className="text-center pt-2 border-t border-border/50">
                             <button
                               type="button"
                               onClick={() => handleResend(channel === "whatsapp" ? "sms" : "whatsapp")}
                               disabled={isSendingOtp}
-                              className="text-[11px] text-white/50 hover:text-white/80 transition-colors inline-flex items-center gap-1.5"
+                              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
                             >
                               <span>{T.switchChannelPrompt}</span>
-                              <span className="text-primary underline font-medium inline-flex items-center gap-1">
+                              <span className="text-primary underline font-semibold inline-flex items-center gap-1">
                                 {channel === "whatsapp" ? (
                                   <>
                                     <MessageSquare className="h-3 w-3" />
@@ -718,12 +761,6 @@ export default function Login() {
                           </div>
                         )}
                       </div>
-
-                      {/* Security badge */}
-                      <div className="flex items-center justify-center gap-1.5 pt-1">
-                        <Lock className="h-3 w-3 text-white/30" />
-                        <span className="text-[10px] text-white/30">Your data is 256-bit encrypted</span>
-                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -731,30 +768,28 @@ export default function Login() {
             </CardContent>
           </Card>
 
-          {/* Social Links / Footer under Card */}
-          <div className="mt-4 flex items-center justify-center gap-2 text-xs text-white/40">
-            <span>Connect with us:</span>
+          {/* Social Links & Trust Footer */}
+          <div className="mt-5 flex items-center justify-between text-xs text-muted-foreground px-2">
+            <span className="flex items-center gap-1.5">
+              <Users className="h-3.5 w-3.5 text-primary" />
+              {T.trust}
+            </span>
             <a
               href="https://www.linkedin.com/company/pg-ease-solutions/"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-primary hover:text-primary/80 transition-colors font-medium hover:underline"
+              className="flex items-center gap-1 text-primary hover:underline font-semibold"
             >
-              <Linkedin className="h-3.5 w-3.5 animate-pulse" />
+              <Linkedin className="h-3.5 w-3.5" />
               LinkedIn
             </a>
           </div>
+        </div>
 
-          {/* Mobile Lottie */}
-          <div className="mt-6 lg:hidden">
-            <div className="relative rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4 backdrop-blur shadow-lg shadow-black/20">
-              <Lottie animationData={loginLottie} loop className="h-36 w-full" />
-              <div className="mt-2 text-center text-[11px] text-white/45">
-                {T.secureLogin} for PG owners
-              </div>
-            </div>
-          </div>
-        </motion.div>
+        {/* Bottom spacing / terms */}
+        <div className="text-center text-[11px] text-muted-foreground">
+          By signing in, you agree to PG Ease's Terms of Service and Privacy Policy.
+        </div>
       </div>
     </div>
   );

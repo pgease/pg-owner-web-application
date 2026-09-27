@@ -70,7 +70,7 @@ const navItems: NavItem[] = [
       { title: "WiFi Management", url: "/my-pgs/wifi", permissionKey: "room_view", featureKey: "wifi_management" },
       { title: "Property Notices", url: "/my-pgs/notices", permissionKey: "room_view", featureKey: "digital_notice_board" },
       { title: "Bank Account", url: "/my-pgs/bank", permissionKey: "room_view" },
-      { title: "Public Listing", url: "/my-pgs/public-listing", permissionKey: "room_view" },
+      { title: "Post PG / Search Listing", url: "/post-pg", permissionKey: "room_view" },
     ],
   },
   {

@@ -1,5 +1,12 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "https://am4eey3lmk.execute-api.ap-south-1.amazonaws.com/api";
+const isLocalhost =
+  typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1" ||
+    window.location.hostname === "[::1]");
+
+const API_BASE_URL = isLocalhost
+  ? "/api"
+  : (import.meta.env.VITE_API_BASE_URL || "https://am4eey3lmk.execute-api.ap-south-1.amazonaws.com/api");
 
 /** Spec alias for PermissionContext — same value as access token after login */
 export const PGEASE_TOKEN_KEY = "pgease_token";

@@ -67,7 +67,7 @@ const StaffListContent = () => {
   } = useStaffList(selectedPgId);
 
   const { data: designations = [] } = useDesignationsQuery();
-  const { hasFeature } = useFeatureAccess();
+  const { hasFeature, planDisplayName } = useFeatureAccess();
 
   const createStaffMutation = useCreateStaffMutation(selectedPgId);
 
@@ -130,7 +130,7 @@ const StaffListContent = () => {
           <Shield className="h-5 w-5 text-primary" />
           <div>
             <p className="text-sm font-medium">
-              Current plan: {featuresData?.planDisplayName}
+              Current plan: {planDisplayName || "Free"}
             </p>
             <p className="text-xs text-muted-foreground">
               Staff roles & advanced permissions are available on higher plans.
@@ -296,7 +296,7 @@ const StaffListContent = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {designations.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>
+                      <SelectItem key={d.id} value={d.name}>
                         {d.name}
                       </SelectItem>
                     ))}

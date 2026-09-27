@@ -8,6 +8,13 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 3000,
+    proxy: {
+      "/api": {
+        target: "https://am4eey3lmk.execute-api.ap-south-1.amazonaws.com",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
     hmr: {
       overlay: false,
     },

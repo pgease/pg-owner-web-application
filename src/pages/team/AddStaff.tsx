@@ -17,6 +17,14 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { usePermissions } from "@/context/PermissionContext";
 import { NoAccessPage } from "@/components/PermissionGuard";
 import { useApp } from "@/context/AppContext";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useDesignationsQuery } from "@/hooks/usePropertyOwnerQueries";
 import { ROLE_PRESETS, ROLE_LABELS, type PresetCell } from "@/constants/rolePresets";
 import { getPermissionDisplayName } from "@/constants/permissions";
 import { PermissionEditor } from "@/components/team/PermissionEditor";
@@ -52,8 +60,11 @@ export default function AddStaff() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState<RoleKey | "">("");
+  const [selectedDesignation, setSelectedDesignation] = useState("");
   const [enabled, setEnabled] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
+
+  const { data: designations = [] } = useDesignationsQuery();
 
   const preset = role ? ROLE_PRESETS[role] : null;
 
@@ -94,7 +105,7 @@ export default function AddStaff() {
         name: name.trim(),
         email: `${name.trim().toLowerCase().replace(/\s+/g, "")}_${digits}@pgease.local`,
         mobileContactNumber: digits,
-        designation: role,
+        designation: selectedDesignation || role || undefined,
         countryCode: "+91",
       });
       if (res?.id && permissions.length > 0) {
@@ -143,6 +154,26 @@ export default function AddStaff() {
                 />
               </div>
             </div>
+            {designations.length > 0 && (
+              <div className="space-y-1.5">
+                <Label>Admin Designation (optional)</Label>
+                <Select value={selectedDesignation} onValueChange={setSelectedDesignation}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select platform designation" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {designations.map((d) => (
+                      <SelectItem key={d.id} value={d.name}>
+                        {d.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  Maps this staff account to the platform designations configured in Admin Panel.
+                </p>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Role</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

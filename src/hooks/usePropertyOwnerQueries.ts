@@ -22,6 +22,10 @@ import {
   getPropertyAmenities,
   getPropertyRestrictions,
   getRentCollectionDashboard,
+  getRentCollectionHistory,
+  type RentCollectionHistoryParams,
+  type RentCollectionHistoryResponse,
+  type RentCollectionHistoryItem,
   getPropertyTenantById,
   getPropertyTenants,
   getRooms,
@@ -602,7 +606,16 @@ export function useMyFeaturesQuery() {
 export function useStaffList(propertyId?: string | null) {
   return useQuery({
     queryKey: queryKeys.staff(propertyId),
-    queryFn: async () => (propertyId ? toArray<StaffWithPermissions>(await getAllStaffWithPermissions(propertyId)) : []),
+    queryFn: async () => {
+      if (!propertyId) return [];
+      try {
+        const res = await getAllStaffWithPermissions(propertyId);
+        return toArray<StaffWithPermissions>(res);
+      } catch (err) {
+        console.warn("getAllStaffWithPermissions query error:", err);
+        return [];
+      }
+    },
     enabled: Boolean(propertyId),
   });
 }
@@ -693,6 +706,17 @@ export function useRentCollectionDashboard(
   });
 }
 
+export function useRentCollectionHistory(
+  propertyId?: string | null,
+  params: RentCollectionHistoryParams = {}
+) {
+  return useQuery({
+    queryKey: ["rent-collection-history", propertyId, params],
+    queryFn: () => getRentCollectionHistory(propertyId!, params),
+    enabled: Boolean(propertyId),
+  });
+}
+
 export function usePostManualRentMutation(propertyId?: string | null) {
   const qc = useQueryClient();
   return useMutation({
@@ -702,6 +726,7 @@ export function usePostManualRentMutation(propertyId?: string | null) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["rent-collection-dashboard"] });
+      qc.invalidateQueries({ queryKey: ["rent-collection-history"] });
     },
   });
 }

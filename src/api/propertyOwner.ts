@@ -2748,20 +2748,35 @@ export interface PublicListingPricingPlan {
 }
 
 export interface PublicListingDetails {
+  propertyId?: string;
+  propertyName?: string;
+  propertyCode?: string;
   isPublished?: boolean;
   description?: string;
+  contactNumber?: string;
+  website?: string;
+  address?: string;
+  locationPin?: string;
+  latitude?: number;
+  longitude?: number;
+  googleMapUrl?: string;
   photos?: string[];
   videoUrls?: string[];
+  videos?: string[];
   pricing?: {
     single?: PublicListingPricingPlan;
     double?: PublicListingPricingPlan;
     triple?: PublicListingPricingPlan;
     fourSharing?: PublicListingPricingPlan;
   };
+  roomPricing?: Record<string, any>;
   amenities?: string[];
   houseRules?: string[];
+  restrictions?: string[];
+  nearbyLandmarks?: string[];
   noticePeriodDays?: number;
   securityDepositMonths?: number;
+  updatedAt?: string;
 }
 
 export async function getPublicListing(propertyId: string) {
