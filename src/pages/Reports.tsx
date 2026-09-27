@@ -58,7 +58,9 @@ import {
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/common/PageHeader";
 import { useApp } from "@/context/AppContext";
-import { usePropertyTenants, useAllRoomsAndCounts } from "@/hooks/usePropertyOwnerQueries";
+import { usePropertyTenants, useAllRoomsAndCounts, useRentCollectionDashboard } from "@/hooks/usePropertyOwnerQueries";
+import { EmptyState } from "@/components/common/EmptyState";
+import { parseRentTenantRow } from "@/lib/rentDashboard";
 import { CanAccessPage } from "@/components/PermissionGuard";
 import { toast } from "@/components/ui/use-toast";
 import {
@@ -104,29 +106,30 @@ export default function Reports() {
   const [previewReport, setPreviewReport] = useState<ReportConfig | null>(null);
   const [previewSearch, setPreviewSearch] = useState("");
 
-  const [recentDownloads, setRecentDownloads] = useState<RecentDownloadItem[]>([
-    {
-      id: "rd-1",
-      title: "All Tenant Record",
-      type: "ALL_TENANTS",
-      pgName: properties.find((p) => p.id === selectedPgId)?.name || "Current PG",
-      recordCount: 6,
-      timestamp: "Today, 07:15 PM",
-      format: "xlsx",
-    },
-    {
-      id: "rd-2",
-      title: "Unpaid Tenant Record",
-      type: "UNPAID_TENANTS",
-      pgName: properties.find((p) => p.id === selectedPgId)?.name || "Current PG",
-      recordCount: 2,
-      timestamp: "Today, 06:40 PM",
-      format: "xlsx",
-    },
-  ]);
+  // Downloads generated during this session only — nothing is pre-seeded.
+  const [recentDownloads, setRecentDownloads] = useState<RecentDownloadItem[]>([]);
 
   const tenantsQuery = usePropertyTenants(selectedPgId);
   const roomsQuery = useAllRoomsAndCounts(selectedPgId);
+  const now = new Date();
+  const rentQuery = useRentCollectionDashboard(selectedPgId, now.getMonth() + 1, now.getFullYear());
+
+  // Real paid / unpaid sets for the current month, keyed by roomTenantId and tenantId.
+  const rentStatusIndex = useMemo(() => {
+    const unpaid = new Set<string>();
+    const paid = new Set<string>();
+    const add = (set: Set<string>, rows: any[] | undefined) => {
+      (rows ?? []).forEach((row) => {
+        const p = parseRentTenantRow(row);
+        if (!p) return;
+        set.add(p.roomTenantId);
+        set.add(p.tenantId);
+      });
+    };
+    add(unpaid, rentQuery.data?.unpaidTenants as any[]);
+    add(paid, rentQuery.data?.paidTenants as any[]);
+    return { unpaid, paid, known: rentQuery.data != null };
+  }, [rentQuery.data]);
 
   const selectedPg = useMemo(
     () => properties.find((p) => p.id === selectedPgId),
@@ -143,27 +146,31 @@ export default function Reports() {
     const roomsList = Array.isArray(roomsQuery.data) ? roomsQuery.data : [];
     return rawTenants.map((t: any) => {
       const room = roomsList.find((r: any) => r.roomId === t.roomId || r.id === t.roomId);
-      const rent = Number(t.rentAmount || tenantRentAmount(t) || 6000);
-      const isUnpaid = t.rentStatus === "unpaid" || (!t.rentStatus && Math.random() > 0.6);
+      const rent = Number(t.rentAmount || tenantRentAmount(t) || 0);
+      const ids = [t.roomTenantId, t.roomTenant?.id, t.id].filter(Boolean).map(String);
+      // Rent status comes only from the rent-collection API. Unknown → neither dues nor collection is claimed.
+      const isUnpaid = t.rentStatus === "unpaid" || ids.some((id) => rentStatusIndex.unpaid.has(id));
+      const isPaid = t.rentStatus === "paid" || ids.some((id) => rentStatusIndex.paid.has(id));
       return {
         tenant: t,
         roomDetails: {
-          sharingCount: room?.totalBeds || 2,
-          occupiedBeds: room?.occupiedBeds || 1,
-          roomType: room?.type || "Standard",
+          sharingCount: room?.totalBeds ?? 0,
+          occupiedBeds: room?.occupiedBeds ?? 0,
+          roomType: room?.type || "",
         },
         financials: {
           fixedRent: rent,
           securityDeposit: Number(t.securityDeposit || 0),
           monthRentDues: isUnpaid ? rent : 0,
-          monthRentCollection: !isUnpaid ? rent : 0,
+          monthRentCollection: isPaid ? rent : 0,
           totalDues: isUnpaid ? rent : 0,
-          totalCollection: !isUnpaid ? rent : 0,
-          onlinePayments: !isUnpaid ? rent : 0,
+          totalCollection: isPaid ? rent : 0,
+          // We don't know the payment channel from this API — never claim it was online.
+          onlinePayments: 0,
         },
       };
     });
-  }, [rawTenants, roomsQuery.data]);
+  }, [rawTenants, roomsQuery.data, rentStatusIndex]);
 
   // The 6 dedicated report specifications requested by the user
   const reportConfigs: ReportConfig[] = useMemo(
@@ -384,8 +391,8 @@ export default function Reports() {
               <span className="p-2 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
                 <FileSpreadsheet className="h-5 w-5" />
               </span>
-              <h1 className="text-2xl font-black tracking-tight text-foreground">
-                Reports & Data Exports
+              <h1 className="text-page-title">
+                Reports
               </h1>
             </div>
             <p className="text-sm text-muted-foreground mt-1">
@@ -576,6 +583,18 @@ export default function Reports() {
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {recentDownloads.length === 0 ? (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={6} className="p-0">
+                      <EmptyState
+                        compact
+                        icon={<FileSpreadsheet />}
+                        title="No reports downloaded yet"
+                        description="Reports you download in this session will be listed here for quick re-download."
+                      />
+                    </TableCell>
+                  </TableRow>
+                ) : null}
                 {recentDownloads.map((item) => (
                   <TableRow key={item.id} className="text-xs">
                     <TableCell className="font-semibold text-foreground flex items-center gap-2">

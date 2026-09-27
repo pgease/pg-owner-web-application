@@ -46,6 +46,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/common/PageHeader";
+import { HelpLink } from "@/components/common/HelpLink";
 import { DataTableContainer } from "@/components/common/DataTableContainer";
 import {
   useApproveKycMutation,
@@ -242,8 +243,9 @@ export default function Kyc() {
         {/* Header with Title & Quota Balance Pill */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <PageHeader
-            title="Verification & Legal Hub"
-            description="Manage DigiLocker Aadhaar KYC, Digital Rental Agreements & Verification Quotas"
+            title="KYC & Agreements"
+            description="Verify tenant identity with Aadhaar and manage rental agreements."
+            actions={<HelpLink tutorialKey="kyc_verification" label="How KYC works" />}
           />
 
           <div className="flex items-center gap-3">
@@ -259,7 +261,7 @@ export default function Kyc() {
                     <Loader2 className="h-3 w-3 animate-spin" />
                   ) : (
                     <>
-                      <span>{balanceData?.remainingCredits ?? 5} Available</span>
+                      <span>{balanceData?.remainingCredits ?? "—"} Available</span>
                       {balanceData?.freeCreditsRemaining !== undefined && (
                         <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300">
                           {balanceData.freeCreditsRemaining} Free

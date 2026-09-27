@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MessageSquareWarning, Plus, Loader2 } from "lucide-react";
+import { MessageSquareWarning, Building2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,10 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { FilterBar } from "@/components/common/FilterBar";
 import { DataTableContainer } from "@/components/common/DataTableContainer";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { StatCard } from "@/components/common/StatCard";
+import { EmptyState } from "@/components/common/EmptyState";
+import { ErrorState } from "@/components/common/ErrorState";
+import { Skeleton } from "@/components/ui/skeleton";
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
 
 const statusOptions: { value: string; label: string }[] = [
@@ -79,43 +83,26 @@ const Complaints = () => {
     <div className="space-y-6 animate-fade-in">
       <PageHeader
         title="Complaints"
-        description="Track and resolve tenant complaints"
-        actions={
-          <Button size="sm" className="gap-2" disabled>
-          <Plus className="h-4 w-4" /> Log Complaint <span className="text-xs opacity-80">(API not in collection)</span>
-          </Button>
-        }
+        description="Complaints raised by tenants from their app. Update the status here so they know it's being handled."
       />
 
       {!selectedPgId ? (
         <Card>
-          <CardContent className="p-6 text-center text-muted-foreground">
-            Select a PG from the header to view complaints.
-          </CardContent>
+          <EmptyState
+            icon={<Building2 />}
+            title="Select a property"
+            description="Choose a PG from the switcher in the top bar to see its complaints."
+          />
         </Card>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-3">
-            {[
-              { label: "Open", count: openCount, variant: "destructive" as const },
-              { label: "In Progress", count: inProgressCount, variant: "secondary" as const },
-              { label: "Resolved", count: resolvedCount, variant: "default" as const },
-            ].map((s) => (
-              <Card key={s.label}>
-                <CardContent className="flex items-center gap-4 p-4">
-                  <div className="rounded-lg bg-primary/10 p-2.5">
-                    <MessageSquareWarning className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{s.count}</p>
-                    <p className="text-xs text-muted-foreground">{s.label}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <StatCard label="Open" value={openCount} tone={openCount > 0 ? "danger" : "default"} icon={<MessageSquareWarning />} loading={loading} hint="Waiting for action" />
+            <StatCard label="In progress" value={inProgressCount} tone={inProgressCount > 0 ? "warning" : "default"} icon={<MessageSquareWarning />} loading={loading} hint="Being handled" />
+            <StatCard label="Resolved" value={resolvedCount} tone="success" icon={<MessageSquareWarning />} loading={loading} hint="Closed" />
           </div>
 
-          <FilterBar>
+          <FilterBar activeCount={priorityFilter === "all" ? 0 : 1} onReset={() => setPriorityFilter("all")}>
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
               <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="Priority" />
@@ -131,18 +118,28 @@ const Complaints = () => {
 
           <DataTableContainer>
               {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <div className="space-y-3 p-4" aria-busy="true" aria-label="Loading complaints">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="h-10 w-full" />
+                  ))}
                 </div>
               ) : isError ? (
-                <div className="py-12 text-center text-muted-foreground text-sm space-y-3">
-                  <p>Failed to load complaints.</p>
-                  <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-                </div>
+                <ErrorState
+                  title="Couldn't load complaints"
+                  description="Check your connection and try again."
+                  onRetry={() => refetch()}
+                />
               ) : complaints.length === 0 ? (
-                <div className="py-12 text-center text-muted-foreground text-sm">
-                  No complaints for this PG. Data comes from the API.
-                </div>
+                <EmptyState
+                  icon={<MessageSquareWarning />}
+                  title={priorityFilter === "all" ? "No complaints yet" : "No complaints with this priority"}
+                  description={
+                    priorityFilter === "all"
+                      ? "When tenants raise a complaint from their app, it will show up here."
+                      : "Try a different priority or clear the filter."
+                  }
+                  action={priorityFilter !== "all" ? <Button variant="outline" size="sm" onClick={() => setPriorityFilter("all")}>Clear filter</Button> : undefined}
+                />
               ) : (
                 <Table>
                   <TableHeader>
@@ -164,7 +161,7 @@ const Complaints = () => {
                           <TableCell className="font-mono text-xs">{c.id.slice(0, 8)}…</TableCell>
                           <TableCell><Badge variant="outline">{c.category || "—"}</Badge></TableCell>
                           <TableCell className="text-sm max-w-[200px] truncate">{c.subject || c.description || "—"}</TableCell>
-                          <TableCell className="text-xs">{c.priority || "—"}</TableCell>
+                          <TableCell>{c.priority ? <StatusBadge status={c.priority} size="sm" /> : <span className="text-xs text-muted-foreground">—</span>}</TableCell>
                           <TableCell className="text-sm">{date}</TableCell>
                           <TableCell><StatusBadge status={c.status} /></TableCell>
                           <TableCell>
@@ -209,7 +206,7 @@ const Complaints = () => {
               />
             </div>
             <CanAccess permission="complaint_edit_assign">
-              <Button onClick={handleUpdateStatus} disabled={updateMutation.isPending} className="bg-teal-600 hover:bg-teal-700 text-white font-bold w-full">
+              <Button onClick={handleUpdateStatus} disabled={updateMutation.isPending} className="w-full">
                 {updateMutation.isPending ? "Saving..." : "Save"}
               </Button>
             </CanAccess>

@@ -137,8 +137,8 @@ export default function SettingsPage() {
             <span className="p-2 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
               <Settings className="h-5 w-5" />
             </span>
-            <h1 className="text-2xl font-black tracking-tight text-foreground">
-              Settings & Configurations
+            <h1 className="text-page-title">
+              Settings
             </h1>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
@@ -162,7 +162,7 @@ export default function SettingsPage() {
           Property Management & Financial
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* 1. Bank Account & UPI Payouts */}
+          {/* 1. Bank Account */}
           <Card
             className="rounded-2xl border-border/80 shadow-xs hover:shadow-md hover:border-blue-300 dark:hover:border-blue-800 transition-all cursor-pointer group bg-card"
             onClick={() => navigate("/my-pgs/bank")}

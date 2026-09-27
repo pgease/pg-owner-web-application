@@ -1,5 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Receipt, Plus, Search, Trash2, Calendar, IndianRupee, PieChart, Info } from "lucide-react";
+import { EmptyState } from "@/components/common/EmptyState";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,13 +24,21 @@ interface ExpenseItem {
   expenseDate: string;
 }
 
-const INITIAL_EXPENSES: ExpenseItem[] = [
-  { id: "1", propertyId: "prop1", amount: 12000, category: "SALARY", description: "Warden helper monthly salary", expenseDate: "2026-07-15" },
-  { id: "2", propertyId: "prop1", amount: 8400, category: "ELECTRICITY", description: "Main line electric bill", expenseDate: "2026-07-10" },
-  { id: "3", propertyId: "prop1", amount: 4500, category: "FOOD", description: "Weekly dairy and vegetables supply", expenseDate: "2026-07-18" },
-  { id: "4", propertyId: "prop1", amount: 3200, category: "MAINTENANCE", description: "Plumbing repair room 204", expenseDate: "2026-07-12" },
-  { id: "5", propertyId: "prop1", amount: 1500, category: "OTHERS", description: "High-speed Wi-Fi router recharge", expenseDate: "2026-07-05" }
-];
+/**
+ * There is no expenses API yet, so entries are kept on this device (localStorage) per property.
+ * This is stated plainly in the UI; nothing is pre-seeded.
+ */
+const STORAGE_KEY = "pgease_local_expenses_v1";
+
+function loadExpenses(): ExpenseItem[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 const CATEGORY_COLORS = {
   SALARY: "bg-teal-500/10 text-teal-600 border-teal-500/20",
@@ -40,7 +50,21 @@ const CATEGORY_COLORS = {
 
 const Expenses = () => {
   const { selectedPgId } = useApp();
-  const [expenses, setExpenses] = useState<ExpenseItem[]>(INITIAL_EXPENSES);
+  const [allExpenses, setAllExpenses] = useState<ExpenseItem[]>(loadExpenses);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(allExpenses));
+    } catch {
+      /* storage unavailable — keep in memory only */
+    }
+  }, [allExpenses]);
+
+  const expenses = useMemo(
+    () => allExpenses.filter((e) => !selectedPgId || e.propertyId === selectedPgId || e.propertyId === "general"),
+    [allExpenses, selectedPgId],
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [open, setOpen] = useState(false);
@@ -82,7 +106,7 @@ const Expenses = () => {
     }
 
     const newExpense: ExpenseItem = {
-      id: Math.random().toString(),
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       propertyId: selectedPgId || "general",
       amount: amt,
       category,
@@ -90,16 +114,17 @@ const Expenses = () => {
       expenseDate: expenseDate || new Date().toISOString().split("T")[0],
     };
 
-    setExpenses((prev) => [newExpense, ...prev]);
-    toast({ title: "Expense Added", description: `Recorded ₹${amt.toLocaleString()} under ${category}.` });
+    setAllExpenses((prev) => [newExpense, ...prev]);
+    toast({ title: "Expense added", description: `Recorded ₹${amt.toLocaleString("en-IN")} under ${category.charAt(0) + category.slice(1).toLowerCase()}.` });
     setAmount("");
     setDescription("");
     setOpen(false);
   };
 
   const handleDelete = (id: string) => {
-    setExpenses((prev) => prev.filter((item) => item.id !== id));
-    toast({ title: "Expense Deleted", description: "Expense item deleted successfully." });
+    setAllExpenses((prev) => prev.filter((item) => item.id !== id));
+    setPendingDeleteId(null);
+    toast({ title: "Expense deleted" });
   };
 
   return (
@@ -107,7 +132,7 @@ const Expenses = () => {
       <div className="space-y-6 animate-fade-in pb-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <PageHeader title="Expense Tracker" description="Record monthly operating expenses, analyze cash outflows, and track categories." />
+            <PageHeader title="Expenses" description="Keep a simple record of what you spend on running the PG — salaries, electricity, food, repairs." />
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -156,6 +181,11 @@ const Expenses = () => {
             </DialogContent>
           </Dialog>
         </div>
+
+        <p className="flex items-start gap-2 rounded-md border border-info/30 bg-info/5 px-3 py-2 text-xs text-muted-foreground">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-info" />
+          Expenses are saved on this device only for now. They won't appear on other devices or for your staff.
+        </p>
 
         {/* Expense Analytics Banner */}
         <div className="grid gap-4 sm:grid-cols-3">
@@ -238,10 +268,23 @@ const Expenses = () => {
               <TableBody>
                 {filteredExpenses.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-12 text-center text-muted-foreground">
-                      <Receipt className="h-10 w-10 mx-auto mb-2 opacity-50 text-muted-foreground" />
-                      <p className="font-semibold">No expenses found</p>
-                      <p className="text-xs">Try adjusting filter criteria or log a new expense.</p>
+                    <TableCell colSpan={5} className="p-0">
+                      <EmptyState
+                        icon={<Receipt />}
+                        title={expenses.length === 0 ? "No expenses recorded yet" : "No expenses match your filters"}
+                        description={
+                          expenses.length === 0
+                            ? "Add your first expense to start tracking where the money goes each month."
+                            : "Try a different category or clear the search."
+                        }
+                        action={
+                          expenses.length === 0 ? (
+                            <Button onClick={() => setOpen(true)} className="gap-1.5">
+                              <Plus className="h-4 w-4" /> Add expense
+                            </Button>
+                          ) : undefined
+                        }
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -265,7 +308,13 @@ const Expenses = () => {
                         ₹{row.amount.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-rose-600 hover:bg-rose-50" onClick={() => handleDelete(row.id)}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => setPendingDeleteId(row.id)}
+                          aria-label={`Delete expense: ${row.description}`}
+                        >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </TableCell>
@@ -276,6 +325,16 @@ const Expenses = () => {
             </Table>
           </div>
         </Card>
+
+        <ConfirmDialog
+          open={pendingDeleteId !== null}
+          onOpenChange={(o) => !o && setPendingDeleteId(null)}
+          title="Delete this expense?"
+          description="It will be removed from your records on this device. This can't be undone."
+          confirmLabel="Delete expense"
+          destructive
+          onConfirm={() => pendingDeleteId && handleDelete(pendingDeleteId)}
+        />
       </div>
     </CanAccessPage>
   );

@@ -188,9 +188,9 @@ export const RestrictionsPage = () => {
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
-              <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
-                <Ban className="h-6 w-6 text-rose-600" />
-                Property Restrictions & House Rules
+              <h1 className="text-page-title flex items-center gap-2">
+                <Ban className="h-6 w-6 text-primary" />
+                House Rules
               </h1>
               <Badge className="bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300 border-rose-200 text-xs font-bold">
                 {selectedIds.length} Enforced

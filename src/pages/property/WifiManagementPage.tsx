@@ -449,7 +449,7 @@ export default function WifiManagementPage() {
                 <Wifi className="h-6 w-6" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                <h1 className="text-page-title flex items-center gap-2">
                   WiFi Management
                 </h1>
                 <p className="text-sm text-muted-foreground">

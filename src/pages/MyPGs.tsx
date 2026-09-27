@@ -105,7 +105,7 @@ const MyPGs = () => {
       color: "text-rose-600 bg-rose-50 dark:bg-rose-950/40",
     },
     {
-      title: "Food & Dining Schedule",
+      title: "Food & Meals",
       desc: "Daily meal timings, weekly menus and food timings",
       url: "/food",
       icon: Utensils,
@@ -133,9 +133,9 @@ const MyPGs = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
-                <Building2 className="h-6 w-6 text-blue-600" />
-                PG Details & Configuration
+              <h1 className="text-page-title flex items-center gap-2">
+                <Building2 className="h-6 w-6 text-primary" />
+                PG Details
               </h1>
               {selectedPg && (
                 <Badge className="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border-blue-200 text-xs font-bold">

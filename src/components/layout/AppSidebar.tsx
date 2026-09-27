@@ -5,26 +5,16 @@ import {
   Users,
   Building2,
   IndianRupee,
-  UserCog,
   BarChart3,
-  CreditCard,
   Settings,
   ChevronLeft,
   ChevronDown,
-  Receipt,
-  MessageSquareWarning,
   LogOut,
   X,
   Wrench,
-  Moon,
-  ClipboardCheck,
-  UserMinus,
-  Wallet,
   LifeBuoy,
-  BookOpen,
-  Home,
-  FileSpreadsheet,
   Lock,
+  UserCog,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -32,13 +22,15 @@ import pgeaseLogo from "@/assets/pgease-logo.jpg";
 import { authStorage } from "@/api/http";
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import { usePermissions } from "@/context/PermissionContext";
-import { LockedSidebarItem } from "@/components/PermissionGuard";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface NavChild {
   title: string;
   url: string;
   permissionKey?: string;
   featureKey?: string;
+  /** Route exists but the screen is a placeholder. Shown with a subtle "Soon" tag. */
+  comingSoon?: boolean;
 }
 
 interface NavItem {
@@ -50,11 +42,15 @@ interface NavItem {
   featureKey?: string;
 }
 
-const navItems: NavItem[] = [
+/**
+ * Navigation mirrors the routes in App.tsx. Labels use plain PG-owner language.
+ * Actions (e.g. "Add tenant") live on their pages, not in navigation.
+ */
+const NAV_ITEMS: NavItem[] = [
   {
-    title: "Home",
+    title: "Dashboard",
     url: "/dashboard",
-    icon: Home,
+    icon: LayoutDashboard,
     permissionKey: "dashboard_access",
   },
   {
@@ -63,34 +59,31 @@ const navItems: NavItem[] = [
     icon: Building2,
     permissionKey: "room_view",
     children: [
-      { title: "PG Details & Config", url: "/my-pgs", permissionKey: "room_view" },
-      { title: "Structure & Rooms", url: "/my-pgs/structure", permissionKey: "room_view" },
+      { title: "PG Details", url: "/my-pgs", permissionKey: "room_view" },
+      { title: "Rooms & Beds", url: "/my-pgs/structure", permissionKey: "room_view" },
       { title: "Amenities", url: "/my-pgs/amenities", permissionKey: "room_view" },
-      { title: "Restrictions", url: "/my-pgs/restrictions", permissionKey: "room_view" },
-      { title: "WiFi Management", url: "/my-pgs/wifi", permissionKey: "room_view", featureKey: "wifi_management" },
-      { title: "Property Notices", url: "/my-pgs/notices", permissionKey: "room_view", featureKey: "digital_notice_board" },
+      { title: "House Rules", url: "/my-pgs/restrictions", permissionKey: "room_view" },
+      { title: "WiFi", url: "/my-pgs/wifi", permissionKey: "room_view", featureKey: "wifi_management" },
+      { title: "Notice Board", url: "/my-pgs/notices", permissionKey: "room_view", featureKey: "digital_notice_board" },
       { title: "Bank Account", url: "/my-pgs/bank", permissionKey: "room_view" },
-      { title: "Post PG / Search Listing", url: "/post-pg", permissionKey: "room_view" },
+      { title: "Public Listing", url: "/post-pg", permissionKey: "room_view" },
     ],
   },
   {
-    title: "People",
+    title: "Tenants",
     url: "/tenants",
     icon: Users,
     permissionKey: "tenant_view",
     children: [
-      { title: "Tenant List", url: "/tenants", permissionKey: "tenant_view" },
+      { title: "All Tenants", url: "/tenants", permissionKey: "tenant_view" },
       { title: "Leads & Visits", url: "/leads", permissionKey: "tenant_view", featureKey: "lead_crm" },
-      { title: "Add tenant", url: "/tenants/add", permissionKey: "tenant_add" },
-      { title: "Tenant KYC", url: "/tenants/kyc", permissionKey: "kyc_view", featureKey: "aadhaar_kyc" },
+      { title: "KYC & Agreements", url: "/tenants/kyc", permissionKey: "kyc_view", featureKey: "aadhaar_kyc" },
       { title: "Notice Period", url: "/tenants/notice-period", permissionKey: "tenant_view", featureKey: "notice_period_tracker" },
-      { title: "Guest Log & Requests", url: "/tenants/guests", permissionKey: "guest_log", featureKey: "nightout_guest_requests" },
-      { title: "Team List", url: "/team", permissionKey: "team_view_members", featureKey: "staff_roles_permissions" },
-      { title: "Permission Matrix", url: "/team/permissions-matrix", permissionKey: "team_view_members", featureKey: "staff_roles_permissions" },
+      { title: "Guest Requests", url: "/tenants/guests", permissionKey: "guest_log", featureKey: "nightout_guest_requests" },
     ],
   },
   {
-    title: "Money",
+    title: "Rent & Payments",
     url: "/rent-payments",
     icon: IndianRupee,
     permissionKey: "account_view_dues",
@@ -98,8 +91,31 @@ const navItems: NavItem[] = [
       { title: "Rent Collection", url: "/rent-payments", permissionKey: "account_view_dues" },
       { title: "Payment History", url: "/rent-payments/history", permissionKey: "account_view_dues" },
       { title: "Dues & Pending", url: "/rent-payments/dues", permissionKey: "account_view_dues" },
-      { title: "Expenses Ledger", url: "/expenses", permissionKey: "expense_view", featureKey: "expense_tracking" },
-      { title: "Refunds", url: "/refunds", permissionKey: "refund_add" },
+      { title: "Expenses", url: "/expenses", permissionKey: "expense_view", featureKey: "expense_tracking" },
+      { title: "Refunds", url: "/refunds", permissionKey: "refund_add", comingSoon: true },
+    ],
+  },
+  {
+    title: "Operations",
+    url: "/complaints",
+    icon: Wrench,
+    children: [
+      { title: "Complaints", url: "/complaints", permissionKey: "complaint_view_all" },
+      { title: "Group Chat", url: "/group-chat", permissionKey: "chat_view", featureKey: "pg_group_chat" },
+      { title: "Food & Meals", url: "/food", permissionKey: "food_view_edit", featureKey: "food_menu_planner" },
+      { title: "Night Out Passes", url: "/nightout", permissionKey: "nightout_view", featureKey: "nightout_guest_requests" },
+      { title: "Eviction", url: "/eviction", permissionKey: "eviction_approve", comingSoon: true },
+    ],
+  },
+  {
+    title: "Staff",
+    url: "/team",
+    icon: UserCog,
+    permissionKey: "team_view_members",
+    featureKey: "staff_roles_permissions",
+    children: [
+      { title: "Team Members", url: "/team", permissionKey: "team_view_members", featureKey: "staff_roles_permissions" },
+      { title: "Permissions", url: "/team/permissions-matrix", permissionKey: "team_view_members", featureKey: "staff_roles_permissions" },
     ],
   },
   {
@@ -110,31 +126,20 @@ const navItems: NavItem[] = [
     featureKey: "advanced_reports",
   },
   {
-    title: "Operations",
-    url: "/complaints",
-    icon: Wrench,
-    children: [
-      { title: "Complaints Desk", url: "/complaints", permissionKey: "complaint_view_all" },
-      { title: "PG Group Chat", url: "/group-chat", permissionKey: "chat_view", featureKey: "pg_group_chat" },
-      { title: "Food & Dining", url: "/food", permissionKey: "food_view_edit", featureKey: "food_menu_planner" },
-      { title: "Night Out Passes", url: "/nightout", permissionKey: "nightout_view", featureKey: "nightout_guest_requests" },
-      { title: "Eviction", url: "/eviction", permissionKey: "eviction_approve" },
-    ],
-  },
-  {
-    title: "Management",
+    title: "Account",
     url: "/settings",
     icon: Settings,
     children: [
-      { title: "Plans & Pricing", url: "/plans" },
-      { title: "Refer & Earn (₹1,000)", url: "/referrals" },
+      { title: "Settings", url: "/settings" },
+      { title: "Plans & Billing", url: "/plans" },
+      { title: "Refer & Earn", url: "/referrals" },
       { title: "Feature Catalogue", url: "/feature-catalogue" },
-      { title: "Activity Audit Logs", url: "/activity-logs", featureKey: "audit_logs" },
-      { title: "Profile Settings", url: "/settings" },
-      { title: "Support Help", url: "/support" },
+      { title: "Activity Logs", url: "/activity-logs", featureKey: "audit_logs" },
     ],
   },
 ];
+
+const HELP_ITEM: NavItem = { title: "Help & Support", url: "/support", icon: LifeBuoy };
 
 interface AppSidebarProps {
   collapsed: boolean;
@@ -143,7 +148,14 @@ interface AppSidebarProps {
   onMobileClose?: () => void;
 }
 
-const AppSidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }: AppSidebarProps) => {
+interface SidebarContentProps {
+  collapsed: boolean;
+  onToggle: () => void;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
+}
+
+const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: SidebarContentProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
@@ -155,18 +167,16 @@ const AppSidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }: AppSideb
     navigate("/login", { replace: true });
   };
 
-  const isChildActive = (item: NavItem) => {
+  const isGroupActive = (item: NavItem) => {
     if (!item.children) return location.pathname === item.url;
     return item.children.some((c) => location.pathname === c.url);
   };
 
-  const toggleGroup = (title: string) => {
-    setOpenGroups((prev) => ({ ...prev, [title]: !(openGroups[title] !== undefined ? openGroups[title] : true) }));
-  };
+  /** A group is open if the user toggled it open, or (by default) it contains the active route. */
+  const isGroupOpen = (item: NavItem) => openGroups[item.title] ?? isGroupActive(item);
 
-  const isGroupOpen = (item: NavItem) => {
-    if (openGroups[item.title] !== undefined) return openGroups[item.title];
-    return true; // Default open for all groups, matching RentOK and user reference
+  const toggleGroup = (item: NavItem) => {
+    setOpenGroups((prev) => ({ ...prev, [item.title]: !isGroupOpen(item) }));
   };
 
   const isLockedByPermission = (permissionKey?: string) => {
@@ -179,192 +189,268 @@ const AppSidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }: AppSideb
     return isFeatureNavLocked(featureKey);
   };
 
-  const renderLocked = (label: string, Icon: React.ElementType) => (
-    <LockedSidebarItem label={label} icon={Icon} />
-  );
+  const goToPlans = () => {
+    navigate("/plans");
+    onMobileClose?.();
+  };
 
-  const sidebarContent = (
+  const renderChild = (child: NavChild) => {
+    const permLocked = isLockedByPermission(child.permissionKey);
+    const featLocked = isLockedByFeature(child.featureKey);
+
+    if (featLocked) {
+      return (
+        <button
+          type="button"
+          onClick={goToPlans}
+          className="flex w-full items-center justify-between gap-2 rounded-md px-3 py-1.5 text-left text-[13px] text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          title="Available on the Pro plan. Click to view plans."
+        >
+          <span className="truncate">{child.title}</span>
+          <span className="inline-flex items-center gap-1 rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+            <Lock className="h-2.5 w-2.5" aria-hidden /> Pro
+          </span>
+        </button>
+      );
+    }
+
+    if (permLocked) {
+      return (
+        <div
+          className="flex w-full cursor-not-allowed items-center justify-between gap-2 rounded-md px-3 py-1.5 text-[13px] text-sidebar-muted/70"
+          title="You don't have access to this section. Ask the PG owner."
+          aria-disabled
+        >
+          <span className="truncate">{child.title}</span>
+          <Lock className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
+        </div>
+      );
+    }
+
+    return (
+      <NavLink
+        to={child.url}
+        end
+        className="flex items-center justify-between gap-2 rounded-md px-3 py-1.5 text-[13px] text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        activeClassName="bg-sidebar-primary/10 font-medium text-sidebar-primary hover:bg-sidebar-primary/10 hover:text-sidebar-primary"
+        onClick={onMobileClose}
+      >
+        <span className="truncate">{child.title}</span>
+        {child.comingSoon ? (
+          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Soon</span>
+        ) : null}
+      </NavLink>
+    );
+  };
+
+  const renderTopLevel = (item: NavItem) => {
+    const active = isGroupActive(item);
+    const hasChildren = Boolean(item.children?.length);
+    const topLocked = isLockedByPermission(item.permissionKey) || isLockedByFeature(item.featureKey);
+    const featLocked = isLockedByFeature(item.featureKey);
+    const Icon = item.icon;
+
+    // Collapsed rail: icon only, tooltip with the label.
+    if (collapsed) {
+      const target = featLocked ? "/plans" : item.url;
+      return (
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <NavLink
+              to={target}
+              end={!hasChildren}
+              aria-label={item.title}
+              className={cn(
+                "mx-auto flex h-10 w-10 items-center justify-center rounded-md text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                active && "bg-sidebar-primary/10 text-sidebar-primary hover:bg-sidebar-primary/10 hover:text-sidebar-primary",
+              )}
+              onClick={onMobileClose}
+            >
+              <Icon className="h-[18px] w-[18px]" aria-hidden />
+            </NavLink>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="text-xs">
+            {item.title}
+            {featLocked ? " · Pro" : ""}
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    if (hasChildren) {
+      const open = isGroupOpen(item);
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => toggleGroup(item)}
+            aria-expanded={open}
+            className={cn(
+              "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              active && "font-medium text-sidebar-primary",
+            )}
+          >
+            <Icon className={cn("h-[18px] w-[18px] shrink-0", active ? "text-sidebar-primary" : "text-sidebar-muted")} aria-hidden />
+            <span className="flex-1 text-left">{item.title}</span>
+            <ChevronDown className={cn("h-3.5 w-3.5 text-sidebar-muted transition-transform", open && "rotate-180")} aria-hidden />
+          </button>
+          {open ? (
+            <ul className="ml-[21px] mt-0.5 space-y-0.5 border-l border-sidebar-border pl-2.5">
+              {item.children!.map((child) => (
+                <li key={child.url}>{renderChild(child)}</li>
+              ))}
+            </ul>
+          ) : null}
+        </>
+      );
+    }
+
+    if (featLocked) {
+      return (
+        <button
+          type="button"
+          onClick={goToPlans}
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          title="Available on the Pro plan. Click to view plans."
+        >
+          <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
+          <span className="flex-1 text-left">{item.title}</span>
+          <span className="inline-flex items-center gap-1 rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+            <Lock className="h-2.5 w-2.5" aria-hidden /> Pro
+          </span>
+        </button>
+      );
+    }
+
+    if (topLocked) {
+      return (
+        <div
+          className="flex w-full cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-sm text-sidebar-muted/70"
+          title="You don't have access to this section. Ask the PG owner."
+          aria-disabled
+        >
+          <Icon className="h-[18px] w-[18px] shrink-0 opacity-60" aria-hidden />
+          <span className="flex-1 text-left">{item.title}</span>
+          <Lock className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
+        </div>
+      );
+    }
+
+    return (
+      <NavLink
+        to={item.url}
+        end={item.url === "/"}
+        className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+        activeClassName="bg-sidebar-primary/10 font-medium text-sidebar-primary hover:bg-sidebar-primary/10 hover:text-sidebar-primary"
+        onClick={onMobileClose}
+      >
+        <Icon className={cn("h-[18px] w-[18px] shrink-0", active ? "text-sidebar-primary" : "text-sidebar-muted")} aria-hidden />
+        <span>{item.title}</span>
+      </NavLink>
+    );
+  };
+
+  return (
     <>
-      <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
-        {!collapsed && (
-          <div className="flex items-center gap-2 animate-fade-in">
-            <img src={pgeaseLogo} alt="PG Ease" className="h-8 w-8 rounded-lg object-cover" />
-            <span className="text-lg font-bold tracking-tight text-sidebar-primary-foreground">
-              PG Ease
-            </span>
-          </div>
-        )}
-        {collapsed && (
-          <img src={pgeaseLogo} alt="PG Ease" className="mx-auto h-8 w-8 rounded-lg object-cover" />
-        )}
-        {mobileOpen && (
-          <button onClick={onMobileClose} className="ml-auto text-sidebar-muted hover:text-sidebar-foreground md:hidden">
+      {/* Brand */}
+      <div className={cn("flex h-14 items-center border-b border-sidebar-border", collapsed ? "justify-center px-2" : "justify-between px-4")}>
+        <NavLink to="/dashboard" className="flex items-center gap-2.5" onClick={onMobileClose} aria-label="PG Ease dashboard">
+          <img src={pgeaseLogo} alt="" className="h-8 w-8 rounded-md object-cover" />
+          {!collapsed ? <span className="text-base font-semibold tracking-tight text-foreground">PG Ease</span> : null}
+        </NavLink>
+        {mobileOpen ? (
+          <button
+            type="button"
+            onClick={onMobileClose}
+            className="rounded-md p-1.5 text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground md:hidden"
+            aria-label="Close menu"
+          >
             <X className="h-5 w-5" />
+          </button>
+        ) : null}
+      </div>
+
+      {/* Primary navigation */}
+      <nav aria-label="Main" className="flex-1 overflow-y-auto scrollbar-thin px-2 py-3">
+        <ul className="space-y-0.5">
+          {NAV_ITEMS.map((item) => (
+            <li key={item.title}>{renderTopLevel(item)}</li>
+          ))}
+        </ul>
+      </nav>
+
+      {/* Secondary: help + logout */}
+      <div className="space-y-0.5 border-t border-sidebar-border px-2 py-2">
+        {renderTopLevel(HELP_ITEM)}
+        {collapsed ? (
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={handleLogout}
+                aria-label="Log out"
+                className="mx-auto flex h-10 w-10 items-center justify-center rounded-md text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-destructive"
+              >
+                <LogOut className="h-[18px] w-[18px]" aria-hidden />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="text-xs">
+              Log out
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-destructive"
+          >
+            <LogOut className="h-[18px] w-[18px] shrink-0 text-sidebar-muted" aria-hidden />
+            <span>Log out</span>
           </button>
         )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4">
-        <ul className="space-y-0.5">
-          {navItems.map((item) => {
-            const active = isChildActive(item);
-            const open = isGroupOpen(item);
-            const hasChildren = item.children && item.children.length > 0;
-            const permLocked = isLockedByPermission(item.permissionKey);
-            const featLocked = isLockedByFeature(item.featureKey);
-            const topLocked = permLocked || featLocked;
-
-            return (
-              <li key={item.title}>
-                {hasChildren && !collapsed ? (
-                  <>
-                    <button
-                      onClick={() => toggleGroup(item.title)}
-                      className={cn(
-                        "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 group",
-                        "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                        active && "text-sidebar-accent-foreground font-semibold"
-                      )}
-                    >
-                      <item.icon className={cn("h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-3", active && "text-sidebar-accent-foreground")} />
-                      <span className="flex-1 text-left">{item.title}</span>
-                      <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", open && "rotate-180")} />
-                    </button>
-                    {open && (
-                      <ul className="ml-[30px] mt-0.5 space-y-0.5 border-l border-sidebar-border pl-3">
-                        {item.children!.map((child) => {
-                          const cPerm = isLockedByPermission(child.permissionKey);
-                          const cFeat = isLockedByFeature(child.featureKey);
-                          if (cFeat) {
-                            return (
-                              <li key={child.url}>
-                                <button
-                                  type="button"
-                                  className="flex w-full items-center justify-between gap-2 rounded-md px-3 py-1.5 text-left text-[13px] font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent/80"
-                                  onClick={() => {
-                                    navigate("/plans");
-                                    onMobileClose?.();
-                                  }}
-                                  title="Upgrade to unlock this Pro feature"
-                                >
-                                  <span className="truncate">{child.title}</span>
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
-                                    <Lock className="h-2.5 w-2.5" /> Pro
-                                  </span>
-                                </button>
-                              </li>
-                            );
-                          }
-                          if (cPerm) {
-                            return (
-                              <li key={child.url}>{renderLocked(child.title, item.icon)}</li>
-                            );
-                          }
-                          return (
-                            <li key={child.url}>
-                              <NavLink
-                                to={child.url}
-                                end
-                                className="block rounded-md px-3 py-1.5 text-[13px] font-medium text-sidebar-muted transition-all duration-200 transform hover:translate-x-1 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                                activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-semibold shadow-sm animate-scale-in"
-                                onClick={onMobileClose}
-                              >
-                                {child.title}
-                              </NavLink>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </>
-                ) : hasChildren && collapsed ? (
-                  <NavLink
-                    to={item.url}
-                    className={cn(
-                      "flex items-center justify-center rounded-lg px-2 py-2.5 text-sm font-medium transition-all duration-200",
-                      "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                    )}
-                    activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-semibold shadow-sm animate-scale-in"
-                    onClick={onMobileClose}
-                    title={item.title}
-                  >
-                    <item.icon className={cn("h-[18px] w-[18px] shrink-0", active && "text-sidebar-primary-foreground")} />
-                  </NavLink>
-                ) : topLocked ? (
-                  <div className="px-1">{renderLocked(item.title, item.icon)}</div>
-                ) : (
-                   <NavLink
-                    to={item.url}
-                    end={item.url === "/"}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 group",
-                      "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                      collapsed && "justify-center px-2"
-                    )}
-                    activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-semibold shadow-sm animate-scale-in"
-                    onClick={onMobileClose}
-                  >
-                    <item.icon className={cn("h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110 group-hover:rotate-3", active && "text-sidebar-primary-foreground")} />
-                    {!collapsed && <span>{item.title}</span>}
-                  </NavLink>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-
-      <div className="border-t border-sidebar-border p-3 space-y-1 mt-auto">
+      {/* Collapse toggle (desktop only) */}
+      <div className="hidden border-t border-sidebar-border p-2 md:block">
         <button
-          onClick={handleLogout}
-          className={cn(
-            "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-red-600 dark:text-red-400 bg-red-50/60 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-950/60 transition-colors border border-red-200/80 dark:border-red-900/40 shadow-xs",
-            collapsed && "justify-center px-2"
-          )}
-          title="Sign Out"
-        >
-          <LogOut className="h-[18px] w-[18px] shrink-0 text-red-600 dark:text-red-400" />
-          {!collapsed && <span>Sign Out / Logout</span>}
-        </button>
-      </div>
-
-      <div className="hidden border-t border-sidebar-border p-3 md:block">
-        <button
+          type="button"
           onClick={onToggle}
-          className="flex w-full items-center justify-center rounded-lg py-2 text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="flex w-full items-center justify-center rounded-md py-2 text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         >
-          <ChevronLeft className={cn("h-4 w-4 transition-transform duration-300", collapsed && "rotate-180")} />
+          <ChevronLeft className={cn("h-4 w-4 transition-transform duration-200", collapsed && "rotate-180")} aria-hidden />
         </button>
       </div>
     </>
   );
+};
 
+const AppSidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }: AppSidebarProps) => {
   return (
     <>
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
-          onClick={onMobileClose}
-        />
-      )}
+      {mobileOpen ? (
+        <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={onMobileClose} aria-hidden />
+      ) : null}
 
+      {/* Desktop sidebar */}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-50 flex h-screen flex-col bg-sidebar text-sidebar-foreground transition-all duration-300",
-          "hidden md:flex",
-          collapsed ? "md:w-[68px]" : "md:w-[240px]",
+          "fixed left-0 top-0 z-50 hidden h-screen flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 md:flex",
+          collapsed ? "md:w-[68px]" : "md:w-[248px]",
         )}
       >
-        {sidebarContent}
+        <SidebarContent collapsed={collapsed} onToggle={onToggle} mobileOpen={false} onMobileClose={onMobileClose} />
       </aside>
 
+      {/* Mobile drawer */}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-50 flex h-screen w-[280px] flex-col bg-sidebar text-sidebar-foreground transition-transform duration-300 md:hidden",
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
+          "fixed left-0 top-0 z-50 flex h-screen w-[280px] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[transform,visibility] duration-200 md:hidden",
+          mobileOpen ? "translate-x-0 visible" : "-translate-x-full invisible",
         )}
+        aria-hidden={!mobileOpen}
       >
-        {sidebarContent}
+        <SidebarContent collapsed={false} onToggle={onToggle} mobileOpen={mobileOpen} onMobileClose={onMobileClose} />
       </aside>
     </>
   );

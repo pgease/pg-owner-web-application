@@ -1,23 +1,22 @@
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
-  Bell,
-  Search,
-  Moon,
-  Sun,
   Menu,
   LogOut,
   ChevronDown,
-  Globe,
   Building2,
   Plus,
-  Keyboard,
-  MessageSquare,
+  Check,
+  PlayCircle,
+  LifeBuoy,
+  Moon,
+  Sun,
+  Settings,
+  Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useState } from "react";
 import pgeaseLogo from "@/assets/pgease-logo.jpg";
 import { authStorage } from "@/api/http";
-import { Link, useNavigate } from "react-router-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,230 +25,230 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useApp } from "@/context/AppContext";
+import { useTutorial } from "@/context/TutorialContext";
 import { SupportLearningHubModal } from "@/components/common/SupportLearningHubModal";
 import { TrialExpiredGateModal } from "@/components/common/TrialExpiredGateModal";
 import { useSubscriptionAccess } from "@/hooks/useSubscriptionAccess";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { cn } from "@/lib/utils";
 
 interface AppHeaderProps {
   onMenuToggle?: () => void;
 }
 
+const THEME_KEY = "pgease_theme";
+
+function readStoredTheme(): boolean {
+  try {
+    return localStorage.getItem(THEME_KEY) === "dark";
+  } catch {
+    return false;
+  }
+}
+
 const AppHeader = ({ onMenuToggle }: AppHeaderProps) => {
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState<boolean>(readStoredTheme);
   const [supportHubOpen, setSupportHubOpen] = useState(false);
   const [trialExpiredOpen, setTrialExpiredOpen] = useState(false);
   const subAccess = useSubscriptionAccess();
+  const entitlements = useEntitlements();
 
   const navigate = useNavigate();
   const { language, setLanguage, selectedPgId, setSelectedPgId, properties } = useApp();
+  const { openTutorial, currentRouteTutorialKey } = useTutorial();
   const owner = authStorage.getPropertyOwner();
   const list = Array.isArray(properties) ? properties : [];
   const selectedPg = list.find((p) => p.id === selectedPgId);
 
-  const toggleTheme = () => {
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle("dark");
-  };
+  // Apply persisted theme on mount and whenever it changes.
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", isDark);
+    try {
+      localStorage.setItem(THEME_KEY, isDark ? "dark" : "light");
+    } catch {
+      // ignore storage failures
+    }
+  }, [isDark]);
 
   const handleLogout = () => {
     authStorage.clear();
     navigate("/login", { replace: true });
   };
 
+  const handleAddProperty = () => {
+    if (subAccess.isExpired) {
+      setTrialExpiredOpen(true);
+    } else {
+      navigate("/onboarding", { state: { forceShowForm: true } });
+    }
+  };
+
+  const initials = (owner?.name || "O").trim().slice(0, 2).toUpperCase();
+
+  // Compact plan chip — informative, not promotional.
+  const planChip = (() => {
+    if (entitlements.isLoading) return null;
+    if (entitlements.isExpired) return { label: "Plan expired", tone: "text-destructive bg-destructive/10" };
+    if (entitlements.isTrial) return { label: `Trial · ${entitlements.daysRemaining}d left`, tone: "text-amber-700 bg-warning/15 dark:text-amber-300" };
+    if (entitlements.isPro) return { label: "Pro", tone: "text-primary bg-primary/10" };
+    return { label: "Lite", tone: "text-muted-foreground bg-muted" };
+  })();
+
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a1128]/95 text-white shadow-md backdrop-blur-md supports-[backdrop-filter]:bg-[#0a1128]/80">
-        <div className="flex h-[52px] items-center gap-2 px-3 md:gap-3 md:px-5">
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={onMenuToggle}
-              className="rounded-md p-2 text-slate-300 hover:bg-white/5 hover:text-white md:hidden"
-              aria-label="Open menu"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-            <Link to="/dashboard" className="hidden items-center gap-2 md:flex">
-              <img src={pgeaseLogo} alt="PG Ease" className="h-8 w-8 rounded-lg object-cover ring-1 ring-white/10" />
-            </Link>
-            <img src={pgeaseLogo} alt="" className="h-7 w-7 rounded-md object-cover md:hidden" aria-hidden />
-          </div>
+      <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="flex h-14 items-center gap-2 px-3 md:gap-3 md:px-5">
+          {/* Mobile: menu + logo */}
+          <button
+            type="button"
+            onClick={onMenuToggle}
+            className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground md:hidden"
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <Link to="/dashboard" className="flex items-center md:hidden" aria-label="PG Ease dashboard">
+            <img src={pgeaseLogo} alt="" className="h-7 w-7 rounded-md object-cover" />
+          </Link>
 
-          <div className="relative mx-auto hidden min-w-0 max-w-sm xl:max-w-md flex-1 md:block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input
-              readOnly
-              placeholder="Search Anything…"
-              className="h-9 w-full border-white/10 bg-white/5 pl-9 pr-4 text-xs text-white placeholder-slate-400 focus-visible:bg-white/10 focus-visible:ring-1 focus-visible:ring-primary shadow-sm rounded-lg"
-              onFocus={() => navigate("/tenants")}
-            />
-          </div>
-
-          <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/group-chat")}
-              className="h-9 w-9 text-slate-300 hover:text-white hover:bg-white/5 relative"
-              title="PG Group Chat (PRO)"
-            >
-              <MessageSquare className="h-4 w-4" />
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-primary" />
-            </Button>
-
+          {/* Property switcher — the most important header control */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-9 gap-1 px-2 text-slate-300 hover:text-white hover:bg-white/5 sm:gap-1.5">
-                <Globe className="h-4 w-4 shrink-0" />
-                <span className="hidden text-xs sm:inline">{language === "hi-IN" ? "हिन्दी" : "EN"}</span>
-                <ChevronDown className="h-3 w-3 shrink-0 opacity-70" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>App language</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setLanguage("en-US")}>
-                English {language === "en-US" && "✓"}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setLanguage("hi-IN")}>
-                हिन्दी {language === "hi-IN" && "✓"}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 max-w-[140px] gap-1.5 border-white/10 bg-white/5 px-2.5 font-semibold text-white shadow-sm hover:bg-white/10 sm:max-w-[200px]"
-              >
-                <Building2 className="h-4 w-4 shrink-0 text-primary-foreground" />
-                <span className="truncate text-xs">{selectedPg ? selectedPg.name : list.length ? "Select PG" : "My PGs"}</span>
+              <Button variant="outline" size="sm" className="h-9 max-w-[200px] gap-2 px-2.5 sm:max-w-[260px]" aria-label="Switch property">
+                <Building2 className="h-4 w-4 shrink-0 text-primary" />
+                <span className="truncate text-sm font-medium">
+                  {selectedPg ? selectedPg.name : list.length ? "Select a PG" : "No PG yet"}
+                </span>
                 <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[220px]">
-              <DropdownMenuLabel>Switch property</DropdownMenuLabel>
+            <DropdownMenuContent align="start" className="min-w-[240px]">
+              <DropdownMenuLabel>Your properties</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {list.length === 0 ? (
-                <DropdownMenuItem disabled>No properties yet</DropdownMenuItem>
+                <DropdownMenuItem disabled>No properties added yet</DropdownMenuItem>
               ) : (
                 list.map((pg) => (
-                  <DropdownMenuItem key={pg.id} onClick={() => setSelectedPgId(pg.id)}>
-                    <Building2 className="mr-2 h-4 w-4 shrink-0" />
-                    <span className="truncate">{pg.name}</span>
-                    {selectedPgId === pg.id ? <span className="ml-auto text-primary">✓</span> : null}
+                  <DropdownMenuItem key={pg.id} onClick={() => setSelectedPgId(pg.id)} className="gap-2">
+                    <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="flex-1 truncate">{pg.name}</span>
+                    {selectedPgId === pg.id ? <Check className="h-4 w-4 text-primary" aria-label="Selected" /> : null}
                   </DropdownMenuItem>
                 ))
               )}
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => {
-                  if (subAccess.isExpired) {
-                    setTrialExpiredOpen(true);
-                  } else {
-                    navigate("/onboarding", { state: { forceShowForm: true } });
-                  }
-                }}
-                className="text-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground font-semibold cursor-pointer"
-              >
-                <Plus className="mr-2 h-4 w-4 shrink-0" />
-                <span>Add New Property</span>
+              <DropdownMenuItem onClick={handleAddProperty} className="gap-2 font-medium text-primary focus:text-primary">
+                <Plus className="h-4 w-4 shrink-0" />
+                Add new property
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="hidden h-9 w-9 text-slate-300 hover:text-white hover:bg-white/5 md:flex"
-            title="Keyboard Shortcuts"
-            onClick={() => {
-              window.dispatchEvent(new KeyboardEvent("keydown", { key: "?", bubbles: true }));
-            }}
-          >
-            <Keyboard className="h-[18px] w-[18px]" />
-          </Button>
+          {planChip ? (
+            <button
+              type="button"
+              onClick={() => navigate("/plans")}
+              className={cn("hidden shrink-0 whitespace-nowrap rounded-md px-2 py-1 text-xs font-medium transition-opacity hover:opacity-80 lg:inline-flex", planChip.tone)}
+              title="View plans & billing"
+            >
+              {planChip.label}
+            </button>
+          ) : null}
 
-          <Button variant="ghost" size="icon" className="hidden h-9 w-9 text-slate-300 hover:text-white hover:bg-white/5 sm:flex" onClick={toggleTheme}>
-            {isDark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
-          </Button>
+          <div className="ml-auto flex items-center gap-1">
+            {/* Contextual tutorial for the current page */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void openTutorial(currentRouteTutorialKey)}
+                  className="h-9 gap-1.5 px-2.5 text-muted-foreground hover:text-foreground"
+                  aria-label="Watch tutorial for this page"
+                >
+                  <PlayCircle className="h-4 w-4" />
+                  <span className="hidden text-sm sm:inline">Tutorial</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="text-xs">Watch a short video about this page</TooltipContent>
+            </Tooltip>
 
-          <Button variant="ghost" size="icon" className="relative h-9 w-9 text-slate-300 hover:text-white hover:bg-white/5">
-            <Bell className="h-[18px] w-[18px]" />
-            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive" />
-          </Button>
+            {/* Help & support */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSupportHubOpen(true)}
+                  className="h-9 gap-1.5 px-2.5 text-muted-foreground hover:text-foreground"
+                  aria-label="Help and support"
+                >
+                  <LifeBuoy className="h-4 w-4" />
+                  <span className="hidden text-sm sm:inline">Help</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="text-xs">Contact support or browse tutorials</TooltipContent>
+            </Tooltip>
 
-          {/* Unified Support & Learning Hub - Circular Avatar with Headset & Glasses */}
-          <button
-            type="button"
-            onClick={() => setSupportHubOpen(true)}
-            className="group relative flex h-9 w-9 items-center justify-center rounded-full border-2 border-teal-400/40 bg-teal-950/60 hover:border-teal-300 hover:scale-105 active:scale-95 transition-all overflow-hidden shrink-0 shadow-sm"
-            title="Support & Learning Hub (Dedicated Manager Rahul Sharma & Video Tutorials)"
-            aria-label="Support & Learning Hub"
-          >
-            <img
-              src="/support-agent-avatar.jpg"
-              alt="Support & Learning Hub"
-              className="h-full w-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLElement).style.display = "none";
-              }}
-            />
-            <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-400 border border-[#0a1128]" />
-          </button>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="ml-0.5 flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-1.5 py-1 hover:bg-white/10 text-white"
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold text-white shadow-sm">
-                  {(owner?.name || "O").slice(0, 2).toUpperCase()}
-                </div>
-                <div className="hidden text-left md:block">
-                  <p className="max-w-[100px] truncate text-xs font-semibold leading-tight text-white">{owner?.name ?? "Owner"}</p>
-                  <p className="text-[10px] text-slate-400">Owner</p>
-                </div>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuLabel>My account</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:bg-destructive/10">
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Logout</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            {/* User menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="ml-1 flex items-center gap-2 rounded-md p-1 pr-2 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label="Account menu"
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                    {initials}
+                  </span>
+                  <span className="hidden min-w-0 lg:block">
+                    <span className="block max-w-[120px] truncate text-sm font-medium leading-tight text-foreground">
+                      {owner?.name ?? "Owner"}
+                    </span>
+                    <span className="block text-[11px] leading-tight text-muted-foreground">PG owner</span>
+                  </span>
+                  <ChevronDown className="hidden h-3.5 w-3.5 opacity-60 lg:block" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <p className="truncate text-sm font-medium">{owner?.name ?? "Owner"}</p>
+                  <p className="text-xs text-muted-foreground">{entitlements.planDisplayName}</p>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate("/settings")} className="gap-2">
+                  <Settings className="h-4 w-4" /> Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsDark((v) => !v)} className="gap-2">
+                  {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  {isDark ? "Light mode" : "Dark mode"}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
+                  <Globe className="h-3.5 w-3.5" /> Language
+                </DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => setLanguage("en-US")} className="justify-between">
+                  English {language === "en-US" ? <Check className="h-4 w-4 text-primary" /> : null}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setLanguage("hi-IN")} className="justify-between">
+                  हिन्दी {language === "hi-IN" ? <Check className="h-4 w-4 text-primary" /> : null}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="gap-2 text-destructive focus:bg-destructive/10 focus:text-destructive">
+                  <LogOut className="h-4 w-4" /> Log out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
-      </div>
+      </header>
 
-      <div className="border-t border-white/5 px-3 pb-2 md:hidden bg-[#0a1128]/95 text-white">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <Input
-            readOnly
-            placeholder="Search Anything…"
-            className="h-9 bg-white/5 border-white/10 pl-9 text-sm text-white placeholder-slate-400"
-            onFocus={() => navigate("/tenants")}
-          />
-        </div>
-      </div>
-    </header>
-
-    {/* Unified Support & Learning Hub and Gating Modals */}
-    <SupportLearningHubModal open={supportHubOpen} onOpenChange={setSupportHubOpen} />
-    <TrialExpiredGateModal
-      open={trialExpiredOpen}
-      onOpenChange={setTrialExpiredOpen}
-      featureName="Add New Property"
-    />
-  </>
-);
+      <SupportLearningHubModal open={supportHubOpen} onOpenChange={setSupportHubOpen} />
+      <TrialExpiredGateModal open={trialExpiredOpen} onOpenChange={setTrialExpiredOpen} featureName="Add New Property" />
+    </>
+  );
 };
 
 export default AppHeader;

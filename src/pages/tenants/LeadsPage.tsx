@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Plus, Search, MessageSquare, Phone, MoreVertical, Calendar, UserPlus, CheckCircle2, XCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useApp } from "@/context/AppContext";
 import { toast } from "@/components/ui/use-toast";
 import { CanAccessPage } from "@/components/PermissionGuard";
+import { EmptyState } from "@/components/common/EmptyState";
 
 interface LeadItem {
   id: string;
@@ -24,13 +25,22 @@ interface LeadItem {
   pgPreference?: string;
 }
 
-const INITIAL_LEADS: LeadItem[] = [
-  { id: "1", name: "Rahul Sharma", phone: "+91 9876543210", source: "Website", status: "NEW", followUpDate: "2026-07-24", notes: "Prefers Single sharing AC room." },
-  { id: "2", name: "Ananya Iyer", phone: "+91 9123456789", source: "Friend Reference", status: "CONTACTED", followUpDate: "2026-07-25", notes: "Wants to visit this Sunday." },
-  { id: "3", name: "Kabir Singh", phone: "+91 8888888888", source: "Justdial", status: "VISITED", followUpDate: "2026-07-23", notes: "Negotiating rent security deposit." },
-  { id: "4", name: "Simran Kaur", phone: "+91 7777777777", source: "Direct Walk-in", status: "BOOKED", notes: "Token money deposited, checking in next month." },
-  { id: "5", name: "Amit Patel", phone: "+91 9999999999", source: "Website", status: "LOST", notes: "Found another PG closer to office." }
-];
+interface StoredLead extends LeadItem {
+  pgId: string;
+}
+
+// Leads are not backed by an API yet, so they are kept on this device only.
+const STORAGE_KEY = "pgease_local_leads_v1";
+
+function loadLeads(): StoredLead[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 const COLUMNS = [
   { key: "NEW", label: "New Inquiry", color: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
@@ -42,7 +52,15 @@ const COLUMNS = [
 
 export default function LeadsPage() {
   const { selectedPgId } = useApp();
-  const [leads, setLeads] = useState<LeadItem[]>(INITIAL_LEADS);
+  const [allLeads, setAllLeads] = useState<StoredLead[]>(loadLeads);
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(allLeads));
+    } catch {
+      /* storage unavailable — keep in memory only */
+    }
+  }, [allLeads]);
+  const leads = useMemo(() => allLeads.filter((l) => l.pgId === (selectedPgId || "general")), [allLeads, selectedPgId]);
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [open, setOpen] = useState(false);
@@ -76,8 +94,9 @@ export default function LeadsPage() {
       toast({ title: "Validation Error", description: "Name and contact number are required.", variant: "destructive" });
       return;
     }
-    const newLead: LeadItem = {
-      id: Math.random().toString(),
+    const newLead: StoredLead = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      pgId: selectedPgId || "general",
       name: name.trim(),
       phone: phone.trim(),
       source,
@@ -85,8 +104,8 @@ export default function LeadsPage() {
       followUpDate: followUpDate || undefined,
       notes: notes.trim() || undefined,
     };
-    setLeads((prev) => [newLead, ...prev]);
-    toast({ title: "Inquiry Added", description: `${name} has been added to the pipeline.` });
+    setAllLeads((prev) => [newLead, ...prev]);
+    toast({ title: "Lead added", description: `${name.trim()} has been added.` });
     setName("");
     setPhone("");
     setSource("Website");
@@ -96,10 +115,9 @@ export default function LeadsPage() {
   };
 
   const handleUpdateStatus = (leadId: string, newStatus: LeadItem["status"]) => {
-    setLeads((prev) =>
+    setAllLeads((prev) =>
       prev.map((l) => (l.id === leadId ? { ...l, status: newStatus } : l))
     );
-    toast({ title: "Status Updated", description: "Lead pipeline updated successfully." });
   };
 
   return (
@@ -107,23 +125,23 @@ export default function LeadsPage() {
       <div className="space-y-6 animate-fade-in pb-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <PageHeader title="Leads & Visits CRM" description="Track booking requests, schedule site visits, and convert inquiries into check-ins." />
+            <PageHeader title="Leads" description="Track enquiries and site visits until they become tenants." />
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2 shadow-sm shrink-0">
-                <Plus className="h-4 w-4" /> Add Inquiry
+                <Plus className="h-4 w-4" /> Add lead
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Add Prospective Tenant</DialogTitle>
-                <DialogDescription>Create a lead card to track followups and site visits.</DialogDescription>
+                <DialogTitle>Add lead</DialogTitle>
+                <DialogDescription>Save an enquiry so you can follow up and schedule a visit.</DialogDescription>
               </DialogHeader>
               <form onSubmit={handleAddLead} className="space-y-4">
                 <div className="grid gap-2">
                   <Label htmlFor="name">Full Name</Label>
-                  <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Rahul Kumar" required />
+                  <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" required />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="phone">Contact Number</Label>
@@ -153,12 +171,16 @@ export default function LeadsPage() {
                 </div>
                 <DialogFooter className="pt-2">
                   <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                  <Button type="submit">Create Card</Button>
+                  <Button type="submit">Save lead</Button>
                 </DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
         </div>
+
+        <p className="rounded-md border border-info/30 bg-info/5 px-3 py-2 text-xs text-muted-foreground">
+          Leads are saved on this device only for now. They won&apos;t appear on other devices or for your staff.
+        </p>
 
         {/* CRM KPIs */}
         <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
@@ -168,7 +190,7 @@ export default function LeadsPage() {
                 <p className="text-2xl font-bold tabular-nums">{kpis.total}</p>
                 <p className="text-xs text-muted-foreground font-medium">Total Leads</p>
               </div>
-              <MessageSquare className="h-8 w-8 text-blue-500 opacity-80" />
+              <MessageSquare className="h-8 w-8 text-muted-foreground/60" />
             </CardContent>
           </Card>
           <Card className="border-border/80 shadow-sm">
@@ -177,7 +199,7 @@ export default function LeadsPage() {
                 <p className="text-2xl font-bold tabular-nums">{kpis.active}</p>
                 <p className="text-xs text-muted-foreground font-medium">Active Pipeline</p>
               </div>
-              <Calendar className="h-8 w-8 text-amber-500 opacity-80" />
+              <Calendar className="h-8 w-8 text-muted-foreground/60" />
             </CardContent>
           </Card>
           <Card className="border-border/80 shadow-sm">
@@ -186,7 +208,7 @@ export default function LeadsPage() {
                 <p className="text-2xl font-bold tabular-nums">{kpis.booked}</p>
                 <p className="text-xs text-muted-foreground font-medium">Converted (Booked)</p>
               </div>
-              <CheckCircle2 className="h-8 w-8 text-emerald-500 opacity-80" />
+              <CheckCircle2 className="h-8 w-8 text-muted-foreground/60" />
             </CardContent>
           </Card>
           <Card className="border-border/80 shadow-sm">
@@ -195,7 +217,7 @@ export default function LeadsPage() {
                 <p className="text-2xl font-bold tabular-nums">{kpis.conversionRate}%</p>
                 <p className="text-xs text-muted-foreground font-medium">Conversion Rate</p>
               </div>
-              <UserPlus className="h-8 w-8 text-purple-500 opacity-80" />
+              <UserPlus className="h-8 w-8 text-muted-foreground/60" />
             </CardContent>
           </Card>
         </div>
@@ -228,6 +250,18 @@ export default function LeadsPage() {
         </div>
 
         {/* Kanban Board Layout */}
+        {leads.length === 0 ? (
+          <EmptyState
+            icon={<UserPlus className="h-6 w-6" />}
+            title="No leads yet"
+            description="Add an enquiry when someone asks about a room, and track it here until they move in."
+            action={
+              <Button className="gap-2" onClick={() => setOpen(true)}>
+                <Plus className="h-4 w-4" /> Add lead
+              </Button>
+            }
+          />
+        ) : (
         <div className="grid gap-4 overflow-x-auto pb-4 md:grid-cols-5 min-w-[1000px] md:min-w-0">
           {COLUMNS.map((col) => {
             const colLeads = filteredLeads.filter((l) => l.status === col.key);
@@ -293,6 +327,7 @@ export default function LeadsPage() {
             );
           })}
         </div>
+        )}
       </div>
     </CanAccessPage>
   );

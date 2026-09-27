@@ -221,8 +221,8 @@ export default function FoodDiningPage() {
       <div className="w-full max-w-6xl mx-auto space-y-6 animate-fade-in pb-24">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-              <UtensilsCrossed className="h-6 w-6 text-teal-600" /> Food & Dining Schedule
+            <h1 className="text-page-title flex items-center gap-2">
+              <UtensilsCrossed className="h-6 w-6 text-primary" /> Food & Meals
             </h1>
             <p className="text-sm text-muted-foreground">
               Manage weekly food menus and meal timing slots for residents at {selectedPg?.name || "your PG"}.

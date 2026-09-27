@@ -270,8 +270,8 @@ export default function EditStaffPermissions() {
           >
             <ArrowLeft className="h-3.5 w-3.5" /> Back to Team List
           </Link>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2.5">
-            <Shield className="h-6 w-6 text-indigo-500" /> Edit Staff & Permissions
+          <h1 className="text-page-title flex items-center gap-2.5">
+            <Shield className="h-6 w-6 text-primary" /> Edit staff permissions
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Update role assignment, contact details, and feature privileges for{" "}

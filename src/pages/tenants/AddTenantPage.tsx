@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Lock } from "lucide-react";
+import { HelpLink } from "@/components/common/HelpLink";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AddTenantForm } from "@/components/tenants/AddTenantForm";
@@ -26,16 +27,20 @@ export default function AddTenantPage() {
   return (
     <CanAccessPage permission="tenant_add">
       <div className="w-full max-w-6xl mx-auto space-y-6 animate-fade-in pb-24">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="shrink-0" asChild>
-            <Link to="/tenants" aria-label="Back to tenants">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Add tenant</h1>
-            <p className="text-sm text-muted-foreground">Allocate a guest to a room and bed. Changes apply immediately.</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" className="shrink-0" asChild>
+              <Link to="/tenants" aria-label="Back to tenants">
+                <ArrowLeft className="h-5 w-5" />
+              </Link>
+            </Button>
+            <div>
+              <h1 className="text-page-title">Add tenant</h1>
+              <p className="text-sm text-muted-foreground">Allocate a guest to a room and bed. Changes apply immediately.</p>
+            </div>
           </div>
+
+          <HelpLink tutorialKey="tenant_add" label="How to add a tenant" className="self-start sm:self-auto" />
         </div>
 
         {!subAccess.canAddTenant ? (

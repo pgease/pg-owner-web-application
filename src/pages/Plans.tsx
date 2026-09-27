@@ -47,6 +47,7 @@ import { useSubscriptionAccess } from "@/hooks/useSubscriptionAccess";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { useApp } from "@/context/AppContext";
 import { toast } from "@/components/ui/use-toast";
+import { SUPPORT_PHONE_DISPLAY, SUPPORT_PHONE_TEL, supportWhatsAppUrl } from "@/config/links";
 
 declare global {
   interface Window {
@@ -57,7 +58,7 @@ declare global {
 const features = [
   { name: "Direct UPI Intent Collection (0% transaction fee)", featureKey: "direct_upi_intent", free: false, lite: true, pro: true },
   { name: "Manual Payment Verification (Approve/Reject)", featureKey: "manual_payment_verify", free: false, lite: true, pro: true },
-  { name: "Dedicated Account Manager (Rahul Sharma)", featureKey: "dedicated_account_manager", free: false, lite: true, pro: true },
+  { name: "Dedicated Account Manager", featureKey: "dedicated_account_manager", free: false, lite: true, pro: true },
   { name: "Automated Payment Gateway Collection", featureKey: "automated_payment_gateway", free: false, lite: false, pro: true },
   { name: "Automated Settlement (T+2 Banking Days)", featureKey: "automated_settlement", free: false, lite: false, pro: true },
   { name: "Dedicated PG Subdomain Website ({pgname}.pgease.in)", featureKey: "pg_subdomain_website", free: false, lite: false, pro: true },
@@ -138,7 +139,7 @@ export default function Plans() {
         "₹29 / bed / month",
         "Direct UPI intent collection (0% fee)",
         "Manual payment verification (Approve / Reject)",
-        "Dedicated Account Manager (Rahul Sharma)",
+        "Dedicated Account Manager",
         "Unlimited tenant & room operations",
         "DigiLocker Aadhaar KYC",
         "Electricity meter billing",
@@ -160,7 +161,7 @@ export default function Plans() {
         "Automated Payment Gateway collection",
         "Automated Settlement (T+2 bank transfer)",
         "Dedicated PG Website ({pgname}.pgease.in)",
-        "Dedicated Account Manager (Rahul Sharma)",
+        "Dedicated Account Manager",
         "Digital Rental Agreement eSign",
         "Automated WhatsApp rent alerts",
       ],
@@ -299,16 +300,16 @@ export default function Plans() {
             </div>
             <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
               <a
-                href="tel:+919876543210"
-                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                href={SUPPORT_PHONE_TEL}
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-md border border-slate-300 dark:border-slate-700 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
-                <Phone className="h-3.5 w-3.5 text-teal-600" /> Call Rahul
+                <Phone className="h-3.5 w-3.5 text-teal-600" /> Call support
               </a>
               <a
-                href="https://wa.me/919876543210?text=Hi%20Rahul,%20my%20PG%20Ease%20trial%20has%20expired%20and%20I%20want%20to%20reactivate%20my%20subscription."
+                href={supportWhatsAppUrl("Hi, my PG Ease plan has expired and I want to reactivate my subscription.")}
                 target="_blank"
                 rel="noreferrer"
-                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-colors"
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-colors"
               >
                 <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
               </a>
@@ -362,10 +363,10 @@ export default function Plans() {
             <div className="flex items-center gap-6">
               <div className="text-left sm:text-right">
                 <div className="text-xs text-muted-foreground font-medium flex items-center gap-1 sm:justify-end">
-                  <ShieldCheck className="h-3.5 w-3.5 text-teal-600" /> Account Manager
+                  <ShieldCheck className="h-3.5 w-3.5 text-teal-600" /> Support
                 </div>
                 <div className="text-sm font-bold text-foreground">
-                  Rahul Sharma
+                  <a href={SUPPORT_PHONE_TEL} className="hover:underline">{SUPPORT_PHONE_DISPLAY}</a>
                 </div>
               </div>
               <div className="text-left sm:text-right">
@@ -705,7 +706,7 @@ export default function Plans() {
                     )}
                   </Button>
 
-                  {!isCurrent && (
+                  {import.meta.env.DEV && !isCurrent && (
                     <Button
                       type="button"
                       variant="outline"
@@ -808,6 +809,7 @@ export default function Plans() {
                 </CardDescription>
               </div>
             </div>
+            {import.meta.env.DEV && (
             <Button
               size="sm"
               variant={subAccess.currentPlan === "LITE" && !subAccess.isTrial && !subAccess.isExpired ? "default" : "outline"}
@@ -829,6 +831,7 @@ export default function Plans() {
                 ? "Active Plan (Lite)"
                 : "Preview Lite Plan Experience"}
             </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-5">
@@ -875,7 +878,7 @@ export default function Plans() {
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-3.5 w-3.5 text-emerald-600 mt-0.5 shrink-0" />
-                  <span><strong>Dedicated Manager:</strong> Personal guidance from your assigned account manager (Rahul Sharma).</span>
+                  <span><strong>Dedicated Manager:</strong> Personal guidance from your assigned account manager.</span>
                 </li>
               </ul>
             </div>
@@ -910,7 +913,7 @@ export default function Plans() {
                 </li>
                 <li className="flex items-start gap-2">
                   <Lock className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
-                  <span><strong>Notice Period Tracker:</strong> Tenant move-out countdowns and vacancy forecasting timeline.</span>
+                  <span><strong>Notice Period:</strong> Tenant move-out countdowns and vacancy forecasting timeline.</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Lock className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
@@ -926,7 +929,8 @@ export default function Plans() {
         </CardContent>
       </Card>
 
-      {/* PLAN STATUS SIMULATION TOOLBAR */}
+      {/* PLAN STATUS SIMULATION TOOLBAR — development builds only */}
+      {import.meta.env.DEV && (
       <div className="mt-8 p-3.5 rounded-2xl bg-slate-900 text-white shadow-lg border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <div className="h-8 w-8 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center font-bold">
@@ -1018,6 +1022,7 @@ export default function Plans() {
           </Button>
         </div>
       </div>
+      )}
     </div>
   );
 }

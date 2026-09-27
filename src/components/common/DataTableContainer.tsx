@@ -1,14 +1,25 @@
 import { type ReactNode } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface DataTableContainerProps {
   children: ReactNode;
+  /** Optional toolbar rendered above the table (search, filters, bulk actions). */
+  toolbar?: ReactNode;
+  /** Optional footer rendered below the table (pagination, totals). */
+  footer?: ReactNode;
+  className?: string;
 }
 
-export function DataTableContainer({ children }: DataTableContainerProps) {
+/**
+ * Standard wrapper for data tables: bordered card, horizontal scroll on small screens,
+ * consistent toolbar/footer slots.
+ */
+export function DataTableContainer({ children, toolbar, footer, className }: DataTableContainerProps) {
   return (
-    <Card>
-      <CardContent className="p-0 overflow-x-auto">{children}</CardContent>
-    </Card>
+    <div className={cn("overflow-hidden rounded-lg border bg-card shadow-sm", className)}>
+      {toolbar ? <div className="border-b p-3 sm:p-4">{toolbar}</div> : null}
+      <div className="overflow-x-auto">{children}</div>
+      {footer ? <div className="border-t p-3 sm:p-4">{footer}</div> : null}
+    </div>
   );
 }

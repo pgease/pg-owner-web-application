@@ -191,6 +191,7 @@ export const EaseBuddyAI: React.FC<{
                 size="icon"
                 className="h-7 w-7 text-white/70 hover:text-white hover:bg-white/10 rounded-lg"
                 onClick={handleClose}
+                aria-label="Close Ease Buddy"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -275,6 +276,7 @@ export const EaseBuddyAI: React.FC<{
               onClick={() => handleSend()}
               disabled={!input.trim()}
               className="h-10 w-10 shrink-0 bg-teal-600 hover:bg-teal-500 text-white rounded-xl shadow-md disabled:opacity-40"
+              aria-label="Send message"
             >
               <Send className="h-4 w-4" />
             </Button>

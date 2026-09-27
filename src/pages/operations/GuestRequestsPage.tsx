@@ -118,8 +118,8 @@ export default function GuestRequestsPage() {
       <div className="w-full max-w-6xl mx-auto space-y-6 animate-fade-in pb-24">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-              <UserCheck className="h-6 w-6 text-teal-600" /> Guest Log & Arrival Requests
+            <h1 className="text-page-title flex items-center gap-2">
+              <UserCheck className="h-6 w-6 text-primary" /> Guest Requests
             </h1>
             <p className="text-sm text-muted-foreground">
               Track, log, and approve visitor arrival requests for {selectedPg?.name || "your property"}.

@@ -199,9 +199,9 @@ export const AmenitiesPage = () => {
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
-              <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
-                <Sparkles className="h-6 w-6 text-teal-600" />
-                Property Amenities
+              <h1 className="text-page-title flex items-center gap-2">
+                <Sparkles className="h-6 w-6 text-primary" />
+                Amenities
               </h1>
               <Badge className="bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300 border-teal-200 text-xs font-bold">
                 {selectedIds.length} Selected

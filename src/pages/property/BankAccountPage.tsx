@@ -26,9 +26,9 @@ export const BankAccountPage = () => {
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
-              <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2.5">
-                <CreditCard className="h-6 w-6 text-blue-600" />
-                Bank Account & UPI Payouts
+              <h1 className="text-page-title flex items-center gap-2.5">
+                <CreditCard className="h-6 w-6 text-primary" />
+                Bank Account
               </h1>
               <Badge className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-200 text-xs font-bold gap-1">
                 <ShieldCheck className="h-3.5 w-3.5" /> 0% Commission

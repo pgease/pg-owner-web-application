@@ -114,8 +114,8 @@ export default function NightOutRequestsPage() {
       <div className="w-full max-w-6xl mx-auto space-y-6 animate-fade-in pb-24">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-              <Moon className="h-6 w-6 text-teal-600" /> Night Out Requests & Curfew Passes
+            <h1 className="text-page-title flex items-center gap-2">
+              <Moon className="h-6 w-6 text-primary" /> Night Out Passes
             </h1>
             <p className="text-sm text-muted-foreground">
               Approve, reject, and grant night out curfew passes for {selectedPg?.name || "your residents"}.

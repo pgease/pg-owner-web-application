@@ -1,3 +1,4 @@
+import { publicListingUrl } from "@/config/links";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -462,7 +463,7 @@ export default function PublicListingPage() {
     ];
   }, [propertyName, address]);
 
-  const publicWebsiteUrl = `http://localhost:5173/properties/${selectedPgId || "stay"}`;
+  const publicWebsiteUrl = publicListingUrl(selectedPgId);
 
   return (
     <div className="space-y-6 pb-20 max-w-6xl mx-auto animate-fade-in">
@@ -474,8 +475,8 @@ export default function PublicListingPage() {
               <Globe className="h-5 w-5" />
             </span>
             <div>
-              <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
-                Post PG & Public Search Listing
+              <h1 className="text-page-title flex items-center gap-2">
+                Public Listing
                 <Badge
                   className={
                     isPublished

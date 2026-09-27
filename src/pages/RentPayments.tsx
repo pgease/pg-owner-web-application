@@ -30,6 +30,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/common/StatusBadge";
+import { HelpLink } from "@/components/common/HelpLink";
 import { PageHeader } from "@/components/common/PageHeader";
 import { useApp } from "@/context/AppContext";
 import { toast } from "@/components/ui/use-toast";
@@ -360,30 +362,34 @@ const RentPayments = () => {
     }
   };
 
-  // Synthesize payment transactions ledger based on paid tenants & tenant data
+  // Fallback ledger built from this month's paid tenants (used only when the history API
+  // returns nothing). Fields the API doesn't provide are shown as "—", never invented.
   const paymentTransactions = useMemo(() => {
     const paidList = dashboard?.paidTenants || [];
-    const dummyModes = ["UPI Intent", "Cash (Manual)", "Razorpay Online", "Bank Transfer (IMPS)"];
-    
+
     return paidList.map((item, idx) => {
       const parsed = parseRentTenantRow(item);
-      const amt = Number((item as any).amountPaid) || Number((item as any).rentAmount) || amountFromRow(item) || 0;
+      const row = item as any;
+      const amt = Number(row.amountPaid) || Number(row.rentAmount) || amountFromRow(item) || 0;
       const room = item.roomNumber ?? item.room_number ?? "—";
       const name = parsed?.label || item.tenantName || item.name || `Tenant #${idx + 1}`;
-      const mode = dummyModes[idx % dummyModes.length];
-      const date = item.paidAt ? new Date(item.paidAt) : new Date(Date.now() - idx * 86400000 * 2.5);
+      const mode = String(row.paymentMethod ?? row.paymentMode ?? row.mode ?? "").trim() || "—";
+      const paidAtRaw = row.paidAt ?? row.paymentDate ?? row.paidOn ?? row.createdAt;
+      const paidAt = paidAtRaw ? new Date(paidAtRaw) : null;
+      const hasDate = paidAt != null && !Number.isNaN(paidAt.getTime());
+      const refId = String(row.transactionId ?? row.referenceId ?? row.refId ?? row.paymentId ?? "").trim() || "—";
 
       return {
-        id: `TXN-${year}${String(month).padStart(2, "0")}-${1000 + idx}`,
+        id: String(row.paymentId ?? row.id ?? `${parsed?.roomTenantId ?? "row"}-${idx}`),
         tenantName: name,
         roomNumber: String(room),
         amount: amt,
         mode,
         status: "Completed",
-        date: date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
-        time: date.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+        date: hasDate ? paidAt!.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—",
+        time: hasDate ? paidAt!.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "",
         period: `${month}/${year}`,
-        refId: `REF-${Math.floor(100000000 + Math.random() * 900000000)}`,
+        refId,
       };
     });
   }, [dashboard?.paidTenants, month, year]);
@@ -408,7 +414,16 @@ const RentPayments = () => {
       const room = item.roomNumber ?? item.room_number ?? "—";
       const name = parsed?.label || item.tenantName || item.name || `Tenant #${idx + 1}`;
       const phone = item.phone || item.mobile || "";
-      const overdueDays = 3 + idx * 4;
+
+      // Overdue days are only computed when the API tells us the tenant's rent due day;
+      // otherwise the row is simply "pending" for the period (no invented ages).
+      const dueDayRaw = (item as any).rentDueDate ?? (item as any).dueDay ?? (item as any).rent_due_date;
+      const dueDay = Number(dueDayRaw);
+      const hasDueDay = Number.isFinite(dueDay) && dueDay >= 1 && dueDay <= 31;
+      const dueDateObj = hasDueDay ? new Date(year, month - 1, dueDay) : null;
+      const overdueDays: number | null = dueDateObj
+        ? Math.max(0, Math.floor((Date.now() - dueDateObj.getTime()) / 86400000))
+        : null;
 
       return {
         id: `DUE-${item.id || idx}`,
@@ -417,9 +432,9 @@ const RentPayments = () => {
         roomNumber: String(room),
         dueType: Number((item as any).electricityBill || 0) > 0 ? "Monthly Rent + Electricity" : "Monthly Rent",
         amount: amt,
-        dueDate: `05/${String(month).padStart(2, "0")}/${year}`,
+        dueDate: dueDateObj ? dueDateObj.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—",
         overdueDays,
-        status: overdueDays > 15 ? "CRITICAL" : "OVERDUE",
+        status: overdueDays == null ? "PENDING" : overdueDays > 15 ? "CRITICAL" : overdueDays > 0 ? "OVERDUE" : "DUE",
         rawRow: item,
       };
     });
@@ -431,8 +446,8 @@ const RentPayments = () => {
         item.tenantName.toLowerCase().includes(duesSearch.toLowerCase()) ||
         item.roomNumber.toLowerCase().includes(duesSearch.toLowerCase()) ||
         item.phone.includes(duesSearch);
-      if (duesFilter === "critical") return matchesSearch && item.overdueDays > 15;
-      if (duesFilter === "recent") return matchesSearch && item.overdueDays <= 7;
+      if (duesFilter === "critical") return matchesSearch && item.overdueDays != null && item.overdueDays > 15;
+      if (duesFilter === "recent") return matchesSearch && (item.overdueDays == null || item.overdueDays <= 7);
       return matchesSearch;
     });
   }, [pendingDuesList, duesSearch, duesFilter]);
@@ -444,29 +459,26 @@ const RentPayments = () => {
       <div className="space-y-6 animate-fade-in max-w-7xl">
         {/* Main Header */}
         <PageHeader
-          title={
-            isHistoryView
-              ? "Payment History & Transactions"
-              : isDuesView
-              ? "Dues & Pending Recovery Desk"
-              : "Rent & Payments Collection"
-          }
+          title={isHistoryView ? "Payment History" : isDuesView ? "Dues & Pending" : "Rent Collection"}
           description={
             isHistoryView
-              ? "Comprehensive audit trail and receipts for all received rent and amenity payments."
+              ? "Every rent payment received, with receipts."
               : isDuesView
-              ? "Track overdue rent balances and send instant 1-click WhatsApp payment reminders."
-              : "View rent collection for current cycle, track paid vs unpaid tenants, and record manual payments."
+              ? "Tenants who haven't paid this month, with one-tap WhatsApp reminders."
+              : "See who has paid this month, who hasn't, and record payments you received directly."
           }
           actions={
-            <Button
-              size="sm"
-              className="gap-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl shadow-sm"
-              onClick={() => setManualPaymentOpen(true)}
-              disabled={!selectedPgId}
-            >
-              <IndianRupee className="h-4 w-4" /> Record Manual Payment
-            </Button>
+            <>
+              <HelpLink tutorialKey="rent_collection" label="How rent collection works" />
+              <Button
+                size="sm"
+                className="gap-2"
+                onClick={() => setManualPaymentOpen(true)}
+                disabled={!selectedPgId}
+              >
+                <IndianRupee className="h-4 w-4" /> Record payment
+              </Button>
+            </>
           }
         />
 
@@ -574,7 +586,7 @@ const RentPayments = () => {
               <Card className="rounded-2xl shadow-xs border-border/80">
                 <CardContent className="pt-4 pb-3">
                   <div className="flex items-center justify-between text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                    <span>Collected (Month)</span>
+                    <span>Collected this month</span>
                     <Wallet className="h-4 w-4 text-emerald-600" />
                   </div>
                   <p className="text-2xl sm:text-3xl font-extrabold text-foreground tabular-nums mt-1.5">
@@ -668,14 +680,16 @@ const RentPayments = () => {
                   <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
                     <span className="h-2 w-2 rounded-full bg-amber-500" /> Pending Collection ({dashboard?.unpaidTenants?.length ?? 0})
                   </h3>
-                  <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 font-semibold">
-                    Immediate Action
-                  </Badge>
+                  {(dashboard?.unpaidTenants?.length ?? 0) > 0 && (
+                    <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 font-semibold">
+                      Needs follow-up
+                    </Badge>
+                  )}
                 </div>
                 <TenantTable
                   rows={dashboard?.unpaidTenants ?? []}
                   propertyId={selectedPgId}
-                  emptyLabel="All active tenants have cleared rent for this period! 🎉"
+                  emptyLabel="Everyone has paid for this period."
                   isUnpaid={true}
                   onRecordPay={openManualForTenant}
                   onSharePaymentLink={openPaymentLinkForTenant}
@@ -1048,7 +1062,7 @@ const RentPayments = () => {
                     <Clock className="h-4 w-4 text-amber-500" />
                   </div>
                   <p className="text-2xl sm:text-3xl font-extrabold text-amber-600 tabular-nums mt-1.5">
-                    {pendingDuesList.filter((d) => d.overdueDays > 15).length}
+                    {pendingDuesList.filter((d) => d.overdueDays != null && d.overdueDays > 15).length}
                   </p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">Requires direct owner intervention</p>
                 </CardContent>
@@ -1180,17 +1194,18 @@ const RentPayments = () => {
                               {item.dueDate}
                             </td>
                             <td className="py-3.5 px-4 whitespace-nowrap">
-                              <Badge
-                                variant="secondary"
-                                className={cn(
-                                  "text-[10px] font-bold",
-                                  item.overdueDays > 15
-                                    ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                                    : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                                )}
-                              >
-                                {item.overdueDays} days overdue
-                              </Badge>
+                              <StatusBadge
+                                size="sm"
+                                tone={item.overdueDays != null && item.overdueDays > 15 ? "danger" : item.overdueDays ? "warning" : "neutral"}
+                                label={
+                                  item.overdueDays == null
+                                    ? "Pending"
+                                    : item.overdueDays === 0
+                                    ? "Due today"
+                                    : `${item.overdueDays} day${item.overdueDays === 1 ? "" : "s"} overdue`
+                                }
+                                status={item.status}
+                              />
                             </td>
                             <td className="py-3.5 px-4 text-right tabular-nums font-extrabold text-destructive text-sm">
                               {formatInr(item.amount)}
@@ -1225,7 +1240,7 @@ const RentPayments = () => {
                                       }
                                     }
                                     const text = encodeURIComponent(
-                                      `Hi ${item.tenantName}, your PG rent of ${formatInr(item.amount)} for Room ${item.roomNumber} is overdue by ${item.overdueDays} days. Please clear it immediately to avoid penalties. You can pay via UPI to our registered PG account. Thank you!`
+                                      `Hi ${item.tenantName}, your PG rent of ${formatInr(item.amount)} for Room ${item.roomNumber} is pending${item.overdueDays ? ` (overdue by ${item.overdueDays} day${item.overdueDays === 1 ? "" : "s"})` : ""}. Please clear it at your earliest. Thank you!`
                                     );
                                     window.open(`https://wa.me/91${item.phone.replace(/\D/g, "")}?text=${text}`, "_blank");
                                   }}

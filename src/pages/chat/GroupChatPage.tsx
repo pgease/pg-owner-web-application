@@ -632,7 +632,8 @@ export default function GroupChatPage() {
               </Button>
             </div>
 
-            {/* Demo QA switcher */}
+            {/* Demo QA switcher — development builds only */}
+            {import.meta.env.DEV && (
             <div className="border-t border-white/10 pt-6 flex flex-wrap items-center gap-3">
               <span className="text-xs text-slate-400">Developer / Demo Preview:</span>
               <Button
@@ -664,6 +665,7 @@ export default function GroupChatPage() {
                 Activate Pro Plan (Demo)
               </Button>
             </div>
+            )}
           </div>
         </div>
       </div>
@@ -673,32 +675,17 @@ export default function GroupChatPage() {
   // ==================== Main Pro Chat Interface ====================
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] max-w-7xl mx-auto p-2 sm:p-4 md:p-6">
-      {/* Top Demo Banner for QA convenience */}
-      {entitlements.isTrial && (
-        <div className="mb-3 px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs text-amber-200">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-3.5 w-3.5 text-amber-400 shrink-0" />
-            <span>
-              <strong>PRO Trial Active</strong> — {entitlements.daysRemaining} days remaining in
-              your 45-day trial. Private PG Group Chat is fully unlocked.
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => subAccess.setDemoPlan("lite")}
-              className="text-[11px] underline text-amber-300 hover:text-white"
-            >
-              Test Lite Lock
-            </button>
-            <button
-              onClick={() => subAccess.setDemoPlan("reset")}
-              className="text-[11px] text-slate-400 hover:text-white"
-            >
-              Reset
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Group chat is a preview: conversations below are sample data, not real messages. */}
+      <div
+        role="status"
+        className="mb-3 flex items-start gap-2 rounded-md border border-info/30 bg-info/5 px-3 py-2 text-xs text-muted-foreground"
+      >
+        <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-info" aria-hidden />
+        <span>
+          <strong className="font-semibold text-foreground">Preview.</strong> Group chat isn&apos;t live yet — the
+          conversation below is sample data. Messages you send here are not delivered to tenants or staff.
+        </span>
+      </div>
 
       {/* Main Chat Box Card */}
       <div className="flex-1 flex flex-col min-h-0 bg-slate-900/90 dark:bg-slate-950 border border-slate-800 rounded-2xl shadow-xl overflow-hidden backdrop-blur-sm">

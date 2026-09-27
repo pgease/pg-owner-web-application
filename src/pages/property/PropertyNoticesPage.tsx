@@ -85,8 +85,8 @@ export default function PropertyNoticesPage() {
       <div className="w-full max-w-6xl mx-auto space-y-6 animate-fade-in pb-24">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-              <Megaphone className="h-6 w-6 text-teal-600" /> Property Notices & Announcements
+            <h1 className="text-page-title flex items-center gap-2">
+              <Megaphone className="h-6 w-6 text-primary" /> Notice Board
             </h1>
             <p className="text-sm text-muted-foreground">
               Publish announcements, emergency updates, and maintenance notices for {selectedPg?.name || "your tenants"}.

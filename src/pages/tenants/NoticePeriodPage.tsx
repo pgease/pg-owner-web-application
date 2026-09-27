@@ -364,15 +364,15 @@ export default function NoticePeriodPage() {
   return (
     <FeatureGuard
       feature="notice_period_tracker"
-      fallbackTitle="Notice Period Tracker is Locked"
+      fallbackTitle="Notice Period is Locked"
       fallbackDescription="Notice Period Tracking is a premium capability not currently enabled on your subscription plan. Please enable it in the Admin Panel or upgrade your plan to unlock."
     >
       <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6 pb-20 animate-in fade-in duration-300">
         {/* Top Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2.5">
-            <Clock className="h-6 w-6 text-amber-500" /> Notice Period Tracker
+          <h1 className="text-page-title flex items-center gap-2.5">
+            <Clock className="h-6 w-6 text-primary" /> Notice Period
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             Track move-out notices, monitor checkout timelines, and plan upcoming bed availability for{" "}

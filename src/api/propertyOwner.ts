@@ -3150,13 +3150,22 @@ export async function getTenantPaymentLink(
 export interface TutorialItem {
   id: string;
   title: string;
+  tutorial_key?: string;
+  tutorialKey?: string;
+  module?: string;
+  action?: string;
   description: string;
   category: string;
   videoUrl: string;
+  youtube_url?: string;
+  youtubeUrl?: string;
   thumbnailUrl?: string | null;
+  thumbnail_url?: string | null;
   duration?: string | null;
   displayOrder?: number;
+  sort_order?: number;
   badge?: string | null;
+  isActive?: boolean;
 }
 
 /**
@@ -3167,6 +3176,52 @@ export async function getTutorials(category?: string): Promise<TutorialItem[]> {
   return httpRequest<TutorialItem[]>(`/tutorials${query}`, {
     method: "GET",
   });
+}
+
+const TUTORIAL_KEY_FALLBACK_MAP: Record<string, string> = {
+  "how to add & onboard new tenants": "tenant_add",
+  "rent collection & direct zero-fee upi intent": "rent_collection",
+  "property setup: rooms, floors & bed allocation": "room_management",
+  "digilocker aadhaar kyc & agreement signing": "kyc_verification",
+  "staff management, wardens & granular roles": "staff_management",
+  "tracking pg expenses, electricity & monthly profits": "expense_tracker",
+  "tenant complaints & maintenance ticketing": "complaints_resolution",
+  "publishing your pg online & capturing direct leads": "public_listing",
+};
+
+/**
+ * Fetch a single tutorial dynamically by its unique technical key (e.g. tenant_add)
+ */
+export async function getTutorialByKey(tutorialKey: string): Promise<TutorialItem | null> {
+  const cleanKey = tutorialKey.trim().toLowerCase();
+  try {
+    const res = await httpRequest<{ success: boolean; data: TutorialItem | null } | TutorialItem>(
+      `/tutorials/${encodeURIComponent(cleanKey)}`,
+      { method: "GET" }
+    );
+    if (res && "data" in res && res.data) return res.data;
+    if (res && "id" in (res as any)) return res as TutorialItem;
+  } catch (_) {
+    // If backend direct key endpoint is pending deployment, fall through to list lookup
+  }
+
+  try {
+    const listRes = await getTutorials();
+    const items: TutorialItem[] = Array.isArray(listRes) ? listRes : (listRes as any)?.data || [];
+    const matched = items.find((t) => {
+      const key = (t.tutorial_key || t.tutorialKey || TUTORIAL_KEY_FALLBACK_MAP[(t.title || "").toLowerCase().trim()] || "").toLowerCase();
+      return key === cleanKey || (t.id && t.id.toLowerCase() === cleanKey);
+    });
+    if (matched) {
+      return {
+        ...matched,
+        tutorial_key: cleanKey,
+      };
+    }
+  } catch (err) {
+    console.warn(`Tutorial key "${cleanKey}" lookup failed:`, err);
+  }
+  return null;
 }
 
 /**

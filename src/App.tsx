@@ -48,8 +48,9 @@ import RestrictionsPage from "./pages/property/RestrictionsPage";
 import ReferralsPage from "./pages/ReferralsPage";
 import ApiCatalogPage from "./pages/reference/ApiCatalogPage";
 import PublicListingPage from "./pages/property/PublicListingPage";
-import GroupChatPage from "./pages/chat/GroupChatPage";
 import FeatureCataloguePage from "./pages/FeatureCataloguePage";
+import GroupChatPage from "./pages/chat/GroupChatPage";
+import { TutorialProvider } from "./context/TutorialContext";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -92,7 +93,8 @@ const App = () => (
               <RequireAuth>
                 <AppProvider>
                   <PermissionProvider>
-                    <AppLayout>
+                    <TutorialProvider>
+                      <AppLayout>
                       <Routes>
                         <Route path="/" element={<Dashboard />} />
                         <Route path="/dashboard" element={<Dashboard />} />
@@ -173,7 +175,8 @@ const App = () => (
                       </Routes>
                       <EaseBuddyAI />
                     </AppLayout>
-                  </PermissionProvider>
+                  </TutorialProvider>
+                </PermissionProvider>
                 </AppProvider>
               </RequireAuth>
             }

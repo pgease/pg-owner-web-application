@@ -23,6 +23,10 @@ import {
   Clock,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/common/EmptyState";
+import { StatCard } from "@/components/common/StatCard";
+import { ErrorState } from "@/components/common/ErrorState";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,37 +94,6 @@ function waLink(phone: string): string | null {
   return `https://wa.me/${n}`;
 }
 
-function KpiCard({
-  label,
-  value,
-  icon: Icon,
-  tone,
-}: {
-  label: string;
-  value: number | string;
-  icon: React.ElementType;
-  tone: "blue" | "emerald" | "rose" | "amber" | "violet" | "slate";
-}) {
-  const tones = {
-    blue: "text-sky-600 dark:text-sky-400",
-    emerald: "text-emerald-600 dark:text-emerald-400",
-    rose: "text-rose-600 dark:text-rose-400",
-    amber: "text-amber-600 dark:text-amber-400",
-    violet: "text-violet-600 dark:text-violet-400",
-    slate: "text-slate-600 dark:text-slate-400",
-  };
-  return (
-    <Card className="border-border/80 shadow-sm">
-      <CardContent className="flex items-center justify-between gap-2 p-4">
-        <div>
-          <p className="text-2xl font-bold tabular-nums tracking-tight">{value}</p>
-          <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        </div>
-        <Icon className={cn("h-8 w-8 shrink-0 opacity-90", tones[tone])} />
-      </CardContent>
-    </Card>
-  );
-}
 
 const Tenants = () => {
   const location = useLocation();
@@ -847,36 +820,50 @@ const Tenants = () => {
   const tenantTableSection = (
     <div className="space-y-4">
       {!selectedPgId ? (
-        <Card className="border-dashed">
-          <CardContent className="p-10 text-center text-muted-foreground">
-            <p className="font-medium text-foreground">Select a property</p>
-            <p className="mt-1 text-sm">Use the PG switcher in the top bar to load your tenant list.</p>
-          </CardContent>
+        <Card>
+          <EmptyState
+            icon={<Users />}
+            title="Select a property"
+            description="Use the PG switcher in the top bar to load your tenant list."
+          />
         </Card>
       ) : tenantsQuery.isLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="space-y-3" aria-busy="true" aria-label="Loading tenants">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full" />
+          ))}
         </div>
       ) : tenantsQuery.isError ? (
         <Card>
-          <CardContent className="p-8 text-center text-muted-foreground">
-            <p className="font-medium">Could not load tenants</p>
-            <Button variant="outline" size="sm" className="mt-3" onClick={() => tenantsQuery.refetch()}>
-              Retry
-            </Button>
-          </CardContent>
+          <ErrorState
+            title="Couldn't load tenants"
+            description="Check your connection and try again."
+            onRetry={() => tenantsQuery.refetch()}
+            retrying={tenantsQuery.isFetching}
+          />
         </Card>
       ) : filteredTenants.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="p-10 text-center text-muted-foreground">
-            <p className="font-medium text-foreground">No tenants match</p>
-            <p className="mt-1 text-sm">Adjust search or filters, or add a tenant.</p>
-            <CanAccess permission="tenant_add">
-              <Button asChild className="mt-4">
-                <Link to="/tenants/add">Add tenant</Link>
-              </Button>
-            </CanAccess>
-          </CardContent>
+        <Card>
+          <EmptyState
+            icon={<Users />}
+            title={(tenantsQuery.data?.length ?? 0) === 0 ? "No tenants yet" : "No tenants match your filters"}
+            description={
+              (tenantsQuery.data?.length ?? 0) === 0
+                ? "Add your first tenant to start tracking rent, KYC and notices."
+                : "Try a different search or clear the filters."
+            }
+            action={
+              (tenantsQuery.data?.length ?? 0) === 0 ? (
+                <CanAccess permission="tenant_add">
+                  <Button asChild>
+                    <Link to="/tenants/add">Add tenant</Link>
+                  </Button>
+                </CanAccess>
+              ) : (
+                <Button variant="outline" onClick={() => setSearchQuery("")}>Clear search</Button>
+              )
+            }
+          />
         </Card>
       ) : (
         <div className="space-y-4">
@@ -956,7 +943,7 @@ const Tenants = () => {
       <div className="space-y-6 animate-fade-in pb-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            <h1 className="text-page-title">
               {isVacantRoomsPage ? "Vacant rooms" : "Tenants"}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -1000,10 +987,10 @@ const Tenants = () => {
         ) : (
           <>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <KpiCard label="Total tenants" value={kpi.total} icon={Users} tone="blue" />
-              <KpiCard label="KYC verified" value={kpi.verified} icon={ShieldCheck} tone="emerald" />
-              <KpiCard label="On notice" value={kpi.onNotice} icon={AlertTriangle} tone="amber" />
-              <KpiCard label="New (7 days)" value={kpi.recent} icon={UserPlus} tone="violet" />
+              <StatCard label="Total tenants" value={kpi.total} icon={<Users className="h-4 w-4" />} tone="brand" />
+              <StatCard label="KYC verified" value={kpi.verified} icon={<ShieldCheck className="h-4 w-4" />} tone="success" />
+              <StatCard label="On notice" value={kpi.onNotice} icon={<AlertTriangle className="h-4 w-4" />} tone={kpi.onNotice > 0 ? "warning" : "default"} />
+              <StatCard label="New (7 days)" value={kpi.recent} icon={<UserPlus className="h-4 w-4" />} tone="default" />
             </div>
 
             {/* Lifecycle Status Filter Tabs */}
@@ -1065,7 +1052,7 @@ const Tenants = () => {
             </div>
 
             <FilterBar>
-              <div className="relative min-w-0 flex-1 max-w-sm">
+              <div className="relative w-full min-w-[220px] flex-1 sm:max-w-sm">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Search name, phone, room…"

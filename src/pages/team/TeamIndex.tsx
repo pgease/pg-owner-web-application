@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Plus, Loader2, Pencil, Shield, User, Phone, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/common/ErrorState";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -73,9 +74,12 @@ function TeamIndexInner() {
         </div>
       ) : q.isError ? (
         <Card>
-          <CardContent className="py-12 text-center text-sm text-destructive">
-            Could not load team. Ensure the staff API is available.
-          </CardContent>
+          <ErrorState
+            title="Couldn't load your team"
+            description="Check your connection and try again."
+            onRetry={() => q.refetch()}
+            retrying={q.isFetching}
+          />
         </Card>
       ) : rows.length === 0 ? (
         <Card>
