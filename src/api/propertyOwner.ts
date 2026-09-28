@@ -3171,9 +3171,10 @@ export interface TutorialItem {
  */
 export async function getTutorials(category?: string): Promise<TutorialItem[]> {
   const query = category && category !== "All" ? `?category=${encodeURIComponent(category)}` : "";
-  return httpRequest<TutorialItem[]>(`/tutorials${query}`, {
+  const res = await httpRequest<{ success?: boolean; data?: TutorialItem[] } | TutorialItem[]>(`/tutorials${query}`, {
     method: "GET",
   });
+  return Array.isArray(res) ? res : res?.data || [];
 }
 
 const TUTORIAL_KEY_FALLBACK_MAP: Record<string, string> = {
@@ -3193,7 +3194,7 @@ const TUTORIAL_KEY_FALLBACK_MAP: Record<string, string> = {
 export async function getTutorialByKey(tutorialKey: string): Promise<TutorialItem | null> {
   const cleanKey = tutorialKey.trim().toLowerCase();
   try {
-    const res = await httpRequest<{ success: boolean; data: TutorialItem | null } | TutorialItem>(
+    const res = await httpRequest<{ success?: boolean; data?: TutorialItem | null } | TutorialItem>(
       `/tutorials/${encodeURIComponent(cleanKey)}`,
       { method: "GET" }
     );
@@ -3204,8 +3205,7 @@ export async function getTutorialByKey(tutorialKey: string): Promise<TutorialIte
   }
 
   try {
-    const listRes = await getTutorials();
-    const items: TutorialItem[] = Array.isArray(listRes) ? listRes : (listRes as any)?.data || [];
+    const items = await getTutorials();
     const matched = items.find((t) => {
       const key = (t.tutorial_key || t.tutorialKey || TUTORIAL_KEY_FALLBACK_MAP[(t.title || "").toLowerCase().trim()] || "").toLowerCase();
       return key === cleanKey || (t.id && t.id.toLowerCase() === cleanKey);
@@ -3226,8 +3226,11 @@ export async function getTutorialByKey(tutorialKey: string): Promise<TutorialIte
  * Fetch distinct tutorial categories
  */
 export async function getTutorialCategories(): Promise<string[]> {
-  return httpRequest<string[]>("/tutorials/categories", {
+  const res = await httpRequest<{ success?: boolean; data?: Array<string | { category: string }> } | string[]>("/tutorials/categories", {
     method: "GET",
   });
+  const rawList = Array.isArray(res) ? res : res?.data || [];
+  return rawList.map((item) => (typeof item === "string" ? item : item.category)).filter(Boolean);
 }
+
 
