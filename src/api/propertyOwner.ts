@@ -1680,7 +1680,7 @@ export interface RentCollectionHistoryItem {
   periodMonth: number;
   periodYear: number;
   paidAt: string;
-  status: "paid" | "partial" | "pending";
+  status: "paid" | "partial" | "pending" | string;
   paymentMethod: string | null;
   reference: string | null;
   notes: string | null;
@@ -1743,8 +1743,6 @@ export async function getRentCollectionHistory(
     auth: true,
   });
 }
-
-
 // ─── Analytics ──────────────────────────────────────────────────────────────
 
 export async function getAnalyticsPgGrowth(propertyId?: string) {
