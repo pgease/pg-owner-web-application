@@ -1683,7 +1683,7 @@ export interface RentCollectionHistoryItem {
   status: "paid" | "partial" | "pending" | string;
   paymentMethod: string | null;
   reference: string | null;
-  notes: string | null;
+  notes: Record<string, any> | string | null;
   createdAt: string;
 }
 
