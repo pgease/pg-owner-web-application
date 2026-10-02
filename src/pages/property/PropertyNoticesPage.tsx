@@ -1,12 +1,10 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bell, Plus, Trash2, Megaphone, AlertCircle, Clock, CheckCircle, Calendar, Send } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Bell, Plus, Trash2, Megaphone, Clock, Calendar, Send, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useApp } from "@/context/AppContext";
@@ -18,13 +16,17 @@ import {
   type CreateNoticePayload,
 } from "@/api/propertyOwner";
 import { CanAccessPage } from "@/components/PermissionGuard";
+import { PageHeader } from "@/components/common/PageHeader";
+import { StatusBadge } from "@/components/common/StatusBadge";
+import { EmptyState } from "@/components/common/EmptyState";
+import { formatDate } from "@/lib/formatters";
 
 export default function PropertyNoticesPage() {
   const { selectedPgId, properties } = useApp();
   const queryClient = useQueryClient();
   const selectedPg = properties.find((p) => p.id === selectedPgId);
 
-  const { data: noticesData, isLoading } = useQuery({
+  const { data: noticesData, isLoading, refetch } = useQuery({
     queryKey: ["propertyNotices", selectedPgId],
     queryFn: () => (selectedPgId ? getPropertyNotices(selectedPgId) : null),
     enabled: Boolean(selectedPgId),
@@ -58,6 +60,8 @@ export default function PropertyNoticesPage() {
       setCreateModalOpen(false);
       setTitle("");
       setMessage("");
+      setAttachmentUrl("");
+      setExpiresAt("");
       queryClient.invalidateQueries({ queryKey: ["propertyNotices", selectedPgId] });
     },
     onError: (e: any) => {
@@ -82,83 +86,100 @@ export default function PropertyNoticesPage() {
 
   return (
     <CanAccessPage permission="room_view">
-      <div className="w-full max-w-6xl mx-auto space-y-6 animate-fade-in pb-24">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-page-title flex items-center gap-2">
-              <Megaphone className="h-6 w-6 text-primary" /> Notice Board
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Publish announcements, emergency updates, and maintenance notices for {selectedPg?.name || "your tenants"}.
-            </p>
+      <div className="space-y-6">
+        <PageHeader
+          title="Notice Board"
+          description={`Broadcast announcements and updates for ${selectedPg?.name || "your tenants"}.`}
+          action={
+            <Button
+              onClick={() => setCreateModalOpen(true)}
+              className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white gap-2 font-medium"
+            >
+              <Plus className="h-4 w-4" /> Create notice
+            </Button>
+          }
+        />
+
+        {!selectedPgId ? (
+          <div className="bg-white rounded-md border border-[var(--gray-200)] p-8">
+            <EmptyState
+              icon={<Building2 className="h-10 w-10 text-[var(--gray-400)]" />}
+              title="Select a property"
+              description="Choose a PG from the switcher in the top bar to view announcements."
+            />
           </div>
-
-          <Button onClick={() => setCreateModalOpen(true)} className="bg-teal-600 hover:bg-teal-700 text-white gap-2 font-bold">
-            <Plus className="h-4 w-4" /> Create Notice
-          </Button>
-        </div>
-
-        {/* NOTICES LIST */}
-        <Card className="border-border shadow-xs">
-          <CardHeader>
-            <CardTitle className="text-lg">Active Announcements ({notices.length})</CardTitle>
-            <CardDescription>All broadcasted communications displayed on the tenant mobile app.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="py-12 text-center text-sm text-muted-foreground">Loading property notices...</div>
-            ) : notices.length === 0 ? (
-              <div className="py-12 text-center space-y-3">
-                <Bell className="h-10 w-10 text-muted-foreground mx-auto" />
-                <p className="text-sm text-muted-foreground">No active notices broadcasted yet.</p>
-                <Button variant="outline" onClick={() => setCreateModalOpen(true)}>
-                  Publish First Notice
-                </Button>
+        ) : (
+          <div className="bg-white rounded-md border border-[var(--gray-200)] p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-[var(--gray-200)] pb-4">
+              <div>
+                <h2 className="text-base font-semibold text-[var(--gray-900)]">
+                  Active Announcements
+                </h2>
+                <p className="text-xs text-[var(--gray-500)] mt-0.5">
+                  Notices currently visible on the tenant mobile app ({notices.length})
+                </p>
               </div>
+            </div>
+
+            {isLoading ? (
+              <div className="py-12 text-center text-sm text-[var(--gray-500)]">
+                Loading property notices...
+              </div>
+            ) : notices.length === 0 ? (
+              <EmptyState
+                icon={<Bell className="h-10 w-10 text-[var(--gray-400)]" />}
+                title="No active notices"
+                description="When you publish announcements, tenants will see them on their app."
+                action={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCreateModalOpen(true)}
+                    className="border-[var(--gray-300)]"
+                  >
+                    Publish first notice
+                  </Button>
+                }
+              />
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {notices.map((notice: any, idx: number) => {
                   const noticeId = notice.id || notice._id || String(idx);
-                  const isHighPriority = notice.priority === "high";
+                  const isHighPriority = String(notice.priority).toLowerCase() === "high";
 
                   return (
                     <div
                       key={noticeId}
-                      className={`rounded-xl p-4 border transition-all ${
-                        isHighPriority
-                          ? "bg-amber-50/40 border-amber-300"
-                          : "bg-slate-50/60 border-slate-200"
-                      }`}
+                      className="p-4 rounded-md border border-[var(--gray-200)] bg-white hover:border-[var(--gray-300)] transition-colors"
                     >
                       <div className="flex items-start justify-between gap-4">
-                        <div className="space-y-1.5 flex-1">
+                        <div className="space-y-2 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-bold text-foreground text-base">{notice.title}</h3>
-                            <Badge
-                              variant="outline"
-                              className={
-                                isHighPriority
-                                  ? "bg-amber-100 text-amber-900 border-amber-300 font-bold"
-                                  : "bg-teal-100 text-teal-800 border-teal-200"
-                              }
-                            >
+                            <h3 className="text-sm font-semibold text-[var(--gray-900)]">
+                              {notice.title}
+                            </h3>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--gray-100)] text-[var(--gray-700)] border border-[var(--gray-200)] capitalize">
                               {notice.category || "General"}
-                            </Badge>
+                            </span>
                             {isHighPriority && (
-                              <Badge className="bg-red-600 text-white font-bold text-[10px]">High Priority</Badge>
+                              <StatusBadge label="High Priority" tone="error" size="sm" />
                             )}
                           </div>
-                          <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{notice.message}</p>
+                          <p className="text-sm text-[var(--gray-700)] leading-relaxed whitespace-pre-wrap">
+                            {notice.message}
+                          </p>
 
-                          <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2">
+                          <div className="flex items-center gap-4 text-xs text-[var(--gray-500)] pt-1">
                             {notice.createdAt && (
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3.5 w-3.5" /> Published {new Date(notice.createdAt).toLocaleDateString()}
+                              <span className="flex items-center gap-1.5 tabular-nums">
+                                <Clock className="h-3.5 w-3.5 text-[var(--gray-400)]" />
+                                Published {formatDate(notice.createdAt)}
                               </span>
                             )}
                             {notice.expiresAt && (
-                              <span className="flex items-center gap-1 text-amber-700 font-medium">
-                                <Calendar className="h-3.5 w-3.5" /> Expires {new Date(notice.expiresAt).toLocaleDateString()}
+                              <span className="flex items-center gap-1.5 text-[var(--warning)] tabular-nums">
+                                <Calendar className="h-3.5 w-3.5" />
+                                Expires {formatDate(notice.expiresAt)}
                               </span>
                             )}
                           </div>
@@ -167,8 +188,9 @@ export default function PropertyNoticesPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="text-slate-400 hover:text-red-600 shrink-0"
+                          className="text-[var(--gray-400)] hover:text-[#B42318] hover:bg-[#FEF1F0] shrink-0 h-8 w-8"
                           onClick={() => deleteNoticeMutation.mutate(noticeId)}
+                          aria-label="Delete notice"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -178,66 +200,106 @@ export default function PropertyNoticesPage() {
                 })}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        )}
 
-        {/* CREATE NOTICE MODAL */}
+        {/* Create Notice Dialog */}
         <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="sm:max-w-lg p-6 space-y-4">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-teal-700 font-bold">
-                <Megaphone className="h-5 w-5" /> Publish New Notice
+              <DialogTitle className="text-base font-semibold text-[var(--gray-900)] flex items-center gap-2">
+                <Megaphone className="h-5 w-5 text-[var(--brand-600)]" />
+                Publish Announcement
               </DialogTitle>
             </DialogHeader>
 
             <div className="space-y-4 py-2">
               <div className="space-y-1.5">
-                <Label>Title</Label>
-                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Water Supply Interruption Tomorrow" />
+                <Label className="text-xs font-medium text-[var(--gray-700)]">
+                  Title <span className="text-[#B42318]">*</span>
+                </Label>
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g. Water tank cleaning tomorrow"
+                  className="h-9 text-sm"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Category</Label>
+                  <Label className="text-xs font-medium text-[var(--gray-700)]">Category</Label>
                   <Select value={category} onValueChange={setCategory}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="maintenance">Maintenance</SelectItem>
                       <SelectItem value="emergency">Emergency</SelectItem>
-                      <SelectItem value="event">Event / Gathering</SelectItem>
-                      <SelectItem value="general">General Update</SelectItem>
+                      <SelectItem value="event">Event</SelectItem>
+                      <SelectItem value="general">General</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label>Priority</Label>
+                  <Label className="text-xs font-medium text-[var(--gray-700)]">Priority</Label>
                   <Select value={priority} onValueChange={setPriority}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="high">🔥 High</SelectItem>
-                      <SelectItem value="medium">⚡ Medium</SelectItem>
-                      <SelectItem value="low">ℹ️ Normal</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="low">Low</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <Label>Notice Message</Label>
-                <Textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={4} placeholder="Type announcement details for tenants..." />
+                <Label className="text-xs font-medium text-[var(--gray-700)]">
+                  Notice Message <span className="text-[#B42318]">*</span>
+                </Label>
+                <Textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  rows={4}
+                  placeholder="Type the message for tenants..."
+                  className="text-sm"
+                />
               </div>
 
               <div className="space-y-1.5">
-                <Label>Expiry Date (Optional)</Label>
-                <Input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+                <Label className="text-xs font-medium text-[var(--gray-700)]">
+                  Expiry Date (optional)
+                </Label>
+                <Input
+                  type="date"
+                  value={expiresAt}
+                  onChange={(e) => setExpiresAt(e.target.value)}
+                  className="h-9 text-sm"
+                />
               </div>
             </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setCreateModalOpen(false)}>Cancel</Button>
-              <Button className="bg-teal-600 hover:bg-teal-700 text-white font-bold gap-1.5" onClick={() => createNoticeMutation.mutate()} disabled={createNoticeMutation.isPending || !title.trim() || !message.trim()}>
-                <Send className="h-4 w-4" /> Publish Announcement
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCreateModalOpen(false)}
+                className="border-[var(--gray-300)]"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white font-medium gap-1.5"
+                onClick={() => createNoticeMutation.mutate()}
+                disabled={createNoticeMutation.isPending || !title.trim() || !message.trim()}
+              >
+                <Send className="h-4 w-4" />
+                {createNoticeMutation.isPending ? "Publishing..." : "Publish Announcement"}
               </Button>
             </DialogFooter>
           </DialogContent>

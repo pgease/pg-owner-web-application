@@ -116,6 +116,7 @@ const App = () => (
                         <Route path="/my-pgs/restrictions" element={<RestrictionsPage />} />
                         <Route path="/my-pgs/wifi" element={<WifiManagementPage />} />
                         <Route path="/my-pgs/notices" element={<PropertyNoticesPage />} />
+                        <Route path="/notices" element={<Navigate to="/my-pgs/notices" replace />} />
                         <Route path="/my-pgs/rooms" element={<Structure />} />
                         <Route path="/my-pgs/bank" element={<BankAccountPage />} />
                         <Route path="/bank" element={<BankAccountPage />} />

@@ -1,19 +1,17 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Clock,
   Calendar,
-  User,
   Plus,
-  Search,
   AlertCircle,
   Edit2,
   ExternalLink,
   Loader2,
-  BedDouble,
   XCircle,
   UserMinus,
+  Building2,
 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import {
@@ -24,11 +22,9 @@ import {
   queryKeys,
 } from "@/hooks/usePropertyOwnerQueries";
 import { FeatureGuard } from "@/components/common/FeatureGuard";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableHeader,
@@ -64,6 +60,13 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import type { PropertyTenant } from "@/api/propertyOwner";
+import { PageHeader } from "@/components/common/PageHeader";
+import { MetricDisplay } from "@/components/common/MetricDisplay";
+import { SearchInput } from "@/components/common/SearchInput";
+import { StatusBadge } from "@/components/common/StatusBadge";
+import { ActionMenu } from "@/components/common/ActionMenu";
+import { EmptyState } from "@/components/common/EmptyState";
+import { formatINR, formatDate } from "@/lib/formatters";
 
 export default function NoticePeriodPage() {
   const navigate = useNavigate();
@@ -226,7 +229,7 @@ export default function NoticePeriodPage() {
       });
 
       toast({
-        title: "Notice Period Initiated 🚪",
+        title: "Notice Period Initiated",
         description: `Move-out scheduled for ${targetTenant.name} on ${initiateForm.expectedMoveOutDate}.`,
       });
 
@@ -276,7 +279,7 @@ export default function NoticePeriodPage() {
       });
 
       toast({
-        title: "Move-Out Date Updated 📅",
+        title: "Move-Out Date Updated",
         description: `New scheduled vacate date is ${extendForm.expectedMoveOutDate}.`,
       });
 
@@ -321,7 +324,7 @@ export default function NoticePeriodPage() {
         },
       });
       toast({
-        title: "Tenant Move-Out Completed 🚪",
+        title: "Tenant Move-Out Completed",
         description: `${selectedTenant.name} has moved out. The bed is now freed and recurring rent invoicing is halted.`,
       });
       setMoveOutModalOpen(false);
@@ -367,621 +370,591 @@ export default function NoticePeriodPage() {
       fallbackTitle="Notice Period is Locked"
       fallbackDescription="Notice Period Tracking is a premium capability not currently enabled on your subscription plan. Please enable it in the Admin Panel or upgrade your plan to unlock."
     >
-      <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6 pb-20 animate-in fade-in duration-300">
+      <div className="space-y-6">
         {/* Top Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-page-title flex items-center gap-2.5">
-            <Clock className="h-6 w-6 text-primary" /> Notice Period
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Track move-out notices, monitor checkout timelines, and plan upcoming bed availability for{" "}
-            <span className="font-semibold text-foreground">
-              {currentProperty?.name || "current PG"}
-            </span>
-            .
-          </p>
-        </div>
-        <Button
-          onClick={() => setInitiateModalOpen(true)}
-          className="bg-amber-600 hover:bg-amber-700 text-white gap-2 shadow-sm shrink-0"
-        >
-          <Plus className="h-4 w-4" /> Record Move-Out Notice
-        </Button>
-      </div>
+        <PageHeader
+          title="Notice Period"
+          description={`Track move-out notices, checkout timelines, and plan upcoming bed turnover for ${currentProperty?.name || "your PG"}.`}
+          action={
+            <Button
+              onClick={() => setInitiateModalOpen(true)}
+              className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white gap-2 font-medium"
+            >
+              <Plus className="h-4 w-4" /> Record move-out notice
+            </Button>
+          }
+        />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-border/60 shadow-sm bg-gradient-to-br from-amber-500/5 via-transparent to-transparent">
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-              Active Notices
-              <Clock className="h-4 w-4 text-amber-500" />
-            </CardDescription>
-            <CardTitle className="text-3xl font-black text-amber-600 dark:text-amber-400">
-              {activeNoticeCount}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs text-muted-foreground">
-            Tenants currently serving checkout notices
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/60 shadow-sm bg-gradient-to-br from-rose-500/5 via-transparent to-transparent">
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-              Leaving Soon (≤ 7 Days)
-              <AlertCircle className="h-4 w-4 text-rose-500" />
-            </CardDescription>
-            <CardTitle className="text-3xl font-black text-rose-600 dark:text-rose-400">
-              {urgentCount}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs text-muted-foreground">
-            Urgent move-outs requiring checkout inspection
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/60 shadow-sm bg-gradient-to-br from-teal-500/5 via-transparent to-transparent">
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-              Vacating This Month
-              <Calendar className="h-4 w-4 text-teal-500" />
-            </CardDescription>
-            <CardTitle className="text-3xl font-black text-teal-600 dark:text-teal-400">
-              {leavingThisMonthCount}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs text-muted-foreground">
-            Beds ready for new tenant onboarding
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/60 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-              Total Property Residents
-              <User className="h-4 w-4 text-indigo-500" />
-            </CardDescription>
-            <CardTitle className="text-3xl font-black text-foreground">
-              {tenants.length}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-xs text-muted-foreground">
-            Active occupancies in {currentProperty?.name || "PG"}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main Notice List Card */}
-      <Card className="border-border/60 shadow-sm overflow-hidden">
-        <CardHeader className="p-5 border-b bg-muted/10 space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            {/* Filter Tabs */}
-            <div className="flex items-center gap-1.5 p-1 bg-muted rounded-lg w-fit">
-              <button
-                onClick={() => setActiveTab("active")}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                  activeTab === "active"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Active Notices ({activeNoticeCount})
-              </button>
-              <button
-                onClick={() => setActiveTab("urgent")}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                  activeTab === "urgent"
-                    ? "bg-background text-foreground shadow-sm text-rose-600 dark:text-rose-400"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Urgent ≤ 7 Days ({urgentCount})
-              </button>
-              <button
-                onClick={() => setActiveTab("all")}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                  activeTab === "all"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                All Residents ({tenants.length})
-              </button>
-            </div>
-
-            {/* Search Box */}
-            <div className="relative w-full md:w-72">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search name, room, phone..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-9 text-xs"
+        {!currentPropertyId ? (
+          <div className="bg-white rounded-md border border-[var(--gray-200)] p-8">
+            <EmptyState
+              icon={<Building2 className="h-10 w-10 text-[var(--gray-400)]" />}
+              title="Select a property"
+              description="Choose a PG from the switcher in the top bar to track notices."
+            />
+          </div>
+        ) : (
+          <>
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <MetricDisplay
+                label="Active Notices"
+                value={activeNoticeCount}
+                hint="Tenants serving checkout notice"
+                tone={activeNoticeCount > 0 ? "warning" : "neutral"}
+              />
+              <MetricDisplay
+                label="Leaving Soon"
+                value={urgentCount}
+                hint="Vacating within 7 days"
+                tone={urgentCount > 0 ? "error" : "neutral"}
+              />
+              <MetricDisplay
+                label="Vacating This Month"
+                value={leavingThisMonthCount}
+                hint="Beds freeing within 30 days"
+                tone="neutral"
+              />
+              <MetricDisplay
+                label="Total Residents"
+                value={tenants.length}
+                hint="Active occupants in PG"
+                tone="neutral"
               />
             </div>
-          </div>
-        </CardHeader>
 
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-2">
-              <Loader2 className="h-7 w-7 animate-spin text-amber-600" />
-              <p className="text-xs text-muted-foreground">Loading notice period records...</p>
-            </div>
-          ) : filteredTenants.length === 0 ? (
-            <div className="p-12 text-center space-y-3">
-              <div className="h-12 w-12 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center mx-auto">
-                <Clock className="h-6 w-6" />
+            {/* Main Notice List Card */}
+            <div className="bg-white rounded-md border border-[var(--gray-200)] space-y-4 p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--gray-200)] pb-3">
+                {/* Filter Tabs */}
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("active")}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                      activeTab === "active"
+                        ? "bg-[var(--brand-50)] text-[var(--brand-700)] font-semibold"
+                        : "text-[var(--gray-600)] hover:text-[var(--gray-900)] hover:bg-[var(--gray-100)]"
+                    }`}
+                  >
+                    Active notices ({activeNoticeCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("urgent")}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                      activeTab === "urgent"
+                        ? "bg-[#FEF1F0] text-[#B42318] font-semibold"
+                        : "text-[var(--gray-600)] hover:text-[var(--gray-900)] hover:bg-[var(--gray-100)]"
+                    }`}
+                  >
+                    Urgent ≤ 7 days ({urgentCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("all")}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                      activeTab === "all"
+                        ? "bg-[var(--brand-50)] text-[var(--brand-700)] font-semibold"
+                        : "text-[var(--gray-600)] hover:text-[var(--gray-900)] hover:bg-[var(--gray-100)]"
+                    }`}
+                  >
+                    All residents ({tenants.length})
+                  </button>
+                </div>
+
+                {/* Search Box */}
+                <div className="w-full sm:w-72">
+                  <SearchInput
+                    placeholder="Search name, room, phone..."
+                    value={search}
+                    onChange={setSearch}
+                  />
+                </div>
               </div>
-              <div className="space-y-1">
-                <h4 className="text-sm font-semibold text-foreground">
-                  {activeTab === "active"
-                    ? "No tenants currently on notice"
-                    : activeTab === "urgent"
-                    ? "No urgent move-outs in the next 7 days"
-                    : "No matching residents found"}
-                </h4>
-                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                  {activeTab === "active"
-                    ? "When a tenant submits their move-out intention, record it here to track checkout dates and manage turnover."
-                    : "Try broadening your search or switching to another filter."}
-                </p>
-              </div>
-              {activeTab === "active" && (
-                <Button
-                  size="sm"
-                  onClick={() => setInitiateModalOpen(true)}
-                  className="bg-amber-600 hover:bg-amber-700 text-white gap-1.5 h-8 mt-2"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Record Move-Out Notice
-                </Button>
+
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-2 text-sm text-[var(--gray-500)]">
+                  <Loader2 className="h-6 w-6 animate-spin text-[var(--brand-600)]" />
+                  Loading notice records...
+                </div>
+              ) : filteredTenants.length === 0 ? (
+                <EmptyState
+                  icon={<Clock className="h-10 w-10 text-[var(--gray-400)]" />}
+                  title={
+                    activeTab === "active"
+                      ? "No tenants currently on notice"
+                      : activeTab === "urgent"
+                      ? "No urgent move-outs in the next 7 days"
+                      : "No matching residents found"
+                  }
+                  description={
+                    activeTab === "active"
+                      ? "When a tenant gives notice to vacate, record it here to track checkout dates and plan bed turnover."
+                      : "Try changing the tab or clearing the search query."
+                  }
+                  action={
+                    activeTab === "active" ? (
+                      <Button
+                        size="sm"
+                        onClick={() => setInitiateModalOpen(true)}
+                        className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white"
+                      >
+                        <Plus className="h-4 w-4 mr-1.5" /> Record move-out notice
+                      </Button>
+                    ) : undefined
+                  }
+                />
+              ) : (
+                <div className="overflow-x-auto rounded border border-[var(--gray-200)]">
+                  <Table>
+                    <TableHeader className="bg-[var(--gray-100)] text-xs text-[var(--gray-600)]">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="py-2.5 px-3">Tenant</TableHead>
+                        <TableHead className="py-2.5 px-3">Room & Bed</TableHead>
+                        <TableHead className="py-2.5 px-3">Notice Served</TableHead>
+                        <TableHead className="py-2.5 px-3">Scheduled Move-Out</TableHead>
+                        <TableHead className="py-2.5 px-3">Timeline</TableHead>
+                        <TableHead className="py-2.5 px-3">Rent / Deposit</TableHead>
+                        <TableHead className="py-2.5 px-3 text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredTenants.map((t) => {
+                        const roomNumber = t.roomNumber || t.roomNo || t.room?.roomNumber || "—";
+                        const bedNumber = t.bedNo || t.bed?.bedNumber || "Bed 1";
+                        const noticeDate = t.computedNoticeStartedAt
+                          ? formatDate(t.computedNoticeStartedAt)
+                          : "—";
+
+                        const vacateDate = t.computedVacateOn
+                          ? formatDate(t.computedVacateOn)
+                          : "—";
+
+                        const daysLeft = t.computedDaysRemaining;
+
+                        return (
+                          <TableRow key={t.id} className="hover:bg-[var(--gray-50)] transition-colors">
+                            {/* Tenant Column */}
+                            <TableCell className="py-2.5 px-3 whitespace-nowrap">
+                              <div>
+                                <div
+                                  className="text-sm font-medium text-[var(--gray-900)] hover:text-[var(--brand-600)] cursor-pointer flex items-center gap-1"
+                                  onClick={() => navigate(`/tenants/${t.id}`)}
+                                >
+                                  {t.name}
+                                  <ExternalLink className="h-3 w-3 text-[var(--gray-400)]" />
+                                </div>
+                                <div className="text-xs text-[var(--gray-500)]">
+                                  {t.phone || t.mobileNumber}
+                                </div>
+                              </div>
+                            </TableCell>
+
+                            {/* Room & Bed */}
+                            <TableCell className="py-2.5 px-3 whitespace-nowrap">
+                              <div className="text-sm font-medium text-[var(--gray-900)]">
+                                Room {roomNumber}
+                              </div>
+                              <div className="text-xs text-[var(--gray-500)]">
+                                {bedNumber} {t.floor ? `· ${t.floor}` : ""}
+                              </div>
+                            </TableCell>
+
+                            {/* Notice Served Date */}
+                            <TableCell className="py-2.5 px-3 text-xs text-[var(--gray-600)] tabular-nums whitespace-nowrap">
+                              {noticeDate}
+                            </TableCell>
+
+                            {/* Scheduled Move Out */}
+                            <TableCell className="py-2.5 px-3 text-xs tabular-nums whitespace-nowrap">
+                              {t.computedVacateOn ? (
+                                <span className="font-semibold text-[var(--gray-900)]">
+                                  {vacateDate}
+                                </span>
+                              ) : (
+                                <span className="text-[var(--gray-400)] italic">Not set</span>
+                              )}
+                            </TableCell>
+
+                            {/* Timeline / Status */}
+                            <TableCell className="py-2.5 px-3 whitespace-nowrap">
+                              {!t.computedIsOnNotice ? (
+                                <StatusBadge label="Active stay" tone="neutral" size="sm" />
+                              ) : daysLeft !== null ? (
+                                daysLeft < 0 ? (
+                                  <StatusBadge
+                                    label={`Overdue (${Math.abs(daysLeft)}d passed)`}
+                                    tone="error"
+                                    size="sm"
+                                  />
+                                ) : daysLeft === 0 ? (
+                                  <StatusBadge label="Vacating today" tone="error" size="sm" />
+                                ) : daysLeft <= 3 ? (
+                                  <StatusBadge
+                                    label={`${daysLeft} days left`}
+                                    tone="error"
+                                    size="sm"
+                                  />
+                                ) : daysLeft <= 7 ? (
+                                  <StatusBadge
+                                    label={`${daysLeft} days left`}
+                                    tone="warning"
+                                    size="sm"
+                                  />
+                                ) : (
+                                  <StatusBadge
+                                    label={`${daysLeft} days left`}
+                                    tone="info"
+                                    size="sm"
+                                  />
+                                )
+                              ) : (
+                                <StatusBadge label="On notice" tone="warning" size="sm" />
+                              )}
+                            </TableCell>
+
+                            {/* Rent & Deposit */}
+                            <TableCell className="py-2.5 px-3 text-xs whitespace-nowrap tabular-nums">
+                              <div className="font-medium text-[var(--gray-900)]">
+                                {formatINR(Number(t.monthlyRent || 0))}/mo
+                              </div>
+                              <div className="text-[11px] text-[var(--gray-500)]">
+                                Deposit: {formatINR(Number(t.securityDeposit || 0))}
+                              </div>
+                            </TableCell>
+
+                            {/* Actions */}
+                            <TableCell className="py-2.5 px-3 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {t.computedIsOnNotice ? (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs px-2.5 text-[#B42318] border-[#F6C7C2] hover:bg-[#FEF1F0]"
+                                      onClick={() => handleOpenMoveOutModal(t)}
+                                    >
+                                      Move out
+                                    </Button>
+                                    <ActionMenu
+                                      items={[
+                                        {
+                                          label: "Extend date",
+                                          icon: <Edit2 className="h-4 w-4" />,
+                                          onClick: () => handleOpenExtendModal(t),
+                                        },
+                                        {
+                                          label: "Cancel notice",
+                                          icon: <XCircle className="h-4 w-4 text-[#B42318]" />,
+                                          onClick: () => handleOpenCancelAlert(t),
+                                        },
+                                        {
+                                          label: "View profile",
+                                          icon: <ExternalLink className="h-4 w-4" />,
+                                          onClick: () => navigate(`/tenants/${t.id}`),
+                                        },
+                                      ]}
+                                    />
+                                  </>
+                                ) : (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs px-2.5 border-[var(--gray-300)]"
+                                      onClick={() => {
+                                        setInitiateForm((prev) => ({
+                                          ...prev,
+                                          tenantId: t.id,
+                                        }));
+                                        setInitiateModalOpen(true);
+                                      }}
+                                    >
+                                      Record notice
+                                    </Button>
+                                    <ActionMenu
+                                      items={[
+                                        {
+                                          label: "View profile",
+                                          icon: <ExternalLink className="h-4 w-4" />,
+                                          onClick: () => navigate(`/tenants/${t.id}`),
+                                        },
+                                      ]}
+                                    />
+                                  </>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/40 text-xs">
-                    <TableHead className="py-3 px-4">Tenant</TableHead>
-                    <TableHead className="py-3 px-4">Room & Bed</TableHead>
-                    <TableHead className="py-3 px-4">Notice Served Date</TableHead>
-                    <TableHead className="py-3 px-4">Scheduled Move-Out</TableHead>
-                    <TableHead className="py-3 px-4">Timeline / Status</TableHead>
-                    <TableHead className="py-3 px-4">Rent & Deposit</TableHead>
-                    <TableHead className="py-3 px-4 text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredTenants.map((t) => {
-                    const roomNumber = t.roomNumber || t.roomNo || t.room?.roomNumber || "—";
-                    const bedNumber = t.bedNo || t.bed?.bedNumber || "Bed 1";
-                    const noticeDate = t.computedNoticeStartedAt
-                      ? new Date(t.computedNoticeStartedAt).toLocaleDateString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })
-                      : "—";
+          </>
+        )}
 
-                    const vacateDate = t.computedVacateOn
-                      ? new Date(t.computedVacateOn).toLocaleDateString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })
-                      : "—";
+        {/* DIALOG 1: RECORD MOVE-OUT NOTICE */}
+        <Dialog open={initiateModalOpen} onOpenChange={setInitiateModalOpen}>
+          <DialogContent className="max-w-md p-6 space-y-4">
+            <DialogHeader>
+              <DialogTitle className="text-base font-semibold text-[var(--gray-900)] flex items-center gap-2">
+                <Clock className="h-5 w-5 text-[var(--brand-600)]" /> Record Move-Out Notice
+              </DialogTitle>
+              <DialogDescription className="text-xs text-[var(--gray-500)]">
+                Schedule checkout for a tenant serving notice. This will update room availability timelines.
+              </DialogDescription>
+            </DialogHeader>
 
-                    const daysLeft = t.computedDaysRemaining;
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-[var(--gray-700)]">
+                  Select Tenant <span className="text-[#B42318]">*</span>
+                </Label>
+                <Select
+                  value={initiateForm.tenantId}
+                  onValueChange={(val) => setInitiateForm({ ...initiateForm, tenantId: val })}
+                >
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Choose resident..." />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {tenants.map((t) => {
+                      const room = t.roomNumber || t.roomNo || t.room?.roomNumber || "";
+                      return (
+                        <SelectItem key={t.id} value={t.id} className="text-sm">
+                          {t.name} (Room {room || "—"}) · {t.phone}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                    return (
-                      <TableRow key={t.id} className="hover:bg-muted/10 transition-colors">
-                        {/* Tenant Column */}
-                        <TableCell className="py-3.5 px-4 whitespace-nowrap">
-                          <div className="flex items-center gap-3">
-                            <div className="h-9 w-9 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 font-bold flex items-center justify-center text-xs shrink-0 border border-amber-500/20">
-                              {(t.name || "T")
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")
-                                .slice(0, 2)
-                                .toUpperCase()}
-                            </div>
-                            <div>
-                              <div
-                                className="text-xs font-bold text-foreground hover:text-amber-600 transition-colors cursor-pointer flex items-center gap-1.5"
-                                onClick={() => navigate(`/tenants/${t.id}`)}
-                              >
-                                {t.name}
-                                <ExternalLink className="h-3 w-3 text-muted-foreground opacity-60" />
-                              </div>
-                              <div className="text-[11px] text-muted-foreground">
-                                {t.phone || t.mobileNumber}
-                              </div>
-                            </div>
-                          </div>
-                        </TableCell>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-[var(--gray-700)]">
+                    Notice Given Date
+                  </Label>
+                  <Input
+                    type="date"
+                    value={initiateForm.noticeGivenAt}
+                    onChange={(e) => setInitiateForm({ ...initiateForm, noticeGivenAt: e.target.value })}
+                    className="h-9 text-sm"
+                  />
+                </div>
 
-                        {/* Room & Bed */}
-                        <TableCell className="py-3.5 px-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <BedDouble className="h-4 w-4 text-muted-foreground" />
-                            <div>
-                              <span className="text-xs font-semibold text-foreground">
-                                Room {roomNumber}
-                              </span>
-                              <span className="text-[11px] text-muted-foreground block">
-                                {bedNumber} {t.floor ? `• ${t.floor}` : ""}
-                              </span>
-                            </div>
-                          </div>
-                        </TableCell>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-[var(--gray-700)]">
+                    Expected Vacate Date
+                  </Label>
+                  <Input
+                    type="date"
+                    value={initiateForm.expectedMoveOutDate}
+                    onChange={(e) => setInitiateForm({ ...initiateForm, expectedMoveOutDate: e.target.value })}
+                    className="h-9 text-sm"
+                  />
+                </div>
+              </div>
 
-                        {/* Notice Served Date */}
-                        <TableCell className="py-3.5 px-4 text-xs whitespace-nowrap">
-                          <div className="font-medium text-muted-foreground flex items-center gap-1.5">
-                            <Calendar className="h-3.5 w-3.5 text-muted-foreground/70" />
-                            {noticeDate}
-                          </div>
-                        </TableCell>
-
-                        {/* Scheduled Move Out */}
-                        <TableCell className="py-3.5 px-4 text-xs whitespace-nowrap">
-                          {t.computedVacateOn ? (
-                            <div className="font-bold text-foreground flex items-center gap-1.5">
-                              <Clock className="h-3.5 w-3.5 text-amber-500" />
-                              {vacateDate}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground italic">Not Set</span>
-                          )}
-                        </TableCell>
-
-                        {/* Timeline / Status */}
-                        <TableCell className="py-3.5 px-4 whitespace-nowrap">
-                          {!t.computedIsOnNotice ? (
-                            <Badge variant="outline" className="text-[10px] text-muted-foreground">
-                              Active Residency
-                            </Badge>
-                          ) : daysLeft !== null ? (
-                            daysLeft < 0 ? (
-                              <Badge variant="destructive" className="text-[10px] gap-1">
-                                <AlertCircle className="h-3 w-3" />
-                                Overdue ({Math.abs(daysLeft)}d passed)
-                              </Badge>
-                            ) : daysLeft === 0 ? (
-                              <Badge className="bg-rose-600 text-white text-[10px] gap-1 animate-pulse">
-                                <AlertCircle className="h-3 w-3" />
-                                Vacating Today!
-                              </Badge>
-                            ) : daysLeft <= 3 ? (
-                              <Badge className="bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-300 text-[10px] gap-1">
-                                <AlertCircle className="h-3 w-3" />
-                                {daysLeft} Days Left
-                              </Badge>
-                            ) : daysLeft <= 7 ? (
-                              <Badge className="bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-300 text-[10px] gap-1">
-                                <Clock className="h-3 w-3" />
-                                {daysLeft} Days Left
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-teal-700 dark:text-teal-400 border-teal-300 text-[10px] gap-1">
-                                <Calendar className="h-3 w-3" />
-                                {daysLeft} Days Left
-                              </Badge>
-                            )
-                          ) : (
-                            <Badge className="bg-amber-100 text-amber-800 text-[10px]">
-                              On Notice
-                            </Badge>
-                          )}
-                        </TableCell>
-
-                        {/* Rent & Deposit */}
-                        <TableCell className="py-3.5 px-4 text-xs whitespace-nowrap">
-                          <div className="font-semibold text-foreground">
-                            ₹{Number(t.monthlyRent || 0).toLocaleString("en-IN")}/mo
-                          </div>
-                          <div className="text-[11px] text-muted-foreground">
-                            Deposit: ₹{Number(t.securityDeposit || 0).toLocaleString("en-IN")}
-                          </div>
-                        </TableCell>
-
-                        {/* Actions */}
-                        <TableCell className="py-3.5 px-4 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {t.computedIsOnNotice ? (
-                              <>
-                                <Button
-                                  size="sm"
-                                  className="h-7 text-xs px-2.5 gap-1 bg-rose-600 hover:bg-rose-700 text-white font-semibold shadow-2xs"
-                                  onClick={() => handleOpenMoveOutModal(t)}
-                                >
-                                  <UserMinus className="h-3 w-3" /> Move Out
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 text-xs px-2 gap-1"
-                                  onClick={() => handleOpenExtendModal(t)}
-                                >
-                                  <Edit2 className="h-3 w-3" /> Extend Date
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 text-xs px-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 gap-1"
-                                  onClick={() => handleOpenCancelAlert(t)}
-                                >
-                                  <XCircle className="h-3 w-3" /> Cancel
-                                </Button>
-                              </>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 text-xs px-2 gap-1 text-amber-600 border-amber-300 hover:bg-amber-50"
-                                onClick={() => {
-                                  setInitiateForm((prev) => ({
-                                    ...prev,
-                                    tenantId: t.id,
-                                  }));
-                                  setInitiateModalOpen(true);
-                                }}
-                              >
-                                <Plus className="h-3 w-3" /> Set Notice
-                              </Button>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 w-7 p-0"
-                              onClick={() => navigate(`/tenants/${t.id}`)}
-                            >
-                              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-[var(--gray-700)]">
+                  Reason / Move-out Notes
+                </Label>
+                <Input
+                  placeholder="e.g. Job transfer, relocation, personal reasons"
+                  value={initiateForm.reason}
+                  onChange={(e) => setInitiateForm({ ...initiateForm, reason: e.target.value })}
+                  className="h-9 text-sm"
+                />
+              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* DIALOG 1: RECORD MOVE-OUT NOTICE */}
-      <Dialog open={initiateModalOpen} onOpenChange={setInitiateModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-amber-500" /> Record Move-Out Notice
-            </DialogTitle>
-            <DialogDescription>
-              Schedule checkout for a tenant serving notice. This will update room availability timelines.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-3">
-            <div className="space-y-1.5">
-              <Label>Select Tenant</Label>
-              <Select
-                value={initiateForm.tenantId}
-                onValueChange={(val) => setInitiateForm({ ...initiateForm, tenantId: val })}
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setInitiateModalOpen(false)}
+                className="border-[var(--gray-300)]"
               >
-                <SelectTrigger className="text-xs">
-                  <SelectValue placeholder="Choose resident..." />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {tenants.map((t) => {
-                    const room = t.roomNumber || t.roomNo || t.room?.roomNumber || "";
-                    return (
-                      <SelectItem key={t.id} value={t.id} className="text-xs">
-                        {t.name} (Room {room || "—"}) • {t.phone}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white"
+                disabled={setNoticeMut.isPending}
+                onClick={handleInitiateNotice}
+              >
+                {setNoticeMut.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                ) : null}
+                Confirm Notice
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-            <div className="grid grid-cols-2 gap-3">
+        {/* DIALOG 2: EXTEND / UPDATE MOVE-OUT DATE */}
+        <Dialog open={extendModalOpen} onOpenChange={setExtendModalOpen}>
+          <DialogContent className="max-w-md p-6 space-y-4">
+            <DialogHeader>
+              <DialogTitle className="text-base font-semibold text-[var(--gray-900)] flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-[var(--brand-600)]" /> Extend Scheduled Move-Out
+              </DialogTitle>
+              <DialogDescription className="text-xs text-[var(--gray-500)]">
+                Update the expected checkout date for{" "}
+                <span className="font-semibold text-[var(--gray-900)]">{selectedTenant?.name}</span>.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2">
               <div className="space-y-1.5">
-                <Label>Notice Given Date</Label>
+                <Label className="text-xs font-medium text-[var(--gray-700)]">
+                  New Scheduled Vacate Date
+                </Label>
                 <Input
                   type="date"
-                  value={initiateForm.noticeGivenAt}
-                  onChange={(e) => setInitiateForm({ ...initiateForm, noticeGivenAt: e.target.value })}
-                  className="text-xs"
+                  value={extendForm.expectedMoveOutDate}
+                  onChange={(e) => setExtendForm({ ...extendForm, expectedMoveOutDate: e.target.value })}
+                  className="h-9 text-sm"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <Label>Expected Vacate Date</Label>
+                <Label className="text-xs font-medium text-[var(--gray-700)]">
+                  Reason for Extension
+                </Label>
                 <Input
-                  type="date"
-                  value={initiateForm.expectedMoveOutDate}
-                  onChange={(e) => setInitiateForm({ ...initiateForm, expectedMoveOutDate: e.target.value })}
-                  className="text-xs"
+                  placeholder="e.g. Extended stay approved for 15 days"
+                  value={extendForm.reason}
+                  onChange={(e) => setExtendForm({ ...extendForm, reason: e.target.value })}
+                  className="h-9 text-sm"
                 />
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label>Reason / Move-out Notes</Label>
-              <Input
-                placeholder="e.g. Job transfer, relocation, personal reasons"
-                value={initiateForm.reason}
-                onChange={(e) => setInitiateForm({ ...initiateForm, reason: e.target.value })}
-                className="text-xs"
-              />
-            </div>
-          </div>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setExtendModalOpen(false)}
+                className="border-[var(--gray-300)]"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white"
+                disabled={setNoticeMut.isPending}
+                onClick={handleUpdateNoticeDate}
+              >
+                {setNoticeMut.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                ) : null}
+                Save New Date
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setInitiateModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              className="bg-amber-600 hover:bg-amber-700 text-white"
-              disabled={setNoticeMut.isPending}
-              onClick={handleInitiateNotice}
-            >
-              {setNoticeMut.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
-              ) : null}
-              Confirm Notice
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        {/* ALERT DIALOG: CANCEL NOTICE PERIOD */}
+        <AlertDialog open={cancelAlertOpen} onOpenChange={setCancelAlertOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Cancel Move-Out Notice?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to cancel the move-out notice for{" "}
+                <span className="font-semibold text-foreground">{selectedTenant?.name}</span>?
+                Their status will be restored to regular active residency, and room availability will be marked occupied.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep Notice</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-[#B42318] hover:bg-[#912018] text-white"
+                onClick={handleConfirmCancelNotice}
+              >
+                Confirm Cancel
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-      {/* DIALOG 2: EXTEND / UPDATE MOVE-OUT DATE */}
-      <Dialog open={extendModalOpen} onOpenChange={setExtendModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-amber-500" /> Extend Scheduled Move-Out
-            </DialogTitle>
-            <DialogDescription>
-              Update the expected checkout date for{" "}
-              <span className="font-semibold text-foreground">{selectedTenant?.name}</span>.
-            </DialogDescription>
-          </DialogHeader>
+        {/* MODAL: COMPLETE MOVE-OUT */}
+        <Dialog open={moveOutModalOpen} onOpenChange={setMoveOutModalOpen}>
+          <DialogContent className="max-w-md p-6 space-y-4">
+            <DialogHeader>
+              <DialogTitle className="text-base font-semibold text-[#B42318] flex items-center gap-2">
+                <UserMinus className="h-5 w-5" /> Complete Move-Out & Free Bed
+              </DialogTitle>
+              <DialogDescription className="text-xs text-[var(--gray-500)]">
+                Finalize departure for <strong className="text-[var(--gray-900)]">{selectedTenant?.name}</strong>. This will free the allocated bed and halt recurring rent generation.
+              </DialogDescription>
+            </DialogHeader>
 
-          <div className="space-y-4 py-3">
-            <div className="space-y-1.5">
-              <Label>New Scheduled Vacate Date</Label>
-              <Input
-                type="date"
-                value={extendForm.expectedMoveOutDate}
-                onChange={(e) => setExtendForm({ ...extendForm, expectedMoveOutDate: e.target.value })}
-                className="text-xs"
-              />
-            </div>
+            <div className="space-y-4 py-2 text-xs">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-[var(--gray-700)]">Actual Move-Out Date *</Label>
+                <Input
+                  type="date"
+                  value={moveOutDate}
+                  onChange={(e) => setMoveOutDate(e.target.value)}
+                  className="h-9 text-sm"
+                />
+              </div>
 
-            <div className="space-y-1.5">
-              <Label>Reason for Extension</Label>
-              <Input
-                placeholder="e.g. Extended stay approved for 15 days"
-                value={extendForm.reason}
-                onChange={(e) => setExtendForm({ ...extendForm, reason: e.target.value })}
-                className="text-xs"
-              />
-            </div>
-          </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-[var(--gray-700)]">Departure Reason</Label>
+                <Input
+                  value={moveOutReason}
+                  onChange={(e) => setMoveOutReason(e.target.value)}
+                  placeholder="e.g. Completed 30-day notice, relocated"
+                  className="h-9 text-sm"
+                />
+              </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setExtendModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              className="bg-teal-600 hover:bg-teal-700 text-white"
-              disabled={setNoticeMut.isPending}
-              onClick={handleUpdateNoticeDate}
-            >
-              {setNoticeMut.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
-              ) : null}
-              Save New Date
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-[var(--gray-700)]">Remarks (optional)</Label>
+                <Input
+                  value={moveOutRemarks}
+                  onChange={(e) => setMoveOutRemarks(e.target.value)}
+                  placeholder="e.g. Keys returned, security deposit settled"
+                  className="h-9 text-sm"
+                />
+              </div>
 
-      {/* ALERT DIALOG: CANCEL NOTICE PERIOD */}
-      <AlertDialog open={cancelAlertOpen} onOpenChange={setCancelAlertOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cancel Move-Out Notice?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to cancel the move-out notice for{" "}
-              <span className="font-semibold text-foreground">{selectedTenant?.name}</span>?
-              Their status will be restored to regular active residency, and room availability will be marked occupied.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep Notice</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-rose-600 hover:bg-rose-700 text-white"
-              onClick={handleConfirmCancelNotice}
-            >
-              Confirm Cancel
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* MODAL: COMPLETE MOVE-OUT */}
-      <Dialog open={moveOutModalOpen} onOpenChange={setMoveOutModalOpen}>
-        <DialogContent className="max-w-md rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-base flex items-center gap-2 text-rose-600">
-              <UserMinus className="h-5 w-5" /> Complete Move-Out & Free Bed
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              Finalize departure for <strong className="text-foreground">{selectedTenant?.name}</strong>. This will free the allocated bed and halt recurring rent generation.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2 text-xs">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold">Actual Move-Out Date *</Label>
-              <Input
-                type="date"
-                value={moveOutDate}
-                onChange={(e) => setMoveOutDate(e.target.value)}
-                className="h-9 text-xs rounded-xl"
-              />
+              <div className="p-3 bg-[var(--gray-50)] rounded-md border border-[var(--gray-200)] text-xs text-[var(--gray-600)] flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-[var(--warning)] mt-0.5" />
+                <span>
+                  Moving out frees the bed for new check-ins and stops automatic rent invoicing.
+                </span>
+              </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold">Departure Reason / Notes</Label>
-              <Input
-                value={moveOutReason}
-                onChange={(e) => setMoveOutReason(e.target.value)}
-                placeholder="e.g. Completed 30-day notice, relocated"
-                className="h-9 text-xs rounded-xl"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label className="text-xs font-bold">Remarks (Optional)</Label>
-              <Input
-                value={moveOutRemarks}
-                onChange={(e) => setMoveOutRemarks(e.target.value)}
-                placeholder="e.g. Keys returned, security deposit refunded"
-                className="h-9 text-xs rounded-xl"
-              />
-            </div>
-
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 text-[11px] text-amber-800 dark:text-amber-300 flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
-              <span>
-                Moving out immediately sets tenant status to MOVED_OUT, frees the bed for new check-ins, and stops automatic rent invoicing.
-              </span>
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" size="sm" onClick={() => setMoveOutModalOpen(false)} className="rounded-xl text-xs">
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              className="rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white gap-1.5 shadow-xs"
-              onClick={handleConfirmMoveOut}
-              disabled={moveOutMut.isPending}
-            >
-              {moveOutMut.isPending ? "Processing..." : "Confirm Move-Out & Free Bed"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  </FeatureGuard>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setMoveOutModalOpen(false)}
+                className="border-[var(--gray-300)]"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="bg-[#B42318] hover:bg-[#912018] text-white"
+                onClick={handleConfirmMoveOut}
+                disabled={moveOutMut.isPending}
+              >
+                {moveOutMut.isPending ? "Processing..." : "Confirm Move-Out"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </FeatureGuard>
   );
 }
