@@ -1,19 +1,41 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Receipt, Plus, Search, Trash2, Calendar, IndianRupee, PieChart, Info } from "lucide-react";
+import { Plus, Trash2, AlertTriangle, Building2 } from "lucide-react";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/common/PageHeader";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MetricDisplay } from "@/components/common/MetricDisplay";
+import { SearchInput } from "@/components/common/SearchInput";
+import { StatusBadge } from "@/components/common/StatusBadge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useApp } from "@/context/AppContext";
 import { toast } from "@/components/ui/use-toast";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { CanAccessPage } from "@/components/PermissionGuard";
+import { formatINR, formatDate } from "@/lib/formatters";
 
 interface ExpenseItem {
   id: string;
@@ -24,10 +46,6 @@ interface ExpenseItem {
   expenseDate: string;
 }
 
-/**
- * There is no expenses API yet, so entries are kept on this device (localStorage) per property.
- * This is stated plainly in the UI; nothing is pre-seeded.
- */
 const STORAGE_KEY = "pgease_local_expenses_v1";
 
 function loadExpenses(): ExpenseItem[] {
@@ -40,12 +58,12 @@ function loadExpenses(): ExpenseItem[] {
   }
 }
 
-const CATEGORY_COLORS = {
-  SALARY: "bg-teal-500/10 text-teal-600 border-teal-500/20",
-  ELECTRICITY: "bg-amber-500/10 text-amber-600 border-amber-500/20",
-  FOOD: "bg-orange-500/10 text-orange-600 border-orange-500/20",
-  MAINTENANCE: "bg-indigo-500/10 text-indigo-600 border-indigo-500/20",
-  OTHERS: "bg-slate-500/10 text-slate-600 border-slate-500/20"
+const CATEGORY_LABELS: Record<ExpenseItem["category"], string> = {
+  SALARY: "Staff Salary",
+  ELECTRICITY: "Electricity & Utilities",
+  FOOD: "Food & Dining",
+  MAINTENANCE: "Repairs & Maintenance",
+  OTHERS: "Other Expenses",
 };
 
 const Expenses = () => {
@@ -57,13 +75,13 @@ const Expenses = () => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(allExpenses));
     } catch {
-      /* storage unavailable — keep in memory only */
+      /* storage unavailable */
     }
   }, [allExpenses]);
 
   const expenses = useMemo(
     () => allExpenses.filter((e) => !selectedPgId || e.propertyId === selectedPgId || e.propertyId === "general"),
-    [allExpenses, selectedPgId],
+    [allExpenses, selectedPgId]
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -105,17 +123,17 @@ const Expenses = () => {
       return;
     }
 
-    const newExpense: ExpenseItem = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    const newItem: ExpenseItem = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       propertyId: selectedPgId || "general",
       amount: amt,
       category,
       description: description.trim(),
-      expenseDate: expenseDate || new Date().toISOString().split("T")[0],
+      expenseDate,
     };
 
-    setAllExpenses((prev) => [newExpense, ...prev]);
-    toast({ title: "Expense added", description: `Recorded ₹${amt.toLocaleString("en-IN")} under ${category.charAt(0) + category.slice(1).toLowerCase()}.` });
+    setAllExpenses((prev) => [newItem, ...prev]);
+    toast({ title: "Expense recorded" });
     setAmount("");
     setDescription("");
     setOpen(false);
@@ -129,209 +147,276 @@ const Expenses = () => {
 
   return (
     <CanAccessPage permission="expense_view">
-      <div className="space-y-6 animate-fade-in pb-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <PageHeader title="Expenses" description="Keep a simple record of what you spend on running the PG — salaries, electricity, food, repairs." />
+      <div className="space-y-6">
+        <PageHeader
+          title="Expenses"
+          description="Keep a simple operational register of PG running costs — staff salaries, utility bills, groceries, and repairs."
+          action={
+            <Button
+              onClick={() => setOpen(true)}
+              className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white gap-2 font-medium"
+            >
+              <Plus className="h-4 w-4" /> Record expense
+            </Button>
+          }
+        />
+
+        {/* P0 Bug 9: Prominent Device-only Storage Warning */}
+        <div className="flex items-start gap-3 rounded-md border border-[var(--warning)] bg-[#FFF7E6] p-3 text-xs text-[var(--gray-800)]">
+          <AlertTriangle className="h-4 w-4 text-[var(--warning)] shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <span className="font-semibold text-[#A15C07]">
+              Device-Only Storage Warning
+            </span>
+            <p className="text-[var(--gray-700)] leading-relaxed">
+              Expenses are currently stored locally in your browser cache. They will not appear on other devices or for your staff, and clearing browser history will erase these records. Cloud sync API integration is in development.
+            </p>
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2 shadow-sm shrink-0">
-                <Plus className="h-4 w-4" /> Add Expense
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Record PG Expense</DialogTitle>
-                <DialogDescription>Log operating expenses to maintain your monthly ledger.</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleAddExpense} className="space-y-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="amount">Amount (₹)</Label>
-                  <Input id="amount" type="number" step="any" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="e.g. 1500" required />
+        </div>
+
+        {!selectedPgId ? (
+          <div className="bg-white rounded-md border border-[var(--gray-200)] p-8">
+            <EmptyState
+              icon={<Building2 className="h-10 w-10 text-[var(--gray-400)]" />}
+              title="Select a property"
+              description="Choose a PG from the switcher in the top bar to manage expenses."
+            />
+          </div>
+        ) : (
+          <>
+            {/* Outflow Metrics */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <MetricDisplay
+                label="Total Outflow"
+                value={formatINR(stats.total)}
+                hint={`${filteredExpenses.length} expense entries recorded`}
+                tone={stats.total > 0 ? "error" : "neutral"}
+              />
+              <MetricDisplay
+                label="Salaries"
+                value={formatINR(stats.categoryTotals.SALARY || 0)}
+                hint="Warden & staff compensation"
+                tone="neutral"
+              />
+              <MetricDisplay
+                label="Utilities"
+                value={formatINR(stats.categoryTotals.ELECTRICITY || 0)}
+                hint="Electricity, water & gas bills"
+                tone="neutral"
+              />
+              <MetricDisplay
+                label="Food & Maintenance"
+                value={formatINR((stats.categoryTotals.FOOD || 0) + (stats.categoryTotals.MAINTENANCE || 0))}
+                hint="Mess supplies & repair costs"
+                tone="neutral"
+              />
+            </div>
+
+            {/* Expenses Register Table */}
+            <div className="bg-white rounded-md border border-[var(--gray-200)] p-4 space-y-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-[var(--gray-200)] pb-3">
+                <div className="flex-1 max-w-sm">
+                  <SearchInput
+                    placeholder="Search by description..."
+                    value={searchQuery}
+                    onChange={setSearchQuery}
+                  />
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="category">Category</Label>
-                  <Select value={category} onValueChange={(v) => setCategory(v as ExpenseItem["category"])}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose category" />
+
+                <div className="flex items-center gap-2">
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger className="w-[180px] h-9 text-xs">
+                      <SelectValue placeholder="All categories" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="SALARY">Salary (Staff / Warden)</SelectItem>
+                      <SelectItem value="all">All categories</SelectItem>
+                      <SelectItem value="SALARY">Staff Salary</SelectItem>
                       <SelectItem value="ELECTRICITY">Electricity & Utilities</SelectItem>
-                      <SelectItem value="FOOD">Food & Dining Supplies</SelectItem>
-                      <SelectItem value="MAINTENANCE">Maintenance & Repairs</SelectItem>
-                      <SelectItem value="OTHERS">Others (Internet, Consumables)</SelectItem>
+                      <SelectItem value="FOOD">Food & Dining</SelectItem>
+                      <SelectItem value="MAINTENANCE">Repairs & Maintenance</SelectItem>
+                      <SelectItem value="OTHERS">Other Expenses</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="date">Expense Date</Label>
-                  <Input id="date" type="date" value={expenseDate} onChange={(e) => setExpenseDate(e.target.value)} required />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="desc">Description</Label>
-                  <Input id="desc" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What was this spent on?" required />
-                </div>
-                <DialogFooter className="pt-2">
-                  <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                  <Button type="submit">Save Expense</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <p className="flex items-start gap-2 rounded-md border border-info/30 bg-info/5 px-3 py-2 text-xs text-muted-foreground">
-          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-info" />
-          Expenses are saved on this device only for now. They won't appear on other devices or for your staff.
-        </p>
-
-        {/* Expense Analytics Banner */}
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Card className="border-border/80 shadow-sm bg-rose-50/20 dark:bg-rose-950/10">
-            <CardContent className="p-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-rose-600 dark:text-rose-400">Total Outflow</p>
-                <p className="text-3xl font-bold mt-1 tabular-nums">₹{stats.total.toLocaleString("en-IN")}</p>
               </div>
-              <div className="p-3 bg-rose-500/10 rounded-xl">
-                <IndianRupee className="h-6 w-6 text-rose-500" />
-              </div>
-            </CardContent>
-          </Card>
 
-          <Card className="border-border/80 shadow-sm sm:col-span-2">
-            <CardHeader className="py-2.5 px-4 border-b flex flex-row items-center justify-between">
-              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <PieChart className="h-3.5 w-3.5" /> Outflow by Category
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 flex flex-wrap gap-x-6 gap-y-3">
-              {(["SALARY", "ELECTRICITY", "FOOD", "MAINTENANCE", "OTHERS"] as const).map((cat) => {
-                const value = stats.categoryTotals[cat] || 0;
-                const percentage = stats.total > 0 ? Math.round((value / stats.total) * 100) : 0;
-                return (
-                  <div key={cat} className="flex flex-col">
-                    <span className="text-xs text-muted-foreground font-medium">{cat.charAt(0) + cat.slice(1).toLowerCase()}</span>
-                    <span className="text-sm font-bold mt-0.5 tabular-nums">
-                      ₹{value.toLocaleString()} <span className="text-[10px] text-muted-foreground font-normal">({percentage}%)</span>
-                    </span>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filter bar */}
-        <div className="flex flex-col sm:flex-row gap-3 items-center justify-between border rounded-lg bg-card p-4">
-          <div className="relative min-w-0 flex-1 max-w-lg w-full">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search by description..."
-              className="pl-9"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Category filter" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="SALARY">Salary</SelectItem>
-                <SelectItem value="ELECTRICITY">Electricity</SelectItem>
-                <SelectItem value="FOOD">Food</SelectItem>
-                <SelectItem value="MAINTENANCE">Maintenance</SelectItem>
-                <SelectItem value="OTHERS">Others</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {/* Expense List */}
-        <Card className="overflow-hidden border-border/80 shadow-sm">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-b bg-muted/30">
-                  <TableHead className="font-semibold text-foreground">Date</TableHead>
-                  <TableHead className="font-semibold text-foreground">Category</TableHead>
-                  <TableHead className="font-semibold text-foreground">Description</TableHead>
-                  <TableHead className="text-right font-semibold text-foreground">Amount</TableHead>
-                  <TableHead className="text-right font-semibold text-foreground">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredExpenses.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="p-0">
-                      <EmptyState
-                        icon={<Receipt />}
-                        title={expenses.length === 0 ? "No expenses recorded yet" : "No expenses match your filters"}
-                        description={
-                          expenses.length === 0
-                            ? "Add your first expense to start tracking where the money goes each month."
-                            : "Try a different category or clear the search."
-                        }
-                        action={
-                          expenses.length === 0 ? (
-                            <Button onClick={() => setOpen(true)} className="gap-1.5">
-                              <Plus className="h-4 w-4" /> Add expense
+              {filteredExpenses.length === 0 ? (
+                <EmptyState
+                  title={searchQuery || categoryFilter !== "all" ? "No matching expenses" : "No expenses recorded yet"}
+                  description={
+                    searchQuery || categoryFilter !== "all"
+                      ? "Try changing your search term or category filter."
+                      : "Record maintenance expenses, utility bills, and salaries to track your PG outflow."
+                  }
+                  action={
+                    searchQuery || categoryFilter !== "all" ? undefined : (
+                      <Button
+                        size="sm"
+                        className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white"
+                        onClick={() => setOpen(true)}
+                      >
+                        <Plus className="h-4 w-4 mr-1.5" /> Record first expense
+                      </Button>
+                    )
+                  }
+                />
+              ) : (
+                <div className="overflow-x-auto rounded border border-[var(--gray-200)]">
+                  <Table>
+                    <TableHeader className="bg-[var(--gray-100)] text-xs text-[var(--gray-600)]">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="py-2.5 px-3">Date</TableHead>
+                        <TableHead className="py-2.5 px-3">Description</TableHead>
+                        <TableHead className="py-2.5 px-3">Category</TableHead>
+                        <TableHead className="py-2.5 px-3 text-right">Amount</TableHead>
+                        <TableHead className="py-2.5 px-3 text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredExpenses.map((e) => (
+                        <TableRow key={e.id} className="text-xs hover:bg-[var(--gray-50)]">
+                          <TableCell className="py-2.5 px-3 whitespace-nowrap tabular-nums text-[var(--gray-600)]">
+                            {formatDate(e.expenseDate)}
+                          </TableCell>
+                          <TableCell className="py-2.5 px-3 font-medium text-[var(--gray-900)]">
+                            {e.description}
+                          </TableCell>
+                          <TableCell className="py-2.5 px-3">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--gray-100)] text-[var(--gray-700)] border border-[var(--gray-200)]">
+                              {CATEGORY_LABELS[e.category] || e.category}
+                            </span>
+                          </TableCell>
+                          <TableCell className="py-2.5 px-3 text-right font-semibold text-[var(--gray-900)] tabular-nums whitespace-nowrap">
+                            {formatINR(e.amount)}
+                          </TableCell>
+                          <TableCell className="py-2.5 px-3 text-right whitespace-nowrap">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-[var(--gray-400)] hover:text-[#B42318] hover:bg-[#FEF1F0]"
+                              onClick={() => setPendingDeleteId(e.id)}
+                              aria-label="Delete expense"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
-                          ) : undefined
-                        }
-                      />
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredExpenses.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="font-medium whitespace-nowrap">
-                        <span className="flex items-center gap-1.5 text-xs">
-                          <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                          {new Date(row.expenseDate).toLocaleDateString()}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={CATEGORY_COLORS[row.category]}>
-                          {row.category}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-[300px] truncate font-medium text-foreground">
-                        {row.description}
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-rose-600 dark:text-rose-400 tabular-nums">
-                        ₹{row.amount.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => setPendingDeleteId(row.id)}
-                          aria-label={`Delete expense: ${row.description}`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          </>
+        )}
 
+        {/* Add Expense Dialog */}
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent className="sm:max-w-md p-6 space-y-4">
+            <DialogHeader>
+              <DialogTitle className="text-base font-semibold text-[var(--gray-900)]">
+                Record PG Expense
+              </DialogTitle>
+              <DialogDescription className="text-xs text-[var(--gray-500)]">
+                Log operating outflow to maintain your monthly property ledger.
+              </DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleAddExpense} className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="amount" className="text-xs font-medium text-[var(--gray-700)]">
+                  Amount (₹) <span className="text-[#B42318]">*</span>
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-sm text-[var(--gray-500)]">₹</span>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="any"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="e.g. 1500"
+                    className="pl-7 h-9 text-sm tabular-nums"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="category" className="text-xs font-medium text-[var(--gray-700)]">
+                  Category <span className="text-[#B42318]">*</span>
+                </Label>
+                <Select value={category} onValueChange={(v) => setCategory(v as ExpenseItem["category"])}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Choose category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SALARY">Salary (Staff / Warden)</SelectItem>
+                    <SelectItem value="ELECTRICITY">Electricity & Utilities</SelectItem>
+                    <SelectItem value="FOOD">Food & Dining Supplies</SelectItem>
+                    <SelectItem value="MAINTENANCE">Maintenance & Repairs</SelectItem>
+                    <SelectItem value="OTHERS">Others (Internet, Consumables)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="date" className="text-xs font-medium text-[var(--gray-700)]">
+                  Expense Date <span className="text-[#B42318]">*</span>
+                </Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={expenseDate}
+                  onChange={(e) => setExpenseDate(e.target.value)}
+                  className="h-9 text-sm"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="desc" className="text-xs font-medium text-[var(--gray-700)]">
+                  Description <span className="text-[#B42318]">*</span>
+                </Label>
+                <Input
+                  id="desc"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="e.g. Motor repair and plumber visit"
+                  className="h-9 text-sm"
+                  required
+                />
+              </div>
+
+              <DialogFooter className="pt-2 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setOpen(false)}
+                  className="border-[var(--gray-300)]"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white font-medium"
+                >
+                  Save expense
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation */}
         <ConfirmDialog
-          open={pendingDeleteId !== null}
-          onOpenChange={(o) => !o && setPendingDeleteId(null)}
-          title="Delete this expense?"
-          description="It will be removed from your records on this device. This can't be undone."
-          confirmLabel="Delete expense"
+          open={Boolean(pendingDeleteId)}
+          onOpenChange={(isOpen) => !isOpen && setPendingDeleteId(null)}
+          title="Delete expense entry?"
+          description="Are you sure you want to remove this expense record from your local register?"
+          confirmLabel="Delete"
           destructive
           onConfirm={() => pendingDeleteId && handleDelete(pendingDeleteId)}
         />

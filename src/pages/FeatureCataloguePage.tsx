@@ -14,12 +14,21 @@ import {
 } from "@/components/ui/table";
 import { getAllFeatures, FEATURE_CATALOGUE, FeatureDefinition } from "@/config/featureCatalogue";
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
+import { usePermissions } from "@/context/PermissionContext";
+import { NoAccessPage } from "@/components/PermissionGuard";
 import { Check, Lock, Search, RefreshCw, ShieldCheck, Cpu } from "lucide-react";
 
 export default function FeatureCataloguePage() {
+  const { role } = usePermissions();
+  const isAdmin = role === "admin" || role === "super_admin";
+
   const { hasFeature, planName, planDisplayName, isLoading, refetch } = useFeatureAccess();
   const [search, setSearch] = useState("");
   const [selectedModule, setSelectedModule] = useState<string>("ALL");
+
+  if (!isAdmin) {
+    return <NoAccessPage />;
+  }
 
   const allFeatures = getAllFeatures();
 
