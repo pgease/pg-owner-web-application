@@ -496,7 +496,7 @@ export function useUpdateComplaintStatus(propertyId?: string | null, priority?: 
     mutationFn: ({ complaintId, payload }: { complaintId: string; payload: UpdateComplaintStatusPayload }) =>
       updateComplaintStatus(complaintId, payload),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: queryKeys.complaints(propertyId, priority) });
+      qc.invalidateQueries({ queryKey: ["property", propertyId, "complaints"] });
     },
   });
 }
