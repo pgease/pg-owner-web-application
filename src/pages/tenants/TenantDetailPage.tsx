@@ -2912,7 +2912,9 @@ export default function TenantDetailPage() {
                           const payDate = pay.paidAt || pay.paid_at || pay.createdAt || pay.created_at;
                           const method = pay.paymentMethod || pay.payment_method || "Payment";
                           let noteText = "";
-                          if (typeof pay.notes === "string" && pay.notes.startsWith("{")) {
+                          if (typeof pay.notes === "object" && pay.notes !== null) {
+                            noteText = pay.notes.notes || "";
+                          } else if (typeof pay.notes === "string" && pay.notes.startsWith("{")) {
                             try {
                               const parsed = JSON.parse(pay.notes);
                               noteText = parsed.notes || "";
