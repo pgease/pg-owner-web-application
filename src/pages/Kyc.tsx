@@ -2,23 +2,19 @@ import { useState } from "react";
 import {
   Loader2,
   ShieldCheck,
-  ShieldX,
   FileText,
   Plus,
-  Sparkles,
   CreditCard,
-  CheckCircle2,
-  Clock,
   Send,
   Download,
   ExternalLink,
   UserCheck,
-  Building,
+  Building2,
+  CheckCircle2,
+  XCircle,
+  Clock,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -46,8 +42,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/common/PageHeader";
-import { HelpLink } from "@/components/common/HelpLink";
-import { DataTableContainer } from "@/components/common/DataTableContainer";
+import { MetricDisplay } from "@/components/common/MetricDisplay";
+import { StatusBadge } from "@/components/common/StatusBadge";
+import { ActionMenu } from "@/components/common/ActionMenu";
+import { EmptyState } from "@/components/common/EmptyState";
 import {
   useApproveKycMutation,
   useKycApplications,
@@ -66,6 +64,7 @@ import {
 import { useApp } from "@/context/AppContext";
 import { toast } from "@/components/ui/use-toast";
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
+import { formatINR, formatDate } from "@/lib/formatters";
 
 declare global {
   interface Window {
@@ -74,16 +73,13 @@ declare global {
 }
 
 export default function Kyc() {
-  const { selectedPgId: currentPropertyId, properties: propertyList } = useApp();
-  const [activeTab, setActiveTab] = useState("kyc");
+  const { selectedPgId: currentPropertyId } = useApp();
+  const [activeTab, setActiveTab] = useState<"kyc" | "agreements">("kyc");
 
   // KYC Queries & Mutations
   const { data: kycRows = [], isLoading: isKycLoading, refetch: refetchKyc } = useKycApplications();
   const approveMut = useApproveKycMutation();
   const rejectMut = useRejectKycMutation();
-  const [rejectOpen, setRejectOpen] = useState(false);
-  const [rejectId, setRejectId] = useState("");
-  const [rejectReason, setRejectReason] = useState("");
   const [detailId, setDetailId] = useState<string | null>(null);
   const detailQuery = useKycDetail(detailId);
   const kycDetail = detailQuery.data as any;
@@ -116,19 +112,25 @@ export default function Kyc() {
     lockInPeriodMonths: 3,
     agreementStartDate: new Date().toISOString().split("T")[0],
     agreementEndDate: "",
-    houseRules: "1. No loud music after 10 PM.\n2. Guests allowed until 8 PM.\n3. Keep common areas clean.",
+    houseRules: "1. No loud music after 10 PM.\n2. Visitors allowed until 8 PM.\n3. Keep common areas tidy.",
   });
 
   const kycList = Array.isArray(kycRows) ? (kycRows as Record<string, any>[]) : [];
   const agreementsList = agreementsData?.agreements || [];
   const creditPacks = (Array.isArray(packsData) ? packsData : packsData?.creditPacks) || [];
 
+  const verifiedKycCount = kycList.filter((r) => {
+    const s = String(r.status || "").toLowerCase();
+    return s === "completed" || s === "approved" || r.processing_done;
+  }).length;
+
+  const pendingKycCount = kycList.length - verifiedKycCount;
+
   // Top-up Razorpay Checkout
   const handleTopupCheckout = async (packId: string) => {
     try {
       const order = await topupOrderMut.mutateAsync(packId);
       if (!window.Razorpay) {
-        // Load Razorpay SDK script dynamically if not present
         const script = document.createElement("script");
         script.src = "https://checkout.razorpay.com/v1/checkout.js";
         document.body.appendChild(script);
@@ -151,8 +153,8 @@ export default function Kyc() {
               creditPackId: packId,
             });
             toast({
-              title: "Credits Recharged! 🎉",
-              description: "Your verification credits have been added to your balance.",
+              title: "Credits Recharged",
+              description: "Your verification credits have been updated.",
             });
             setTopupOpen(false);
           } catch (err: any) {
@@ -184,13 +186,14 @@ export default function Kyc() {
       return;
     }
     try {
-      const res = await requestKycMut.mutateAsync(selectedTenantForKyc);
+      await requestKycMut.mutateAsync(selectedTenantForKyc);
       toast({
-        title: "KYC Request Dispatched! 🚀",
+        title: "KYC Request Sent",
         description: "Aadhaar DigiLocker verification link sent to tenant via WhatsApp.",
       });
       setRequestKycOpen(false);
       setSelectedTenantForKyc("");
+      refetchKyc();
     } catch (err: any) {
       toast({
         title: "Failed to request KYC",
@@ -224,10 +227,11 @@ export default function Kyc() {
       });
 
       toast({
-        title: "Rental Agreement Created! 📝",
-        description: "Digital agreement drafted and dispatched to tenant for DigiLocker eSign.",
+        title: "Rental Agreement Created",
+        description: "Agreement generated and sent to tenant for e-Sign.",
       });
       setCreateAgreementOpen(false);
+      refetchAgreements();
     } catch (err: any) {
       toast({
         title: "Failed to create agreement",
@@ -239,127 +243,132 @@ export default function Kyc() {
 
   return (
     <CanAccessPage permission="kyc_view">
-      <div className="space-y-6 animate-fade-in pb-12">
-        {/* Header with Title & Quota Balance Pill */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <PageHeader
-            title="KYC & Agreements"
-            description="Verify tenant identity with Aadhaar and manage rental agreements."
-            actions={<HelpLink tutorialKey="kyc_verification" label="How KYC works" />}
-          />
-
-          <div className="flex items-center gap-3">
-            {/* Credit Balance Card */}
-            <div className="flex items-center gap-3 bg-gradient-to-r from-teal-500/10 to-emerald-500/10 border border-teal-200 dark:border-teal-800 rounded-xl px-4 py-2 shadow-sm">
-              <div className="p-2 bg-teal-500 text-white rounded-lg">
-                <ShieldCheck className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground font-medium">Verification Credits</div>
-                <div className="text-sm font-bold text-foreground flex items-center gap-1.5">
-                  {isBalanceLoading ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <>
-                      <span>{balanceData?.remainingCredits ?? "—"} Available</span>
-                      {balanceData?.freeCreditsRemaining !== undefined && (
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300">
-                          {balanceData.freeCreditsRemaining} Free
-                        </Badge>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
+      <div className="space-y-6">
+        <PageHeader
+          title="KYC & Digital Agreements"
+          description="Verify tenant identity with DigiLocker Aadhaar verification and manage digital rental agreements."
+          action={
+            <div className="flex items-center gap-2">
               <Button
+                variant="outline"
                 size="sm"
-                className="ml-2 bg-teal-600 hover:bg-teal-700 text-white h-8 gap-1 shadow-sm"
+                className="border-[var(--gray-300)]"
                 onClick={() => setTopupOpen(true)}
               >
-                <Sparkles className="h-3.5 w-3.5" /> Top-up
+                Top up credits
               </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Navigation Tabs: KYC vs Agreements */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3">
-            <TabsList className="grid w-full sm:w-[380px] grid-cols-2">
-              <TabsTrigger value="kyc" className="gap-2">
-                <UserCheck className="h-4 w-4" /> Aadhaar KYC
-              </TabsTrigger>
-              <TabsTrigger value="agreements" className="gap-2">
-                <FileText className="h-4 w-4" /> Rental Agreements
-              </TabsTrigger>
-            </TabsList>
-
-            <div className="flex items-center gap-2">
               {activeTab === "kyc" ? (
-                <>
-                  <Button size="sm" variant="outline" onClick={() => refetchKyc()}>
-                    Refresh
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5 shadow-sm"
-                    onClick={() => setRequestKycOpen(true)}
-                  >
-                    <Plus className="h-4 w-4" /> Request Tenant KYC
-                  </Button>
-                </>
+                <Button
+                  size="sm"
+                  className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white gap-2 font-medium"
+                  onClick={() => setRequestKycOpen(true)}
+                >
+                  <Plus className="h-4 w-4" /> Request tenant KYC
+                </Button>
               ) : (
-                <>
-                  <Button size="sm" variant="outline" onClick={() => refetchAgreements()}>
-                    Refresh
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5 shadow-sm"
-                    onClick={() => setCreateAgreementOpen(true)}
-                  >
-                    <Plus className="h-4 w-4" /> Create Digital Agreement
-                  </Button>
-                </>
+                <Button
+                  size="sm"
+                  className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white gap-2 font-medium"
+                  onClick={() => setCreateAgreementOpen(true)}
+                >
+                  <Plus className="h-4 w-4" /> Create agreement
+                </Button>
               )}
             </div>
-          </div>
+          }
+        />
 
-          {/* TAB 1: KYC APPLICATIONS */}
-          <TabsContent value="kyc" className="mt-6 space-y-4">
+        {/* Operational Metrics Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <MetricDisplay
+            label="Verification Credits"
+            value={balanceData?.remainingCredits ?? "—"}
+            hint={
+              balanceData?.freeCreditsRemaining !== undefined
+                ? `${balanceData.freeCreditsRemaining} free credits included`
+                : "Available for DigiLocker KYC"
+            }
+            tone={Number(balanceData?.remainingCredits || 0) > 0 ? "success" : "warning"}
+          />
+          <MetricDisplay
+            label="Verified Tenants"
+            value={verifiedKycCount}
+            hint="Aadhaar authenticated records"
+            tone="success"
+          />
+          <MetricDisplay
+            label="Pending KYC"
+            value={pendingKycCount}
+            hint="Awaiting tenant OTP submission"
+            tone={pendingKycCount > 0 ? "warning" : "neutral"}
+          />
+          <MetricDisplay
+            label="Digital Agreements"
+            value={agreementsList.length}
+            hint="Drafted and signed contracts"
+            tone="neutral"
+          />
+        </div>
+
+        {/* Tabs Bar */}
+        <div className="flex items-center gap-1 border-b border-[var(--gray-200)] pb-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab("kyc")}
+            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              activeTab === "kyc"
+                ? "bg-[var(--brand-50)] text-[var(--brand-700)] font-semibold"
+                : "text-[var(--gray-600)] hover:text-[var(--gray-900)] hover:bg-[var(--gray-100)]"
+            }`}
+          >
+            Aadhaar KYC ({kycList.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("agreements")}
+            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              activeTab === "agreements"
+                ? "bg-[var(--brand-50)] text-[var(--brand-700)] font-semibold"
+                : "text-[var(--gray-600)] hover:text-[var(--gray-900)] hover:bg-[var(--gray-100)]"
+            }`}
+          >
+            Rental Agreements ({agreementsList.length})
+          </button>
+        </div>
+
+        {/* TAB 1: KYC APPLICATIONS */}
+        {activeTab === "kyc" && (
+          <div className="bg-white rounded-md border border-[var(--gray-200)] p-4 space-y-4">
             {isKycLoading ? (
-              <div className="flex justify-center py-16">
-                <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+              <div className="flex justify-center py-16 text-sm text-[var(--gray-500)]">
+                <Loader2 className="h-6 w-6 animate-spin text-[var(--brand-600)] mr-2" />
+                Loading KYC records...
               </div>
             ) : kycList.length === 0 ? (
-              <Card className="border-dashed">
-                <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                  <div className="h-12 w-12 rounded-full bg-teal-50 dark:bg-teal-950 flex items-center justify-center mb-3">
-                    <UserCheck className="h-6 w-6 text-teal-600" />
-                  </div>
-                  <h3 className="text-base font-semibold">No Pending KYC Applications</h3>
-                  <p className="text-sm text-muted-foreground max-w-sm mt-1 mb-4">
-                    Send instant DigiLocker Aadhaar verification requests to your tenants with 1 click.
-                  </p>
+              <EmptyState
+                icon={<UserCheck className="h-10 w-10 text-[var(--gray-400)]" />}
+                title="No KYC applications yet"
+                description="Send instant DigiLocker Aadhaar verification links to your tenants via WhatsApp."
+                action={
                   <Button
                     size="sm"
-                    className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5"
+                    className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white"
                     onClick={() => setRequestKycOpen(true)}
                   >
-                    <Plus className="h-4 w-4" /> Request Tenant KYC
+                    <Plus className="h-4 w-4 mr-1.5" /> Request tenant KYC
                   </Button>
-                </CardContent>
-              </Card>
+                }
+              />
             ) : (
-              <DataTableContainer>
+              <div className="overflow-x-auto rounded border border-[var(--gray-200)]">
                 <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead>Tenant Details</TableHead>
-                      <TableHead>DigiLocker Status</TableHead>
-                      <TableHead>Aadhaar Verified</TableHead>
-                      <TableHead>Created At</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                  <TableHeader className="bg-[var(--gray-100)] text-xs text-[var(--gray-600)]">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="py-2.5 px-3">Tenant Details</TableHead>
+                      <TableHead className="py-2.5 px-3">Status</TableHead>
+                      <TableHead className="py-2.5 px-3">Aadhaar Verified</TableHead>
+                      <TableHead className="py-2.5 px-3">Requested On</TableHead>
+                      <TableHead className="py-2.5 px-3 text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -369,233 +378,237 @@ export default function Kyc() {
                       const isVerified = status === "completed" || status === "approved" || row.processing_done;
 
                       return (
-                        <TableRow key={id || String(i)}>
-                          <TableCell>
-                            <div className="font-medium text-foreground">
+                        <TableRow key={id || String(i)} className="text-xs hover:bg-[var(--gray-50)]">
+                          <TableCell className="py-2.5 px-3">
+                            <div className="font-medium text-[var(--gray-900)]">
                               {row.tenantName || row.name || row.tenant?.name || row.roomTenant?.tenant?.name || row.roomTenant?.name || "Tenant"}
                             </div>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-xs text-[var(--gray-500)] tabular-nums">
                               {row.mobileNumber || row.phone || row.tenant?.phone || row.roomTenant?.tenant?.phone || row.roomTenant?.phone || "—"}
                             </div>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="py-2.5 px-3 whitespace-nowrap">
                             {isVerified ? (
-                              <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 gap-1 border-0">
-                                <CheckCircle2 className="h-3 w-3" /> Verified ✓
-                              </Badge>
+                              <StatusBadge label="Verified" tone="success" size="sm" />
                             ) : status === "rejected" ? (
-                              <Badge variant="destructive">Rejected</Badge>
+                              <StatusBadge label="Rejected" tone="error" size="sm" />
                             ) : (
-                              <Badge variant="secondary" className="gap-1">
-                                <Clock className="h-3 w-3" /> Pending OTP
-                              </Badge>
+                              <StatusBadge label="Pending OTP" tone="warning" size="sm" />
                             )}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="py-2.5 px-3">
                             {row.aadhaarNumber ? (
-                              <span className="font-mono text-xs">XXXX-XXXX-{row.aadhaarNumber.slice(-4)}</span>
+                              <span className="font-mono text-xs text-[var(--gray-700)]">
+                                XXXX-XXXX-{row.aadhaarNumber.slice(-4)}
+                              </span>
                             ) : isVerified ? (
-                              <span className="text-xs text-emerald-600 font-medium">DigiLocker Match</span>
+                              <span className="text-xs text-[var(--success)] font-medium">
+                                DigiLocker Matched
+                              </span>
                             ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
+                              <span className="text-xs text-[var(--gray-400)]">—</span>
                             )}
                           </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {row.createdAt ? new Date(row.createdAt).toLocaleDateString("en-IN") : "—"}
+                          <TableCell className="py-2.5 px-3 tabular-nums text-[var(--gray-600)] whitespace-nowrap">
+                            {row.createdAt ? formatDate(row.createdAt) : "—"}
                           </TableCell>
-                          <TableCell className="text-right space-x-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-xs h-8"
-                              onClick={() => setDetailId(id)}
-                            >
-                              View Details
-                            </Button>
-                            {!isVerified && (
-                              <CanAccess permission="kyc_approve">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 gap-1 text-xs"
-                                  disabled={approveMut.isPending}
-                                  onClick={async () => {
-                                    await approveMut.mutateAsync(id);
-                                    toast({ title: "KYC Application Approved ✓" });
-                                  }}
-                                >
-                                  <ShieldCheck className="h-3.5 w-3.5" /> Approve
-                                </Button>
-                              </CanAccess>
-                            )}
+                          <TableCell className="py-2.5 px-3 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs px-2 border-[var(--gray-300)]"
+                                onClick={() => setDetailId(id)}
+                              >
+                                Details
+                              </Button>
+                              {!isVerified && (
+                                <CanAccess permission="kyc_approve">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-xs px-2 text-[var(--success)] border-[#B4E5C5] hover:bg-[#ECFAF1]"
+                                    disabled={approveMut.isPending}
+                                    onClick={async () => {
+                                      await approveMut.mutateAsync(id);
+                                      toast({ title: "KYC Application Approved" });
+                                      refetchKyc();
+                                    }}
+                                  >
+                                    Approve
+                                  </Button>
+                                </CanAccess>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
                     })}
                   </TableBody>
                 </Table>
-              </DataTableContainer>
+              </div>
             )}
-          </TabsContent>
+          </div>
+        )}
 
-          {/* TAB 2: DIGITAL RENTAL AGREEMENTS */}
-          <TabsContent value="agreements" className="mt-6 space-y-4">
+        {/* TAB 2: DIGITAL RENTAL AGREEMENTS */}
+        {activeTab === "agreements" && (
+          <div className="bg-white rounded-md border border-[var(--gray-200)] p-4 space-y-4">
             {isAgreementsLoading ? (
-              <div className="flex justify-center py-16">
-                <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+              <div className="flex justify-center py-16 text-sm text-[var(--gray-500)]">
+                <Loader2 className="h-6 w-6 animate-spin text-[var(--brand-600)] mr-2" />
+                Loading agreements...
               </div>
             ) : agreementsList.length === 0 ? (
-              <Card className="border-dashed">
-                <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                  <div className="h-12 w-12 rounded-full bg-teal-50 dark:bg-teal-950 flex items-center justify-center mb-3">
-                    <FileText className="h-6 w-6 text-teal-600" />
-                  </div>
-                  <h3 className="text-base font-semibold">No Rental Agreements Yet</h3>
-                  <p className="text-sm text-muted-foreground max-w-sm mt-1 mb-4">
-                    Create legally binding digital agreements with Aadhaar eSign via Digio.
-                  </p>
+              <EmptyState
+                icon={<FileText className="h-10 w-10 text-[var(--gray-400)]" />}
+                title="No rental agreements drafted yet"
+                description="Draft legally valid rental agreements with online Aadhaar e-Sign."
+                action={
                   <Button
                     size="sm"
-                    className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5"
+                    className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white"
                     onClick={() => setCreateAgreementOpen(true)}
                   >
-                    <Plus className="h-4 w-4" /> Create Digital Agreement
+                    <Plus className="h-4 w-4 mr-1.5" /> Create agreement
                   </Button>
-                </CardContent>
-              </Card>
+                }
+              />
             ) : (
-              <DataTableContainer>
+              <div className="overflow-x-auto rounded border border-[var(--gray-200)]">
                 <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead>Tenant / Room</TableHead>
-                      <TableHead>Rent & Deposit</TableHead>
-                      <TableHead>Terms</TableHead>
-                      <TableHead>Signing Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                  <TableHeader className="bg-[var(--gray-100)] text-xs text-[var(--gray-600)]">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="py-2.5 px-3">Tenant & Room</TableHead>
+                      <TableHead className="py-2.5 px-3">Rent & Deposit</TableHead>
+                      <TableHead className="py-2.5 px-3">Terms</TableHead>
+                      <TableHead className="py-2.5 px-3">Signing Status</TableHead>
+                      <TableHead className="py-2.5 px-3 text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {agreementsList.map((ag) => {
                       const isSigned = ag.status === "signed";
                       return (
-                        <TableRow key={ag.id}>
-                          <TableCell>
-                            <div className="font-medium text-foreground">{ag.tenantName}</div>
-                            <div className="text-xs text-muted-foreground">
-                              Room {ag.roomNumber} • {ag.tenantPhone}
+                        <TableRow key={ag.id} className="text-xs hover:bg-[var(--gray-50)]">
+                          <TableCell className="py-2.5 px-3">
+                            <div className="font-medium text-[var(--gray-900)]">{ag.tenantName}</div>
+                            <div className="text-xs text-[var(--gray-500)]">
+                              Room {ag.roomNumber} · {ag.tenantPhone}
                             </div>
                           </TableCell>
-                          <TableCell>
-                            <div className="font-medium text-foreground">₹{ag.monthlyRent.toLocaleString("en-IN")}/mo</div>
-                            <div className="text-xs text-muted-foreground">
-                              Deposit: ₹{ag.securityDeposit.toLocaleString("en-IN")}
+                          <TableCell className="py-2.5 px-3 whitespace-nowrap tabular-nums">
+                            <div className="font-medium text-[var(--gray-900)]">
+                              {formatINR(ag.monthlyRent)}/mo
+                            </div>
+                            <div className="text-xs text-[var(--gray-500)]">
+                              Deposit: {formatINR(ag.securityDeposit)}
                             </div>
                           </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            <div>Notice: {ag.noticePeriodDays} Days</div>
-                            <div>Lock-in: {ag.lockInPeriodMonths} Months</div>
+                          <TableCell className="py-2.5 px-3 text-xs text-[var(--gray-600)] tabular-nums whitespace-nowrap">
+                            <div>Notice: {ag.noticePeriodDays} days</div>
+                            <div>Lock-in: {ag.lockInPeriodMonths} months</div>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="py-2.5 px-3 whitespace-nowrap">
                             {isSigned ? (
-                              <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 gap-1 border-0">
-                                <CheckCircle2 className="h-3 w-3" /> Signed ✓
-                              </Badge>
+                              <StatusBadge label="Signed" tone="success" size="sm" />
                             ) : ag.status === "sent_for_esign" ? (
-                              <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 gap-1 border-0">
-                                <Clock className="h-3 w-3" /> Sent for eSign
-                              </Badge>
+                              <StatusBadge label="Sent for eSign" tone="info" size="sm" />
                             ) : (
-                              <Badge variant="secondary">Draft</Badge>
+                              <StatusBadge label="Draft" tone="neutral" size="sm" />
                             )}
                           </TableCell>
-                          <TableCell className="text-right space-x-2">
-                            {ag.signingDirectUrl && !isSigned && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 gap-1 text-xs"
-                                onClick={() => window.open(ag.signingDirectUrl, "_blank")}
-                              >
-                                <ExternalLink className="h-3.5 w-3.5" /> Sign Link
-                              </Button>
-                            )}
-                            {ag.signedPdfUrl || ag.agreementPdfUrl ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 gap-1 text-xs"
-                                onClick={() => window.open(ag.signedPdfUrl || ag.agreementPdfUrl, "_blank")}
-                              >
-                                <Download className="h-3.5 w-3.5" /> PDF
-                              </Button>
-                            ) : null}
-                            {!isSigned && (
-                              <Button
-                                size="sm"
-                                variant="default"
-                                className="bg-teal-600 hover:bg-teal-700 text-white h-8 gap-1 text-xs"
-                                disabled={sendEsignMut.isPending}
-                                onClick={async () => {
-                                  await sendEsignMut.mutateAsync(ag.id);
-                                  toast({
-                                    title: "eSign Link Dispatched! 📲",
-                                    description: "WhatsApp agreement signing link re-sent to tenant.",
-                                  });
-                                }}
-                              >
-                                <Send className="h-3.5 w-3.5" /> Resend
-                              </Button>
-                            )}
+                          <TableCell className="py-2.5 px-3 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {ag.signingDirectUrl && !isSigned && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs px-2 border-[var(--gray-300)]"
+                                  onClick={() => window.open(ag.signingDirectUrl, "_blank")}
+                                >
+                                  Sign link
+                                </Button>
+                              )}
+                              {ag.signedPdfUrl || ag.agreementPdfUrl ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs px-2 border-[var(--gray-300)]"
+                                  onClick={() => window.open(ag.signedPdfUrl || ag.agreementPdfUrl, "_blank")}
+                                >
+                                  <Download className="h-3.5 w-3.5 mr-1" /> PDF
+                                </Button>
+                              ) : null}
+                              {!isSigned && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs px-2 border-[var(--gray-300)]"
+                                  disabled={sendEsignMut.isPending}
+                                  onClick={async () => {
+                                    await sendEsignMut.mutateAsync(ag.id);
+                                    toast({
+                                      title: "eSign Link Resent",
+                                      description: "Agreement signing link resent to tenant.",
+                                    });
+                                  }}
+                                >
+                                  Resend
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
                     })}
                   </TableBody>
                 </Table>
-              </DataTableContainer>
+              </div>
             )}
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
 
         {/* DIALOG 1: CREDIT TOP-UP MODAL */}
         <Dialog open={topupOpen} onOpenChange={setTopupOpen}>
-          <DialogContent className="max-w-xl">
+          <DialogContent className="max-w-lg p-6 space-y-4">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-                <Sparkles className="h-5 w-5 text-teal-600" /> Top-up Verification Credits
+              <DialogTitle className="text-base font-semibold text-[var(--gray-900)]">
+                Top-up Verification Credits
               </DialogTitle>
-              <DialogDescription>
-                Verification credits allow you to run instant DigiLocker Aadhaar KYC & generate digital agreements.
+              <DialogDescription className="text-xs text-[var(--gray-500)]">
+                Verification credits enable instant DigiLocker Aadhaar KYC and digital agreement drafting. WhatsApp messages remain completely free.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2">
               {creditPacks.map((pack) => {
                 const isSelected = selectedPackId === pack.id;
                 return (
                   <div
                     key={pack.id}
                     onClick={() => setSelectedPackId(pack.id)}
-                    className={`relative cursor-pointer rounded-xl border-2 p-4 transition-all ${
+                    className={`cursor-pointer rounded-md border p-3 transition-colors ${
                       isSelected
-                        ? "border-teal-600 bg-teal-50/50 dark:bg-teal-950/30 shadow-sm"
-                        : "border-border hover:border-teal-200 dark:hover:border-teal-800"
+                        ? "border-[var(--brand-600)] bg-[var(--brand-50)]"
+                        : "border-[var(--gray-200)] hover:border-[var(--gray-300)] bg-white"
                     }`}
                   >
-                    {pack.popular && (
-                      <Badge className="absolute -top-2.5 right-3 bg-teal-600 text-white text-[10px]">
-                        MOST POPULAR
-                      </Badge>
-                    )}
-                    <div className="font-bold text-foreground text-base">{pack.name}</div>
-                    <div className="text-2xl font-black text-teal-600 my-1">
-                      {pack.credits} <span className="text-xs font-normal text-muted-foreground">Credits</span>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-sm text-[var(--gray-900)]">{pack.name}</span>
+                      {pack.popular && (
+                        <span className="text-[10px] font-semibold bg-[var(--brand-600)] text-white px-1.5 py-0.5 rounded">
+                          POPULAR
+                        </span>
+                      )}
                     </div>
-                    <div className="text-sm font-semibold text-foreground">
-                      ₹{pack.price.toLocaleString("en-IN")}{" "}
-                      <span className="text-xs text-muted-foreground font-normal">
-                        (₹{(pack.price / pack.credits).toFixed(0)}/credit)
+                    <div className="text-xl font-bold text-[var(--gray-900)] my-1 tabular-nums">
+                      {pack.credits} <span className="text-xs font-normal text-[var(--gray-500)]">Credits</span>
+                    </div>
+                    <div className="text-xs font-medium text-[var(--gray-700)] tabular-nums">
+                      {formatINR(pack.price)}{" "}
+                      <span className="text-[var(--gray-500)] font-normal">
+                        ({formatINR(Math.round(pack.price / pack.credits))}/credit)
                       </span>
                     </div>
                   </div>
@@ -603,73 +616,81 @@ export default function Kyc() {
               })}
             </div>
 
-            <DialogFooter className="flex sm:justify-between items-center gap-3">
-              <div className="text-xs text-muted-foreground">⚡ Instant recharge via Razorpay UPI / Cards</div>
-              <Button
-                className="bg-teal-600 hover:bg-teal-700 text-white gap-2 font-medium"
-                disabled={!selectedPackId || topupOrderMut.isPending}
-                onClick={() => handleTopupCheckout(selectedPackId)}
-              >
-                {topupOrderMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-                Pay & Recharge
-              </Button>
+            <DialogFooter className="flex sm:justify-between items-center gap-2 pt-2">
+              <span className="text-xs text-[var(--gray-500)]">Recharge via UPI or Cards</span>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTopupOpen(false)}
+                  className="border-[var(--gray-300)]"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white font-medium"
+                  disabled={!selectedPackId || topupOrderMut.isPending}
+                  onClick={() => handleTopupCheckout(selectedPackId)}
+                >
+                  {topupOrderMut.isPending ? "Processing..." : "Recharge credits"}
+                </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         {/* DIALOG 2: REQUEST TENANT KYC MODAL */}
         <Dialog open={requestKycOpen} onOpenChange={setRequestKycOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md p-6 space-y-4">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <UserCheck className="h-5 w-5 text-teal-600" /> Request Tenant KYC
+              <DialogTitle className="text-base font-semibold text-[var(--gray-900)]">
+                Request Tenant KYC
               </DialogTitle>
-              <DialogDescription>
-                Select an active tenant to send an Aadhaar verification request via DigiLocker.
+              <DialogDescription className="text-xs text-[var(--gray-500)]">
+                Select a tenant to send a DigiLocker Aadhaar verification link via WhatsApp. Consumes 1 credit.
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 py-2">
-              <div className="space-y-2">
-                <Label>Select Tenant</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-[var(--gray-700)]">
+                  Select Tenant <span className="text-[#B42318]">*</span>
+                </Label>
                 <Select value={selectedTenantForKyc} onValueChange={setSelectedTenantForKyc}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a tenant from your PG" />
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Choose resident..." />
                   </SelectTrigger>
                   <SelectContent>
                     {tenantsData.map((t: any) => {
                       const tid = t.roomTenantId || t.id;
                       return (
-                        <SelectItem key={tid} value={tid}>
-                          {t.name || t.tenantName} (Room {t.roomNumber || t.roomNo || "—"}) • {t.mobileNumber || t.phone}
+                        <SelectItem key={tid} value={tid} className="text-sm">
+                          {t.name || t.tenantName} (Room {t.roomNumber || t.roomNo || "—"}) · {t.mobileNumber || t.phone}
                         </SelectItem>
                       );
                     })}
                   </SelectContent>
                 </Select>
               </div>
-
-              <div className="rounded-lg bg-muted/60 p-3 text-xs space-y-1">
-                <div className="font-semibold text-foreground flex items-center gap-1.5">
-                  <ShieldCheck className="h-4 w-4 text-teal-600" /> DigiLocker Aadhaar Verification
-                </div>
-                <p className="text-muted-foreground">
-                  Consumes 1 credit. The tenant will receive an instant WhatsApp notification with the official DigiLocker OTP portal.
-                </p>
-              </div>
             </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setRequestKycOpen(false)}>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRequestKycOpen(false)}
+                className="border-[var(--gray-300)]"
+              >
                 Cancel
               </Button>
               <Button
-                className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5"
+                size="sm"
+                className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white font-medium"
                 disabled={!selectedTenantForKyc || requestKycMut.isPending}
                 onClick={handleInitiateTenantKyc}
               >
-                {requestKycMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Send KYC Request
+                {requestKycMut.isPending ? "Sending..." : "Send KYC Request"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -677,31 +698,33 @@ export default function Kyc() {
 
         {/* DIALOG 3: CREATE DIGITAL AGREEMENT MODAL */}
         <Dialog open={createAgreementOpen} onOpenChange={setCreateAgreementOpen}>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-teal-600" /> Create Digital Rental Agreement
+              <DialogTitle className="text-base font-semibold text-[var(--gray-900)]">
+                Create Digital Rental Agreement
               </DialogTitle>
-              <DialogDescription>
-                Draft a legally compliant rental agreement and dispatch for Aadhaar eSign.
+              <DialogDescription className="text-xs text-[var(--gray-500)]">
+                Draft a legally compliant rental agreement and dispatch for DigiLocker Aadhaar e-Sign.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 py-2">
-              <div className="space-y-2">
-                <Label>Select Tenant</Label>
+            <div className="space-y-3 py-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-[var(--gray-700)]">
+                  Select Tenant <span className="text-[#B42318]">*</span>
+                </Label>
                 <Select
                   value={agreementForm.roomTenantId}
                   onValueChange={(val) => setAgreementForm({ ...agreementForm, roomTenantId: val })}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a tenant from your PG" />
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Choose resident..." />
                   </SelectTrigger>
                   <SelectContent>
                     {tenantsData.map((t: any) => {
                       const tid = t.roomTenantId || t.id;
                       return (
-                        <SelectItem key={tid} value={tid}>
+                        <SelectItem key={tid} value={tid} className="text-sm">
                           {t.name || t.tenantName} (Room {t.roomNumber || t.roomNo || "—"})
                         </SelectItem>
                       );
@@ -712,82 +735,94 @@ export default function Kyc() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Monthly Rent (₹)</Label>
+                  <Label className="text-xs font-medium text-[var(--gray-700)]">Monthly Rent (₹)</Label>
                   <Input
                     type="number"
                     value={agreementForm.monthlyRent}
                     onChange={(e) => setAgreementForm({ ...agreementForm, monthlyRent: Number(e.target.value) })}
+                    className="h-9 text-sm tabular-nums"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Security Deposit (₹)</Label>
+                  <Label className="text-xs font-medium text-[var(--gray-700)]">Security Deposit (₹)</Label>
                   <Input
                     type="number"
                     value={agreementForm.securityDeposit}
                     onChange={(e) => setAgreementForm({ ...agreementForm, securityDeposit: Number(e.target.value) })}
+                    className="h-9 text-sm tabular-nums"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Notice Period (Days)</Label>
+                  <Label className="text-xs font-medium text-[var(--gray-700)]">Notice Period (Days)</Label>
                   <Input
                     type="number"
                     value={agreementForm.noticePeriodDays}
                     onChange={(e) => setAgreementForm({ ...agreementForm, noticePeriodDays: Number(e.target.value) })}
+                    className="h-9 text-sm tabular-nums"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Lock-in Period (Months)</Label>
+                  <Label className="text-xs font-medium text-[var(--gray-700)]">Lock-in Period (Months)</Label>
                   <Input
                     type="number"
                     value={agreementForm.lockInPeriodMonths}
                     onChange={(e) => setAgreementForm({ ...agreementForm, lockInPeriodMonths: Number(e.target.value) })}
+                    className="h-9 text-sm tabular-nums"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Agreement Start Date</Label>
+                  <Label className="text-xs font-medium text-[var(--gray-700)]">Start Date</Label>
                   <Input
                     type="date"
                     value={agreementForm.agreementStartDate}
                     onChange={(e) => setAgreementForm({ ...agreementForm, agreementStartDate: e.target.value })}
+                    className="h-9 text-sm"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>End Date (Optional)</Label>
+                  <Label className="text-xs font-medium text-[var(--gray-700)]">End Date (optional)</Label>
                   <Input
                     type="date"
                     value={agreementForm.agreementEndDate}
                     onChange={(e) => setAgreementForm({ ...agreementForm, agreementEndDate: e.target.value })}
+                    className="h-9 text-sm"
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <Label>House Rules & Terms</Label>
+                <Label className="text-xs font-medium text-[var(--gray-700)]">House Rules & Terms</Label>
                 <Textarea
                   rows={3}
                   value={agreementForm.houseRules}
                   onChange={(e) => setAgreementForm({ ...agreementForm, houseRules: e.target.value })}
+                  className="text-sm"
                 />
               </div>
             </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setCreateAgreementOpen(false)}>
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCreateAgreementOpen(false)}
+                className="border-[var(--gray-300)]"
+              >
                 Cancel
               </Button>
               <Button
-                className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5"
+                size="sm"
+                className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white font-medium"
                 disabled={!agreementForm.roomTenantId || createAgreementMut.isPending}
                 onClick={handleCreateAgreement}
               >
-                {createAgreementMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Generate & Dispatch eSign
+                {createAgreementMut.isPending ? "Generating..." : "Generate Agreement"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -795,39 +830,39 @@ export default function Kyc() {
 
         {/* DIALOG 4: VIEW KYC DETAILS MODAL */}
         <Dialog open={Boolean(detailId)} onOpenChange={(o) => !o && setDetailId(null)}>
-          <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogContent className="max-w-md p-6 space-y-4">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-teal-600" /> Aadhaar Verification Details
+              <DialogTitle className="text-base font-semibold text-[var(--gray-900)]">
+                Aadhaar Verification Details
               </DialogTitle>
             </DialogHeader>
             {detailQuery.isLoading ? (
               <div className="flex justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-teal-600" />
+                <Loader2 className="h-6 w-6 animate-spin text-[var(--brand-600)]" />
               </div>
             ) : detailQuery.data ? (
               <div className="space-y-3 py-2 text-sm">
-                <div className="grid grid-cols-2 gap-2 bg-muted/40 p-3 rounded-lg">
+                <div className="grid grid-cols-2 gap-3 bg-[var(--gray-50)] p-3 rounded-md border border-[var(--gray-200)]">
                   <div>
-                    <span className="text-xs text-muted-foreground">Full Name:</span>
-                    <p className="font-semibold">{kycDetail.name || "—"}</p>
+                    <span className="text-[11px] text-[var(--gray-500)] block">Full Name</span>
+                    <p className="font-semibold text-sm text-[var(--gray-900)]">{kycDetail.name || "—"}</p>
                   </div>
                   <div>
-                    <span className="text-xs text-muted-foreground">Gender / DOB:</span>
-                    <p className="font-semibold">{kycDetail.gender || "—"} • {kycDetail.dob || "—"}</p>
+                    <span className="text-[11px] text-[var(--gray-500)] block">Gender / DOB</span>
+                    <p className="font-semibold text-sm text-[var(--gray-900)]">{kycDetail.gender || "—"} · {kycDetail.dob || "—"}</p>
                   </div>
                   <div className="col-span-2">
-                    <span className="text-xs text-muted-foreground">Address:</span>
-                    <p className="text-xs font-medium mt-0.5">{kycDetail.address || "—"}</p>
+                    <span className="text-[11px] text-[var(--gray-500)] block">Permanent Address</span>
+                    <p className="text-xs text-[var(--gray-700)] mt-0.5 leading-relaxed">{kycDetail.address || "—"}</p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-xs text-emerald-600 font-semibold">
+                <div className="flex items-center gap-2 text-xs text-[var(--success)] font-medium pt-1">
                   <CheckCircle2 className="h-4 w-4" /> Authenticated directly via UIDAI DigiLocker Gateway
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground text-center py-4">No data available.</p>
+              <p className="text-xs text-[var(--gray-500)] text-center py-4">No data available.</p>
             )}
           </DialogContent>
         </Dialog>
