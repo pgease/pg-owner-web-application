@@ -1,15 +1,14 @@
-import { useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useState, useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { CanAccessPage } from "@/components/PermissionGuard";
-import { Plus, Shield, Loader2, AlertCircle } from "lucide-react";
+import { Plus, Shield, Building2, Phone, Mail, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,22 +19,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { useApp } from "@/context/AppContext";
 import { toast } from "@/components/ui/use-toast";
 import { PageHeader } from "@/components/common/PageHeader";
-import { DataTableContainer } from "@/components/common/DataTableContainer";
+import { SearchInput } from "@/components/common/SearchInput";
+import { DataTable, type Column } from "@/components/common/DataTable";
+import { StatusBadge } from "@/components/common/StatusBadge";
+import { ActionMenu } from "@/components/common/ActionMenu";
+import { EmptyState } from "@/components/common/EmptyState";
 import {
   useStaffList,
   useDesignationsQuery,
-  useMyFeaturesQuery,
   useCreateStaffMutation,
 } from "@/hooks/usePropertyOwnerQueries";
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
@@ -51,8 +45,11 @@ const INITIAL_FORM = {
 };
 
 const StaffListContent = () => {
+  const navigate = useNavigate();
   const { selectedPgId, properties } = useApp();
   const [addOpen, setAddOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [compact, setCompact] = useState(false);
   const [form, setForm] = useState(INITIAL_FORM);
 
   const selectedPg = Array.isArray(properties)
@@ -108,150 +105,232 @@ const StaffListContent = () => {
 
   const staffList = Array.isArray(staff) ? staff : [];
 
+  const filteredStaff = useMemo(() => {
+    if (!searchQuery.trim()) return staffList;
+    const q = searchQuery.toLowerCase().trim();
+    return staffList.filter((s: any) => {
+      const name = (s.name || "").toLowerCase();
+      const email = (s.email || "").toLowerCase();
+      const phone = (s.mobileContactNumber || "").toLowerCase();
+      const designation = (s.designation || "").toLowerCase();
+      return name.includes(q) || email.includes(q) || phone.includes(q) || designation.includes(q);
+    });
+  }, [staffList, searchQuery]);
+
+  const columns: Column<any>[] = [
+    {
+      key: "name",
+      header: "Staff Member",
+      render: (s) => (
+        <div>
+          <div className="font-medium text-sm text-[var(--gray-900)]">{s.name}</div>
+          <div className="text-xs text-[var(--gray-500)]">{s.email}</div>
+        </div>
+      ),
+    },
+    {
+      key: "mobile",
+      header: "Contact",
+      render: (s) => (
+        <span className="text-sm text-[var(--gray-700)] tabular-nums">
+          {s.countryCode ? `${s.countryCode} ` : "+91 "}
+          {s.mobileContactNumber}
+        </span>
+      ),
+    },
+    {
+      key: "designation",
+      header: "Designation",
+      render: (s) => (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--gray-100)] text-[var(--gray-700)] border border-[var(--gray-200)]">
+          {s.designation || "General Staff"}
+        </span>
+      ),
+    },
+    {
+      key: "permissions",
+      header: "Permissions",
+      render: (s) => (
+        <span className="text-xs text-[var(--gray-600)] tabular-nums">
+          {s.permissions?.length ?? 0} assigned
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: () => <StatusBadge label="Active" tone="success" />,
+    },
+    {
+      key: "actions",
+      header: "Action",
+      align: "right",
+      render: (s) => (
+        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+          <ActionMenu
+            items={[
+              {
+                label: "Call",
+                icon: <Phone className="h-4 w-4" />,
+                onClick: () => {
+                  window.location.href = `tel:${s.countryCode || "+91"}${s.mobileContactNumber}`;
+                },
+              },
+              {
+                label: "Send Email",
+                icon: <Mail className="h-4 w-4" />,
+                onClick: () => {
+                  window.location.href = `mailto:${s.email}`;
+                },
+              },
+              {
+                label: "Manage Roles & Permissions",
+                icon: <UserCheck className="h-4 w-4" />,
+                onClick: () => navigate("/staff/roles"),
+              },
+            ]}
+          />
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       <PageHeader
         title="Staff"
-        description={`Manage your PG staff and roles${selectedPg ? ` — ${selectedPg.name}` : ""}`}
-        actions={
+        description={`Manage team members, roles, and permissions${selectedPg ? ` for ${selectedPg.name}` : ""}.`}
+        action={
           <Button
             size="sm"
-            className="gap-2"
+            className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white gap-2 font-medium"
             disabled={!selectedPgId}
             onClick={() => setAddOpen(true)}
           >
-            <Plus className="h-4 w-4" /> Add Staff
+            <Plus className="h-4 w-4" /> Add staff
           </Button>
         }
       />
 
       {isFreePlan && (
-        <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
-          <Shield className="h-5 w-5 text-primary" />
-          <div>
-            <p className="text-sm font-medium">
-              Current plan: {planDisplayName || "Free"}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Staff roles & advanced permissions are available on higher plans.
-              Upgrade to assign complaints, track activity, and manage staff
-              permissions.
-            </p>
+        <div className="flex items-center justify-between gap-4 rounded-md border border-[var(--gray-200)] bg-[var(--gray-50)] p-4">
+          <div className="flex items-center gap-3">
+            <Shield className="h-5 w-5 text-[var(--brand-600)] shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-[var(--gray-900)]">
+                Current plan: {planDisplayName || "Lite"}
+              </p>
+              <p className="text-xs text-[var(--gray-600)]">
+                Role-based access control and advanced staff permissions are available on Pro plan.
+              </p>
+            </div>
           </div>
           <Button
             size="sm"
             variant="outline"
-            className="ml-auto shrink-0"
-            onClick={() => (window.location.href = "/plans")}
+            className="shrink-0 border-[var(--gray-300)]"
+            onClick={() => navigate("/plans")}
           >
-            Upgrade
+            View Plans
           </Button>
         </div>
       )}
 
       {!selectedPgId ? (
-        <Card>
-          <CardContent className="p-6 text-center text-muted-foreground">
-            Select a PG from the header to view and manage staff.
-          </CardContent>
-        </Card>
-      ) : isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="bg-white rounded-md border border-[var(--gray-200)] p-8">
+          <EmptyState
+            icon={<Building2 className="h-10 w-10 text-[var(--gray-400)]" />}
+            title="Select a property"
+            description="Choose a PG from the switcher in the top bar to view its staff."
+          />
         </div>
-      ) : isError ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-3 p-6 text-center">
-            <AlertCircle className="h-8 w-8 text-destructive" />
-            <p className="text-sm text-muted-foreground">
-              Failed to load staff. Please try again.
-            </p>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
-      ) : staffList.length === 0 ? (
-        <Card>
-          <CardContent className="p-6 text-center text-muted-foreground">
-            No staff members yet. Click "Add Staff" to get started.
-          </CardContent>
-        </Card>
       ) : (
-        <DataTableContainer>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Mobile</TableHead>
-                <TableHead>Designation</TableHead>
-                <TableHead>Permissions</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {staffList.map((s) => (
-                <TableRow key={s.id}>
-                  <TableCell className="font-medium">{s.name}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {s.email}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {s.countryCode ? `${s.countryCode} ` : ""}
-                    {s.mobileContactNumber}
-                  </TableCell>
-                  <TableCell>
-                    {s.designation ? (
-                      <Badge variant="secondary">{s.designation}</Badge>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {s.permissions?.length ?? 0}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Badge variant="default">Active</Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </DataTableContainer>
+        <div className="space-y-4">
+          {/* Toolbar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 rounded-md border border-[var(--gray-200)]">
+            <div className="flex-1 max-w-sm">
+              <SearchInput
+                placeholder="Search staff by name, email, phone..."
+                value={searchQuery}
+                onChange={setSearchQuery}
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCompact(!compact)}
+                className="h-8 text-xs border-[var(--gray-300)]"
+              >
+                {compact ? "Default" : "Compact"}
+              </Button>
+            </div>
+          </div>
+
+          <DataTable
+            columns={columns}
+            data={filteredStaff}
+            keyExtractor={(s) => s.id}
+            isLoading={isLoading}
+            isError={isError}
+            onRetry={() => refetch()}
+            compact={compact}
+            emptyTitle="No staff members yet"
+            emptyDescription="Add managers, wardens, or maintenance staff to manage your PG operations."
+            emptyAction={
+              <Button
+                size="sm"
+                className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white"
+                onClick={() => setAddOpen(true)}
+              >
+                <Plus className="h-4 w-4 mr-1.5" /> Add staff
+              </Button>
+            }
+          />
+        </div>
       )}
 
+      {/* Add Staff Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md p-6 space-y-4">
           <DialogHeader>
-            <DialogTitle>Add Staff</DialogTitle>
+            <DialogTitle className="text-base font-semibold text-[var(--gray-900)]">
+              Add Staff Member
+            </DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-2">
-            <div className="space-y-2">
-              <Label>Name</Label>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-[var(--gray-700)]">
+                Full Name <span className="text-[#B42318]">*</span>
+              </Label>
               <Input
-                placeholder="Full name"
+                placeholder="e.g. Ramesh Kumar"
                 value={form.name}
                 onChange={(e) =>
                   setForm((p) => ({ ...p, name: e.target.value }))
                 }
+                className="h-9 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-[var(--gray-700)]">
+                Email Address <span className="text-[#B42318]">*</span>
+              </Label>
               <Input
                 type="email"
-                placeholder="email@example.com"
+                placeholder="ramesh@example.com"
                 value={form.email}
                 onChange={(e) =>
                   setForm((p) => ({ ...p, email: e.target.value }))
                 }
+                className="h-9 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Mobile</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-[var(--gray-700)]">
+                Mobile Number <span className="text-[#B42318]">*</span>
+              </Label>
               <div className="flex gap-2">
                 <Select
                   value={form.countryCode}
@@ -259,7 +338,7 @@ const StaffListContent = () => {
                     setForm((p) => ({ ...p, countryCode: v }))
                   }
                 >
-                  <SelectTrigger className="w-20">
+                  <SelectTrigger className="w-20 h-9 text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -278,20 +357,22 @@ const StaffListContent = () => {
                         .slice(0, 10),
                     }))
                   }
-                  className="flex-1"
+                  className="flex-1 h-9 text-sm"
                 />
               </div>
             </div>
             {designations.length > 0 && (
-              <div className="space-y-2">
-                <Label>Designation (optional)</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-[var(--gray-700)]">
+                  Designation (optional)
+                </Label>
                 <Select
                   value={form.designation}
                   onValueChange={(v) =>
                     setForm((p) => ({ ...p, designation: v }))
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-9 text-sm">
                     <SelectValue placeholder="Select designation" />
                   </SelectTrigger>
                   <SelectContent>
@@ -304,24 +385,25 @@ const StaffListContent = () => {
                 </Select>
               </div>
             )}
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setAddOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleAddStaff}
-                disabled={createStaffMutation.isPending}
-              >
-                {createStaffMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" /> Adding...
-                  </>
-                ) : (
-                  "Add Staff"
-                )}
-              </Button>
-            </div>
           </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAddOpen(false)}
+              className="border-[var(--gray-300)]"
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white font-medium"
+              onClick={handleAddStaff}
+              disabled={createStaffMutation.isPending}
+            >
+              {createStaffMutation.isPending ? "Adding..." : "Add Staff"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
