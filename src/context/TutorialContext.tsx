@@ -197,3 +197,6 @@ export function useTutorial() {
   }
   return context;
 }
+
+export const useTutorials = useTutorial;
+

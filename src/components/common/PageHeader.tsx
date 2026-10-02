@@ -14,6 +14,8 @@ interface PageHeaderProps {
   description?: ReactNode;
   /** Primary + secondary actions, right-aligned on desktop. */
   actions?: ReactNode;
+  /** Alias for actions */
+  action?: ReactNode;
   /** Optional breadcrumb trail rendered above the title. */
   breadcrumbs?: Crumb[];
   /** Renders a back arrow next to the title that links to this route. */
@@ -32,12 +34,14 @@ export function PageHeader({
   title,
   description,
   actions,
+  action,
   breadcrumbs,
   backTo,
   backLabel = "Back",
   titleAddon,
   className,
 }: PageHeaderProps) {
+  const headerActions = actions ?? action;
   return (
     <header className={cn("flex flex-col gap-3", className)}>
       {breadcrumbs && breadcrumbs.length > 0 ? (
@@ -79,7 +83,7 @@ export function PageHeader({
             {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
           </div>
         </div>
-        {actions ? <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{actions}</div> : null}
+        {headerActions ? <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{headerActions}</div> : null}
       </div>
     </header>
   );

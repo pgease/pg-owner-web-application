@@ -1,33 +1,25 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  Search,
   Plus,
-  Building2,
-  DoorOpen,
-  BedDouble,
-  Loader2,
-  Users,
-  UserPlus,
-  ShieldCheck,
-  AlertTriangle,
-  Megaphone,
-  ExternalLink,
+  ArrowRightLeft,
+  UserMinus,
+  Clock,
+  Download,
+  IndianRupee,
   Phone,
   MessageCircle,
-  ArrowRightLeft,
-  Layers,
-  UserMinus,
-  AlertCircle,
-  Calendar,
-  Clock,
+  ExternalLink,
+  ShieldCheck,
+  Megaphone,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/common/EmptyState";
-import { StatCard } from "@/components/common/StatCard";
 import { ErrorState } from "@/components/common/ErrorState";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/common/StatusBadge";
+import { SearchInput } from "@/components/common/SearchInput";
+import { ActionMenu } from "@/components/common/ActionMenu";
+import { DataTable } from "@/components/common/DataTable";
+import { MetricDisplay } from "@/components/common/MetricDisplay";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,15 +33,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useApp } from "@/context/AppContext";
 import type { PropertyTenant } from "@/api/propertyOwner";
 import { roomHasVacancyForAllocation } from "@/api/propertyOwner";
@@ -63,7 +46,6 @@ import {
   useCancelTenantNoticeMutation,
   useMoveOutTenantMutation,
 } from "@/hooks/usePropertyOwnerQueries";
-import { FilterBar } from "@/components/common/FilterBar";
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
 import { toast } from "@/components/ui/use-toast";
 import {
@@ -78,9 +60,9 @@ import {
   tenantFloor,
   tenantBedNo,
   tenantStayStatus,
-  tenantStatusDisplay,
-  tenantCode,
 } from "@/lib/tenantDisplay";
+import { formatDate, formatINR } from "@/lib/formatters";
+import { TenantDetailDrawer } from "@/components/tenants/TenantDetailDrawer";
 import { cn } from "@/lib/utils";
 
 function phoneDigits(phone: string): string {
@@ -94,17 +76,22 @@ function waLink(phone: string): string | null {
   return `https://wa.me/${n}`;
 }
 
-
 const Tenants = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { properties, selectedPgId, setSelectedPgId } = useApp();
+  const { properties, selectedPgId } = useApp();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [kycFilter, setKycFilter] = useState<"all" | "verified" | "pending">("all");
   const [selectedBlockId, setSelectedBlockId] = useState<string>("");
   const [selectedFloorId, setSelectedFloorId] = useState<string>("");
   const [selectedRoomId, setSelectedRoomId] = useState<string>("");
-  const [groupBy, setGroupBy] = useState<"block" | "floor" | "none">("none");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "notice" | "moved_out">("all");
+  const [density, setDensity] = useState<"default" | "compact">("default");
+
+  // Drawer inspection state
+  const [activeDrawerTenant, setActiveDrawerTenant] = useState<PropertyTenant | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // Move Tenant State
   const [moveModalOpen, setMoveModalOpen] = useState(false);
@@ -117,9 +104,6 @@ const Tenants = () => {
   const [newDeposit, setNewDeposit] = useState<string>("");
   const [transferDeposit, setTransferDeposit] = useState<boolean>(true);
   const [moveRemarks, setMoveRemarks] = useState<string>("");
-
-  // Status Filter State
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "notice" | "moved_out">("all");
 
   // Vacate / Move Out State
   const [vacateModalOpen, setVacateModalOpen] = useState(false);
@@ -172,7 +156,7 @@ const Tenants = () => {
         remarks: moveRemarks.trim() || undefined,
       });
       toast({
-        title: "Tenant Relocated Successfully! 🚚",
+        title: "Tenant relocated successfully",
         description: `${tenantDisplayName(selectedTenantForMove)} moved to room successfully.`,
       });
       setMoveModalOpen(false);
@@ -203,8 +187,8 @@ const Tenants = () => {
         },
       });
       toast({
-        title: "Tenant Move-Out Completed 🚪",
-        description: `${tenantDisplayName(selectedTenantForVacate)} has moved out. The bed is now free and recurring rent invoicing is halted.`,
+        title: "Tenant move-out completed",
+        description: `${tenantDisplayName(selectedTenantForVacate)} has moved out. The bed is now free.`,
       });
       setVacateModalOpen(false);
       setSelectedTenantForVacate(null);
@@ -240,8 +224,8 @@ const Tenants = () => {
         },
       });
       toast({
-        title: "Notice Period Initiated 📅",
-        description: `${tenantDisplayName(selectedTenantForNotice)} is now on notice (scheduled to vacate ${noticeMoveOutDate}).`,
+        title: "Notice period initiated",
+        description: `${tenantDisplayName(selectedTenantForNotice)} is now on notice (leaving ${noticeMoveOutDate}).`,
       });
       setNoticeModalOpen(false);
       setSelectedTenantForNotice(null);
@@ -266,7 +250,7 @@ const Tenants = () => {
     try {
       await cancelNoticeMutation.mutateAsync(roomTenantId);
       toast({
-        title: "Notice Cancelled Successfully",
+        title: "Notice cancelled",
         description: `${tenantDisplayName(selectedTenantForCancelNotice)} has been restored to active stay.`,
       });
       setCancelNoticeAlertOpen(false);
@@ -287,29 +271,11 @@ const Tenants = () => {
   const effectiveBlockId = selectedBlockId || blocks[0]?.id || "";
   const floorsQuery = useFloors(selectedPgId, effectiveBlockId || undefined);
   const floors = floorsQuery.data ?? [];
-  const effectiveFloorId = selectedFloorId || floors[0]?.id || "";
-  const roomsQuery = useRoomsList(selectedPgId, effectiveBlockId || undefined, effectiveFloorId || undefined, {
-    requireBlockAndFloor: false,
-  });
-  const rooms = roomsQuery.data ?? [];
-
-  // All rooms in current PG for the filter dropdown
   const allPropertyRoomsQuery = useRoomsList(selectedPgId, undefined, undefined, { requireBlockAndFloor: false });
   const allPropertyRooms = allPropertyRoomsQuery.data ?? [];
 
   const isVacantRoomsPage = location.pathname === "/tenants/vacant-rooms";
   const tenantsQuery = usePropertyTenants(isVacantRoomsPage ? null : selectedPgId);
-
-  const searchFilteredRooms = useMemo(() => {
-    if (!searchQuery.trim()) return rooms;
-    const q = searchQuery.toLowerCase();
-    return rooms.filter((r) => String(r.roomNumber).toLowerCase().includes(q));
-  }, [rooms, searchQuery]);
-
-  const filteredRooms = useMemo(() => {
-    if (!isVacantRoomsPage) return searchFilteredRooms;
-    return searchFilteredRooms.filter(roomHasVacancyForAllocation);
-  }, [isVacantRoomsPage, searchFilteredRooms]);
 
   const filteredTenants = useMemo(() => {
     const rows = tenantsQuery.data ?? [];
@@ -373,90 +339,6 @@ const Tenants = () => {
     };
   }, [rawTenantsList]);
 
-  const groupedByBlockTenants = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        blockName: string;
-        displayOrder: number;
-        floors: Map<string, { floorName: string; displayOrder: number; tenants: PropertyTenant[] }>;
-      }
-    >();
-
-    for (const t of filteredTenants) {
-      const roomId = t.room?.id || (t as any).roomId || t.roomTenant?.roomId;
-      const roomObj = allPropertyRooms.find((r) => r.id === roomId);
-
-      const bKey = t.block?.id || roomObj?.blockId || (roomId ? "main-block" : "unassigned");
-      const bName = t.block?.name || roomObj?.block || blocks.find((b) => b.id === (roomObj?.blockId || t.block?.id))?.name || (roomId ? "Main Building" : "Unassigned");
-      const bOrder = t.block?.displayOrder ?? 999;
-
-      if (!map.has(bKey)) {
-        map.set(bKey, { blockName: bName, displayOrder: bOrder, floors: new Map() });
-      }
-      const bObj = map.get(bKey)!;
-
-      const fKey = t.floor?.id || roomObj?.floorId || (roomId ? "main-floor" : "unassigned");
-      const fName = t.floor?.name || roomObj?.floor || floors.find((f) => f.id === (roomObj?.floorId || t.floor?.id))?.name || (roomId ? "Ground Floor" : "Unassigned");
-      const fOrder = t.floor?.displayOrder ?? 999;
-
-      if (!bObj.floors.has(fKey)) {
-        bObj.floors.set(fKey, { floorName: fName, displayOrder: fOrder, tenants: [] });
-      }
-      bObj.floors.get(fKey)!.tenants.push(t);
-    }
-
-    return Array.from(map.entries())
-      .map(([blockId, b]) => ({
-        blockId,
-        blockName: b.blockName,
-        displayOrder: b.displayOrder,
-        totalTenants: Array.from(b.floors.values()).reduce((sum, f) => sum + f.tenants.length, 0),
-        floors: Array.from(b.floors.entries())
-          .map(([floorId, f]) => ({
-            floorId,
-            floorName: f.floorName,
-            displayOrder: f.displayOrder,
-            tenants: f.tenants,
-          }))
-          .sort((a, b) => a.displayOrder - b.displayOrder || a.floorName.localeCompare(b.floorName)),
-      }))
-      .sort((a, b) => a.displayOrder - b.displayOrder || a.blockName.localeCompare(b.blockName));
-  }, [filteredTenants, allPropertyRooms, blocks, floors]);
-
-  const groupedByFloorTenants = useMemo(() => {
-    const map = new Map<
-      string,
-      { floorName: string; blockName: string; displayOrder: number; tenants: PropertyTenant[] }
-    >();
-
-    for (const t of filteredTenants) {
-      const roomId = t.room?.id || (t as any).roomId || t.roomTenant?.roomId;
-      const roomObj = allPropertyRooms.find((r) => r.id === roomId);
-
-      const fKey = t.floor?.id || roomObj?.floorId || (roomId ? "main-floor" : "unassigned");
-      const fName = t.floor?.name || roomObj?.floor || floors.find((f) => f.id === (roomObj?.floorId || t.floor?.id))?.name || (roomId ? "Ground Floor" : "Unassigned");
-      const bName = t.block?.name || roomObj?.block || blocks.find((b) => b.id === (roomObj?.blockId || t.block?.id))?.name || (roomId ? "Main Building" : "Unassigned");
-      const fOrder = t.floor?.displayOrder ?? 999;
-
-      if (!map.has(fKey)) {
-        map.set(fKey, { floorName: fName, blockName: bName, displayOrder: fOrder, tenants: [] });
-      }
-      map.get(fKey)!.tenants.push(t);
-    }
-
-    return Array.from(map.entries())
-      .map(([floorId, f]) => ({
-        floorId,
-        floorName: f.floorName,
-        blockName: f.blockName,
-        displayOrder: f.displayOrder,
-        totalTenants: f.tenants.length,
-        tenants: f.tenants,
-      }))
-      .sort((a, b) => a.displayOrder - b.displayOrder || a.floorName.localeCompare(b.floorName));
-  }, [filteredTenants, allPropertyRooms, blocks, floors]);
-
   const kpi = useMemo(() => {
     const rows = tenantsQuery.data ?? [];
     const verified = rows.filter((t) => tenantVerificationLabel(t) === "verified").length;
@@ -476,721 +358,470 @@ const Tenants = () => {
     };
   }, [tenantsQuery.data]);
 
-  const occupiedBeds = filteredRooms.reduce((sum, r) => sum + (Number(r.occupiedBeds) || 0), 0);
-  const availableBeds = filteredRooms.reduce((sum, r) => sum + (Number(r.availableBeds) || 0), 0);
-  const totalBeds = filteredRooms.reduce((sum, r) => sum + (Number(r.numberOfBeds) || 0), 0);
-
-  const roomsLoading = blocksQuery.isLoading || floorsQuery.isLoading || roomsQuery.isLoading;
-  const roomsError = blocksQuery.isError || floorsQuery.isError || roomsQuery.isError;
-
-  const filterBarVacant = (
-    <FilterBar>
-      <div className="relative min-w-0 flex-1 max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search by room number..."
-          className="pl-9"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-      </div>
-      <Select
-        value={selectedPgId || "none"}
-        onValueChange={(v) => {
-          if (v !== "none") setSelectedPgId(v);
-        }}
-      >
-        <SelectTrigger className="w-[200px]">
-          <SelectValue placeholder="Select PG" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="none" disabled>
-            Select PG
-          </SelectItem>
-          {list
-            .filter((p) => p.id && String(p.id).trim() !== "")
-            .map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name}
-              </SelectItem>
-            ))}
-        </SelectContent>
-      </Select>
-      <Select
-        value={effectiveBlockId || "none"}
-        onValueChange={(v) => {
-          setSelectedBlockId(v);
-          setSelectedFloorId("");
-        }}
-      >
-        <SelectTrigger className="w-[160px]">
-          <SelectValue placeholder="Block" />
-        </SelectTrigger>
-        <SelectContent>
-          {blocks
-            .filter((b) => b.id && String(b.id).trim() !== "")
-            .map((b) => (
-              <SelectItem key={b.id} value={b.id}>
-                {b.name}
-              </SelectItem>
-            ))}
-          {blocks.length === 0 && <SelectItem value="none" disabled>No blocks</SelectItem>}
-        </SelectContent>
-      </Select>
-      <Select value={effectiveFloorId || "none"} onValueChange={setSelectedFloorId}>
-        <SelectTrigger className="w-[160px]">
-          <SelectValue placeholder="Floor" />
-        </SelectTrigger>
-        <SelectContent>
-          {floors
-            .filter((f) => f.id && String(f.id).trim() !== "")
-            .map((f) => (
-              <SelectItem key={f.id} value={f.id}>
-                {f.name}
-              </SelectItem>
-            ))}
-          {floors.length === 0 && <SelectItem value="none" disabled>No floors</SelectItem>}
-        </SelectContent>
-      </Select>
-    </FilterBar>
-  );
-
-  const roomsSection = (
-    <>
-      <Card className="border-border/80 shadow-sm">
-        <CardContent className="p-4">
-          <p className="mb-3 text-sm font-semibold">{isVacantRoomsPage ? "Vacancy overview" : "Occupancy overview"}</p>
-          <div className="flex flex-wrap gap-5 text-sm text-muted-foreground">
-            <span>Total beds: {totalBeds}</span>
-            <span>Occupied: {occupiedBeds}</span>
-            <span>Available: {availableBeds}</span>
-            <span>Rooms shown: {filteredRooms.length}</span>
-          </div>
-        </CardContent>
-      </Card>
-
-      {roomsLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      ) : roomsError ? (
-        <Card>
-          <CardContent className="p-8 text-center text-muted-foreground">
-            <p className="font-medium">Failed to load room data</p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-3"
-              onClick={() => {
-                blocksQuery.refetch();
-                floorsQuery.refetch();
-                roomsQuery.refetch();
-              }}
-            >
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
-      ) : filteredRooms.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center text-muted-foreground">
-            <p className="font-medium">{isVacantRoomsPage ? "No vacant rooms found" : "No room inventory found"}</p>
-            <p className="mt-1 text-sm">
-              {isVacantRoomsPage
-                ? "Try another block/floor, or add rooms in Structure."
-                : "Add blocks, floors, and rooms under My PGs → Structure."}
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {filteredRooms.map((r, index) => (
-            <Card
-              key={r.id && String(r.id).trim() !== "" ? r.id : `room-row-${index}-${String(r.roomNumber)}`}
-              className="border-border/80 shadow-sm"
-            >
-              <CardContent className="p-4">
-                <div className="flex flex-wrap items-start gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold">Room {r.roomNumber}</p>
-                      <Badge variant="secondary">{r.numberOfBeds} beds</Badge>
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-4 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Building2 className="h-3.5 w-3.5" />
-                        Block:{" "}
-                        {r.block && String(r.block).trim() !== ""
-                          ? String(r.block)
-                          : blocks.find((b) => b.id === effectiveBlockId)?.name ?? "—"}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <DoorOpen className="h-3.5 w-3.5" />
-                        Room: {r.roomNumber}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <BedDouble className="h-3.5 w-3.5" />
-                        Available: {r.availableBeds ?? "—"}
-                      </span>
-                    </div>
-                    <p className="mt-3 border-t border-dashed pt-3 text-sm">
-                      <span className="font-medium">Occupied:</span> {r.occupiedBeds ?? 0}/{r.numberOfBeds}
-                    </p>
-                  </div>
-                  <Button size="sm" variant="outline" asChild>
-                    <Link to="/tenants/add">Add tenant</Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-    </>
-  );
-
-  const statusLabel = (t: PropertyTenant) => {
-    if (t.notice?.isOnNotice) return "On notice";
-    if (tenantVerificationLabel(t) === "verified") return "Verified";
-    return "KYC pending";
+  // Export to CSV
+  const handleExportCSV = () => {
+    if (filteredTenants.length === 0) return;
+    const headers = ["Name", "Phone", "Room", "Bed", "Rent", "Due Status", "KYC", "Stay Status", "Joined"];
+    const rows = filteredTenants.map((t) => [
+      `"${tenantDisplayName(t)}"`,
+      `"${tenantPhone(t)}"`,
+      `"${tenantRoomNo(t)}"`,
+      `"${tenantBedNo(t)}"`,
+      `"${tenantRentAmount(t)}"`,
+      `"${tenantRentDueLabel(t)}"`,
+      `"${tenantVerificationLabel(t)}"`,
+      `"${tenantStayStatus(t)}"`,
+      `"${formatDate((t as any).roomTenant?.startDate || t.createdAt)}"`,
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Tenants_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  const renderTenantCard = (row: PropertyTenant) => {
-    const wa = row.phone ? waLink(row.phone) : null;
-    const isVerified = tenantVerificationLabel(row) === "verified";
-    const initial = tenantInitials(row);
-
-    const roomId = row.room?.id || (row as any).roomId || row.roomTenant?.roomId;
-    const roomObj = allPropertyRooms.find((r) => r.id === roomId);
-    const roomNo = roomObj?.roomNumber || roomObj?.name || tenantRoomNo(row);
-    const floorName = roomObj?.floor || floors.find((f) => f.id === (roomObj?.floorId || row.floor?.id))?.name || tenantFloor(row);
-    const blockName = roomObj?.block || blocks.find((b) => b.id === (roomObj?.blockId || row.block?.id))?.name || tenantBlock(row);
-    const bedNo = tenantBedNo(row);
-    const tenantPhoto = (row as any).photoUrl || (row as any).imageUrl || (row as any).profilePhotoUrl;
-    const statusInfo = tenantStatusDisplay(row);
-    const code = tenantCode(row);
-
-    return (
-      <Card
-        key={row.id}
-        className={cn(
-          "cursor-pointer hover:shadow-md transition-shadow duration-200 border-border/60 overflow-hidden bg-card",
-          statusInfo.status === "UNDER_NOTICE" && "border-amber-300 dark:border-amber-800/60 bg-amber-500/[0.02]",
-          statusInfo.status === "MOVED_OUT" && "opacity-75 bg-muted/20",
-        )}
-        onClick={() => navigate(`/tenants/${row.id}`)}
-      >
-        <CardContent className="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          {/* Left Details block */}
-          <div className="flex items-center gap-4 min-w-0 flex-1">
-            <Avatar className="h-12 w-12 border shrink-0">
-              {tenantPhoto ? (
-                <AvatarImage src={tenantPhoto} alt={tenantDisplayName(row)} className="object-cover" />
-              ) : null}
-              <AvatarFallback className="text-sm font-semibold bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-300">
-                {initial}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <h3 className="font-bold text-base text-foreground truncate">
-                  {tenantDisplayName(row)}
-                </h3>
-                {code && (
-                  <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                    {code}
-                  </span>
-                )}
-                <Badge
-                  variant="outline"
-                  className={cn("text-[10px] py-0 px-2 font-medium flex items-center gap-1", statusInfo.badgeClass)}
-                >
-                  {statusInfo.status === "UNDER_NOTICE" && <Clock className="h-2.5 w-2.5" />}
-                  {statusInfo.label}
-                </Badge>
-                {isVerified ? (
-                  <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-50 text-[10px] py-0 px-2 font-medium">
-                    Aadhaar verified
-                  </Badge>
-                ) : (
-                  <Badge className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-50 text-[10px] py-0 px-2 font-medium">
-                    Pending KYC
-                  </Badge>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center text-xs text-muted-foreground gap-x-2 mt-1">
-                <span className="font-semibold text-foreground">Block: {blockName}</span>
-                <span className="text-border">|</span>
-                <span className="font-semibold text-foreground">Floor: {floorName}</span>
-                <span className="text-border">|</span>
-                <span className="font-semibold text-foreground">Room: {roomNo}</span>
-                <span className="text-border">|</span>
-                <span className="font-semibold text-foreground">Bed: {bedNo}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Middle Info block (Rent & Dues) */}
-          <div className="flex items-center gap-4 text-xs shrink-0 flex-wrap md:flex-nowrap md:mx-6">
-            <div className="flex flex-col">
-              <span className="text-[10px] text-muted-foreground uppercase font-semibold">Rent</span>
-              <span className="font-bold text-sm text-foreground">{tenantRentAmount(row)}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] text-muted-foreground uppercase font-semibold">Due Status</span>
-              <span className="text-xs text-orange-600 dark:text-orange-400 font-bold bg-orange-50 dark:bg-orange-950/20 px-2 py-0.5 rounded mt-0.5">
-                Rent due: {tenantRentDueLabel(row)}
-              </span>
-            </div>
-          </div>
-
-          {/* Right Quick actions block */}
-          <div className="flex items-center gap-2 shrink-0 justify-end flex-wrap" onClick={(e) => e.stopPropagation()}>
-            {statusInfo.status === "MOVED_OUT" ? (
-              <span className="text-xs font-semibold text-muted-foreground bg-muted/60 px-3 py-1.5 rounded-lg border border-border/60">
-                Stay Completed
-              </span>
-            ) : statusInfo.status === "UNDER_NOTICE" ? (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 gap-1.5 rounded-lg border-rose-300 text-rose-600 hover:bg-rose-50 font-bold shadow-2xs"
-                  onClick={() => handleOpenVacateModal(row)}
-                >
-                  <UserMinus className="h-3.5 w-3.5" /> Complete Move-Out
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 gap-1 rounded-lg border-amber-300 text-amber-800 hover:bg-amber-50 font-medium"
-                  onClick={() => handleOpenCancelNoticeModal(row)}
-                >
-                  Cancel Notice
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 gap-1.5 rounded-lg border-teal-600/30 text-teal-700 hover:bg-teal-50 font-bold"
-                  onClick={() => handleOpenMoveModal(row)}
-                >
-                  <ArrowRightLeft className="h-3.5 w-3.5" /> Move
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 gap-1.5 rounded-lg border-amber-300 text-amber-700 hover:bg-amber-50 font-medium"
-                  onClick={() => handleOpenNoticeModal(row)}
-                >
-                  <Clock className="h-3.5 w-3.5" /> Notice
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 gap-1.5 rounded-lg border-rose-200 text-rose-600 hover:bg-rose-50 font-bold"
-                  onClick={() => handleOpenVacateModal(row)}
-                >
-                  <UserMinus className="h-3.5 w-3.5" /> Move Out
-                </Button>
-              </>
-            )}
-            {tenantPhone(row) !== "—" && (
-              <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-lg border-teal-600/30 text-teal-600 hover:bg-teal-50" asChild>
-                <a href={`tel:${phoneDigits(row.phone ?? "")}`}>
-                  <Phone className="h-3.5 w-3.5" /> Call
-                </a>
-              </Button>
-            )}
-            {wa && (
-              <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-lg border-emerald-600/30 text-emerald-600 hover:bg-emerald-50" asChild>
-                <a href={wa} target="_blank" rel="noreferrer">
-                  <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
-                </a>
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    );
+  const handleRowClick = (tenant: PropertyTenant) => {
+    setActiveDrawerTenant(tenant);
+    setDrawerOpen(true);
   };
-
-  const tenantTableSection = (
-    <div className="space-y-4">
-      {!selectedPgId ? (
-        <Card>
-          <EmptyState
-            icon={<Users />}
-            title="Select a property"
-            description="Use the PG switcher in the top bar to load your tenant list."
-          />
-        </Card>
-      ) : tenantsQuery.isLoading ? (
-        <div className="space-y-3" aria-busy="true" aria-label="Loading tenants">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full" />
-          ))}
-        </div>
-      ) : tenantsQuery.isError ? (
-        <Card>
-          <ErrorState
-            title="Couldn't load tenants"
-            description="Check your connection and try again."
-            onRetry={() => tenantsQuery.refetch()}
-            retrying={tenantsQuery.isFetching}
-          />
-        </Card>
-      ) : filteredTenants.length === 0 ? (
-        <Card>
-          <EmptyState
-            icon={<Users />}
-            title={(tenantsQuery.data?.length ?? 0) === 0 ? "No tenants yet" : "No tenants match your filters"}
-            description={
-              (tenantsQuery.data?.length ?? 0) === 0
-                ? "Add your first tenant to start tracking rent, KYC and notices."
-                : "Try a different search or clear the filters."
-            }
-            action={
-              (tenantsQuery.data?.length ?? 0) === 0 ? (
-                <CanAccess permission="tenant_add">
-                  <Button asChild>
-                    <Link to="/tenants/add">Add tenant</Link>
-                  </Button>
-                </CanAccess>
-              ) : (
-                <Button variant="outline" onClick={() => setSearchQuery("")}>Clear search</Button>
-              )
-            }
-          />
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-            <p className="text-sm font-semibold text-foreground">
-              <span className="tabular-nums">{filteredTenants.length}</span> tenant{filteredTenants.length === 1 ? "" : "s"} found
-            </p>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span>View:</span>
-              <span className="font-medium text-foreground uppercase">{groupBy === "block" ? "Grouped by Block" : groupBy === "floor" ? "Grouped by Floor" : "Flat List"}</span>
-            </div>
-          </div>
-
-          {groupBy === "block" ? (
-            <div className="space-y-6">
-              {groupedByBlockTenants.map((block) => (
-                <div key={block.blockId} className="border border-border/80 rounded-xl bg-card overflow-hidden shadow-xs">
-                  <div className="bg-muted/40 px-4 py-3 border-b flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-5 w-5 text-teal-600" />
-                      <h2 className="font-bold text-base text-foreground">{block.blockName}</h2>
-                    </div>
-                    <Badge variant="secondary" className="font-semibold text-xs">
-                      {block.totalTenants} {block.totalTenants === 1 ? "Tenant" : "Tenants"}
-                    </Badge>
-                  </div>
-
-                  <div className="p-4 space-y-5">
-                    {block.floors.map((floor) => (
-                      <div key={floor.floorId} className="space-y-3">
-                        <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">
-                          <Layers className="h-3.5 w-3.5 text-emerald-600" />
-                          {floor.floorName} ({floor.tenants.length})
-                        </div>
-                        <div className="flex flex-col gap-3">
-                          {floor.tenants.map((row) => renderTenantCard(row))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : groupBy === "floor" ? (
-            <div className="space-y-6">
-              {groupedByFloorTenants.map((floor) => (
-                <div key={floor.floorId} className="border border-border/80 rounded-xl bg-card overflow-hidden shadow-xs">
-                  <div className="bg-muted/40 px-4 py-3 border-b flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Layers className="h-5 w-5 text-emerald-600" />
-                      <h2 className="font-bold text-base text-foreground">{floor.floorName}</h2>
-                      {floor.blockName && <span className="text-xs text-muted-foreground font-normal">({floor.blockName})</span>}
-                    </div>
-                    <Badge variant="secondary" className="font-semibold text-xs">
-                      {floor.totalTenants} {floor.totalTenants === 1 ? "Tenant" : "Tenants"}
-                    </Badge>
-                  </div>
-
-                  <div className="p-4 flex flex-col gap-3">
-                    {floor.tenants.map((row) => renderTenantCard(row))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {filteredTenants.map((row) => renderTenantCard(row))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <CanAccessPage permission="tenant_view">
-      <div className="space-y-6 animate-fade-in pb-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="space-y-5 pb-8">
+        {/* Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-page-title">
-              {isVacantRoomsPage ? "Vacant rooms" : "Tenants"}
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {isVacantRoomsPage
-                ? "Rooms with free beds for quick allocation"
-                : "Search, filter block/floor/room wise, and open tenant profile"}
+            <h1 className="text-xl font-semibold text-[var(--gray-900)]">Tenants</h1>
+            <p className="text-xs text-[var(--gray-600)] mt-0.5">
+              Directory of current and previous residents with room assignments and billing status.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex items-center gap-2">
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
-              className="gap-2 border-teal-300 text-teal-700 font-bold hover:bg-teal-50 shadow-xs"
               onClick={() => handleOpenMoveModal()}
+              className="gap-1.5"
             >
-              <ArrowRightLeft className="h-4 w-4" />
-              Move Tenant
-            </Button>
-            <Button variant="outline" size="sm" className="gap-2" asChild>
-              <Link to="/support">
-                <Megaphone className="h-4 w-4" />
-                Announcements
-              </Link>
+              <ArrowRightLeft className="h-4 w-4" /> Move tenant
             </Button>
             <CanAccess permission="tenant_add">
-              <Button size="sm" className="gap-2 shadow-sm" asChild>
+              <Button size="sm" asChild className="gap-1.5">
                 <Link to="/tenants/add">
-                  <Plus className="h-4 w-4" />
-                  Add tenant
+                  <Plus className="h-4 w-4" /> Add tenant
                 </Link>
               </Button>
             </CanAccess>
           </div>
         </div>
 
-        {isVacantRoomsPage ? (
-          <>
-            {filterBarVacant}
-            {roomsSection}
-          </>
-        ) : (
-          <>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard label="Total tenants" value={kpi.total} icon={<Users className="h-4 w-4" />} tone="brand" />
-              <StatCard label="KYC verified" value={kpi.verified} icon={<ShieldCheck className="h-4 w-4" />} tone="success" />
-              <StatCard label="On notice" value={kpi.onNotice} icon={<AlertTriangle className="h-4 w-4" />} tone={kpi.onNotice > 0 ? "warning" : "default"} />
-              <StatCard label="New (7 days)" value={kpi.recent} icon={<UserPlus className="h-4 w-4" />} tone="default" />
-            </div>
+        {/* Operational Metrics Bar */}
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <MetricDisplay label="Total tenants" value={kpi.total} />
+          <MetricDisplay label="KYC verified" value={kpi.verified} tone="success" />
+          <MetricDisplay label="On notice" value={kpi.onNotice} tone={kpi.onNotice > 0 ? "warning" : "default"} />
+          <MetricDisplay label="New (last 7 days)" value={kpi.recent} />
+        </div>
 
-            {/* Lifecycle Status Filter Tabs */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              <Button
-                type="button"
-                size="sm"
-                variant={statusFilter === "all" ? "default" : "outline"}
-                onClick={() => setStatusFilter("all")}
-                className={cn(
-                  "h-8 rounded-full text-xs font-semibold gap-1.5 transition-all",
-                  statusFilter === "all" ? "bg-slate-900 text-white hover:bg-slate-800" : "text-slate-600 border-slate-200 hover:bg-slate-50"
-                )}
-              >
-                All Tenants ({statusCounts.all})
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={statusFilter === "active" ? "default" : "outline"}
-                onClick={() => setStatusFilter("active")}
-                className={cn(
-                  "h-8 rounded-full text-xs font-semibold gap-1.5 transition-all",
-                  statusFilter === "active"
-                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                    : "text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-                )}
-              >
-                Active ({statusCounts.active})
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={statusFilter === "notice" ? "default" : "outline"}
-                onClick={() => setStatusFilter("notice")}
-                className={cn(
-                  "h-8 rounded-full text-xs font-semibold gap-1.5 transition-all",
-                  statusFilter === "notice"
-                    ? "bg-amber-600 text-white hover:bg-amber-700"
-                    : "text-amber-700 border-amber-200 hover:bg-amber-50"
-                )}
-              >
-                <Clock className="h-3 w-3" /> Under Notice ({statusCounts.notice})
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={statusFilter === "moved_out" ? "default" : "outline"}
-                onClick={() => setStatusFilter("moved_out")}
-                className={cn(
-                  "h-8 rounded-full text-xs font-semibold gap-1.5 transition-all",
-                  statusFilter === "moved_out"
-                    ? "bg-slate-700 text-white hover:bg-slate-800"
-                    : "text-slate-600 border-slate-200 hover:bg-slate-50"
-                )}
-              >
-                Moved Out ({statusCounts.movedOut})
-              </Button>
-            </div>
+        {/* Lifecycle Status Tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto border-b border-[var(--gray-200)] pb-2 pt-1 scrollbar-none">
+          {(
+            [
+              ["all", `All (${statusCounts.all})`],
+              ["active", `Active (${statusCounts.active})`],
+              ["notice", `Under Notice (${statusCounts.notice})`],
+              ["moved_out", `Moved Out (${statusCounts.movedOut})`],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setStatusFilter(key)}
+              className={cn(
+                "px-3 py-1.5 text-xs font-medium rounded-sm transition-colors tabular-nums",
+                statusFilter === key
+                  ? "bg-[var(--brand-50)] text-[var(--brand-700)] font-semibold border border-[var(--brand-100)]"
+                  : "text-[var(--gray-600)] hover:bg-[var(--gray-100)] hover:text-[var(--gray-900)]",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
-            <FilterBar>
-              <div className="relative w-full min-w-[220px] flex-1 sm:max-w-sm">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search name, phone, room…"
-                  className="pl-9"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
+        {/* Search, FilterBar Chips, Density Toggle, Export */}
+        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
+          <div className="flex flex-wrap items-center gap-2 flex-1">
+            <SearchInput
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search name, phone, room…"
+              className="w-full sm:w-64"
+            />
 
-              {/* Block Filter */}
-              <Select
-                value={selectedBlockId || "all"}
-                onValueChange={(v) => {
-                  setSelectedBlockId(v === "all" ? "" : v);
-                  setSelectedFloorId("");
-                  setSelectedRoomId("");
-                }}
-              >
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="All Blocks" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Blocks</SelectItem>
-                  {blocks.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>
-                      {b.name}
+            {/* Block Filter */}
+            <Select
+              value={selectedBlockId || "all"}
+              onValueChange={(v) => {
+                setSelectedBlockId(v === "all" ? "" : v);
+                setSelectedFloorId("");
+                setSelectedRoomId("");
+              }}
+            >
+              <SelectTrigger className="w-[130px] h-9 text-xs">
+                <SelectValue placeholder="All Blocks" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Blocks</SelectItem>
+                {blocks.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Floor Filter */}
+            <Select
+              value={selectedFloorId || "all"}
+              onValueChange={(v) => {
+                setSelectedFloorId(v === "all" ? "" : v);
+                setSelectedRoomId("");
+              }}
+            >
+              <SelectTrigger className="w-[125px] h-9 text-xs">
+                <SelectValue placeholder="All Floors" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Floors</SelectItem>
+                {floors
+                  .filter((f) => !selectedBlockId || selectedBlockId === "all" || f.blockId === selectedBlockId)
+                  .map((f) => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.name}
                     </SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
+              </SelectContent>
+            </Select>
 
-              {/* Floor Filter */}
-              <Select
-                value={selectedFloorId || "all"}
-                onValueChange={(v) => {
-                  setSelectedFloorId(v === "all" ? "" : v);
-                  setSelectedRoomId("");
-                }}
+            {/* Room Filter */}
+            <Select
+              value={selectedRoomId || "all"}
+              onValueChange={(v) => setSelectedRoomId(v === "all" ? "" : v)}
+            >
+              <SelectTrigger className="w-[125px] h-9 text-xs">
+                <SelectValue placeholder="All Rooms" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Rooms</SelectItem>
+                {allPropertyRooms
+                  .filter((r) => !selectedFloorId || selectedFloorId === "all" || r.floorId === selectedFloorId)
+                  .map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      Room {r.roomNumber}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+
+            {/* KYC Status Filter */}
+            <Select value={kycFilter} onValueChange={(v) => setKycFilter(v as typeof kycFilter)}>
+              <SelectTrigger className="w-[120px] h-9 text-xs">
+                <SelectValue placeholder="KYC status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All KYC</SelectItem>
+                <SelectItem value="verified">Verified</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-2 self-end md:self-auto">
+            {/* Density Toggle */}
+            <div className="flex rounded-md border border-[var(--gray-300)] p-0.5 bg-white">
+              <button
+                type="button"
+                onClick={() => setDensity("default")}
+                className={cn(
+                  "px-2 py-1 text-xs rounded-sm transition-colors",
+                  density === "default"
+                    ? "bg-[var(--gray-100)] text-[var(--gray-900)] font-medium"
+                    : "text-[var(--gray-500)] hover:text-[var(--gray-900)]",
+                )}
+                title="Normal row height"
               >
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="All Floors" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Floors</SelectItem>
-                  {floors
-                    .filter((f) => !selectedBlockId || selectedBlockId === "all" || f.blockId === selectedBlockId)
-                    .map((f) => (
-                      <SelectItem key={f.id} value={f.id}>
-                        {f.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-
-              {/* Room Filter */}
-              <Select
-                value={selectedRoomId || "all"}
-                onValueChange={(v) => setSelectedRoomId(v === "all" ? "" : v)}
+                Normal
+              </button>
+              <button
+                type="button"
+                onClick={() => setDensity("compact")}
+                className={cn(
+                  "px-2 py-1 text-xs rounded-sm transition-colors",
+                  density === "compact"
+                    ? "bg-[var(--gray-100)] text-[var(--gray-900)] font-medium"
+                    : "text-[var(--gray-500)] hover:text-[var(--gray-900)]",
+                )}
+                title="Compact row height"
               >
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="All Rooms" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Rooms</SelectItem>
-                  {allPropertyRooms
-                    .filter((r) => !selectedFloorId || selectedFloorId === "all" || r.floorId === selectedFloorId)
-                    .map((r) => (
-                      <SelectItem key={r.id} value={r.id}>
-                        Room {r.roomNumber}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+                Compact
+              </button>
+            </div>
 
-              {/* KYC Status Filter */}
-              <Select value={kycFilter} onValueChange={(v) => setKycFilter(v as typeof kycFilter)}>
-                <SelectTrigger className="w-[130px]">
-                  <SelectValue placeholder="KYC status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All KYC</SelectItem>
-                  <SelectItem value="verified">Verified</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                </SelectContent>
-              </Select>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExportCSV}
+              className="gap-1.5 h-9 text-xs"
+              disabled={filteredTenants.length === 0}
+            >
+              <Download className="h-3.5 w-3.5" /> Export
+            </Button>
+          </div>
+        </div>
 
-              {/* Group By Mode Toggle */}
-              <div className="flex bg-muted p-0.5 rounded-lg border">
-                <Button
-                  type="button"
-                  variant={groupBy === "block" ? "default" : "ghost"}
-                  size="sm"
-                  className={`h-7 px-2.5 text-xs font-semibold ${
-                    groupBy === "block" ? "bg-teal-600 text-white shadow-xs" : "text-muted-foreground"
-                  }`}
-                  onClick={() => setGroupBy("block")}
-                >
-                  By Block
-                </Button>
-                <Button
-                  type="button"
-                  variant={groupBy === "floor" ? "default" : "ghost"}
-                  size="sm"
-                  className={`h-7 px-2.5 text-xs font-semibold ${
-                    groupBy === "floor" ? "bg-teal-600 text-white shadow-xs" : "text-muted-foreground"
-                  }`}
-                  onClick={() => setGroupBy("floor")}
-                >
-                  By Floor
-                </Button>
-                <Button
-                  type="button"
-                  variant={groupBy === "none" ? "default" : "ghost"}
-                  size="sm"
-                  className={`h-7 px-2.5 text-xs font-semibold ${
-                    groupBy === "none" ? "bg-teal-600 text-white shadow-xs" : "text-muted-foreground"
-                  }`}
-                  onClick={() => setGroupBy("none")}
-                >
-                  Flat
-                </Button>
-              </div>
+        {/* Standardized DataTable */}
+        <DataTable
+          columns={[
+            {
+              id: "tenant",
+              header: "Tenant",
+              sortable: true,
+              render: (t: PropertyTenant) => (
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-full bg-[var(--brand-50)] border border-[var(--brand-100)] text-[var(--brand-700)] flex items-center justify-center font-medium text-xs shrink-0">
+                    {tenantInitials(t)}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="block font-medium text-[var(--gray-900)] truncate">
+                      {tenantDisplayName(t)}
+                    </span>
+                    <span className="block text-xs text-[var(--gray-500)] tabular-nums">
+                      {tenantPhone(t)}
+                    </span>
+                  </div>
+                </div>
+              ),
+            },
+            {
+              id: "roomBed",
+              header: "Room / Bed",
+              render: (t: PropertyTenant) => {
+                const room = tenantRoomNo(t);
+                const bed = tenantBedNo(t);
+                return (
+                  <div>
+                    <span className="font-medium text-[var(--gray-900)]">
+                      {room !== "—" ? `Room ${room}` : "—"}
+                    </span>
+                    <span className="text-xs text-[var(--gray-500)] block">
+                      {bed !== "—" ? `Bed ${bed}` : ""}
+                    </span>
+                  </div>
+                );
+              },
+            },
+            {
+              id: "rent",
+              header: "Monthly Rent",
+              align: "right",
+              render: (t: PropertyTenant) => (
+                <span className="tabular-nums font-medium text-[var(--gray-900)]">
+                  {tenantRentAmount(t)}
+                </span>
+              ),
+            },
+            {
+              id: "thisMonth",
+              header: "This Month",
+              render: (t: PropertyTenant) => {
+                const isOverdue = t.isOverdue || t.rentDueDays && t.rentDueDays > 0;
+                return (
+                  <div className="flex flex-col gap-0.5">
+                    <StatusBadge
+                      status={isOverdue ? "overdue" : "pending"}
+                      label={isOverdue ? `Overdue ${t.rentDueDays ?? ""}d` : "Pending"}
+                      size="sm"
+                    />
+                  </div>
+                );
+              },
+            },
+            {
+              id: "kyc",
+              header: "KYC",
+              render: (t: PropertyTenant) => {
+                const isVerified = tenantVerificationLabel(t) === "verified";
+                return (
+                  <StatusBadge
+                    status={isVerified ? "kyc_completed" : "kyc_pending"}
+                    size="sm"
+                  />
+                );
+              },
+            },
+            {
+              id: "stayStatus",
+              header: "Stay Status",
+              render: (t: PropertyTenant) => {
+                const st = tenantStayStatus(t);
+                return (
+                  <StatusBadge
+                    status={st === "UNDER_NOTICE" ? "on_notice" : st === "MOVED_OUT" ? "moved_out" : "occupied"}
+                    size="sm"
+                  />
+                );
+              },
+            },
+            {
+              id: "joined",
+              header: "Joined",
+              align: "right",
+              render: (t: PropertyTenant) => (
+                <span className="tabular-nums text-xs text-[var(--gray-600)]">
+                  {formatDate((t as any).roomTenant?.startDate || t.createdAt)}
+                </span>
+              ),
+            },
+            {
+              id: "actions",
+              header: "",
+              align: "right",
+              render: (t: PropertyTenant) => {
+                const phone = tenantPhone(t);
+                const clean = phone !== "—" ? phone.replace(/\D/g, "") : "";
+                const wa = clean.length >= 10 ? `https://wa.me/${clean.length === 10 ? `91${clean}` : clean}` : null;
+                const stay = tenantStayStatus(t);
 
-              <Button variant="outline" size="sm" asChild>
-                <Link to="/tenants/vacant-rooms">Vacant rooms</Link>
-              </Button>
-            </FilterBar>
+                return (
+                  <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-7 px-2.5 text-xs"
+                      onClick={() =>
+                        navigate("/rent-payments", {
+                          state: { recordForTenantId: t.id, tenantName: tenantDisplayName(t) },
+                        })
+                      }
+                    >
+                      Record
+                    </Button>
 
-            {tenantTableSection}
-          </>
-        )}
+                    <ActionMenu
+                      items={[
+                        {
+                          label: "View profile",
+                          icon: <ExternalLink className="h-3.5 w-3.5" />,
+                          onClick: () => navigate(`/tenants/${t.id}`),
+                        },
+                        {
+                          label: "Move tenant",
+                          icon: <ArrowRightLeft className="h-3.5 w-3.5" />,
+                          onClick: () => handleOpenMoveModal(t),
+                        },
+                        ...(stay !== "UNDER_NOTICE"
+                          ? [
+                              {
+                                label: "Initiate notice",
+                                icon: <Clock className="h-3.5 w-3.5 text-amber-600" />,
+                                onClick: () => handleOpenNoticeModal(t),
+                              },
+                            ]
+                          : [
+                              {
+                                label: "Cancel notice",
+                                icon: <Clock className="h-3.5 w-3.5 text-emerald-600" />,
+                                onClick: () => handleOpenCancelNoticeModal(t),
+                              },
+                            ]),
+                        {
+                          label: "Move out",
+                          icon: <UserMinus className="h-3.5 w-3.5 text-[#B42318]" />,
+                          destructive: true,
+                          onClick: () => handleOpenVacateModal(t),
+                        },
+                        ...(clean
+                          ? [
+                              {
+                                label: "Call tenant",
+                                icon: <Phone className="h-3.5 w-3.5 text-emerald-600" />,
+                                onClick: () => window.open(`tel:${clean}`, "_self"),
+                              },
+                            ]
+                          : []),
+                        ...(wa
+                          ? [
+                              {
+                                label: "WhatsApp chat",
+                                icon: <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />,
+                                onClick: () => window.open(wa, "_blank"),
+                              },
+                            ]
+                          : []),
+                      ]}
+                    />
+                  </div>
+                );
+              },
+            },
+          ]}
+          data={filteredTenants}
+          keyExtractor={(t) => t.id}
+          loading={tenantsQuery.isLoading}
+          density={density}
+          onRowClick={handleRowClick}
+          emptyState={
+            <EmptyState
+              title={tenantsQuery.data?.length === 0 ? "No tenants registered yet" : "No tenants match your search"}
+              description={
+                tenantsQuery.data?.length === 0
+                  ? "Add your first tenant to assign rooms, beds, and track rent collection."
+                  : "Try clearing search filters or selecting another block."
+              }
+              action={
+                tenantsQuery.data?.length === 0 ? (
+                  <Button asChild size="sm">
+                    <Link to="/tenants/add">Add first tenant</Link>
+                  </Button>
+                ) : (
+                  <Button variant="secondary" size="sm" onClick={() => setSearchQuery("")}>
+                    Clear search
+                  </Button>
+                )
+              }
+            />
+          }
+        />
+
+        {/* Tenant Detail Drawer (Opened on row click) */}
+        <TenantDetailDrawer
+          tenant={activeDrawerTenant}
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          onMoveTenant={handleOpenMoveModal}
+          onNoticeTenant={handleOpenNoticeModal}
+          onVacateTenant={handleOpenVacateModal}
+          onRecordPayment={(t) =>
+            navigate("/rent-payments", {
+              state: { recordForTenantId: t.id, tenantName: tenantDisplayName(t) },
+            })
+          }
+          onSendReminder={(t) => {
+            const clean = phoneDigits(t.phone ?? "");
+            if (clean) window.open(`https://wa.me/${clean.length === 10 ? `91${clean}` : clean}?text=Hi%20${encodeURIComponent(tenantDisplayName(t))},%20this%20is%20a%20reminder%20regarding%20your%20monthly%20PG%20rent.`, "_blank");
+          }}
+        />
 
         {/* MOVE TENANT DIALOG MODAL */}
         <Dialog open={moveModalOpen} onOpenChange={setMoveModalOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-teal-700 font-bold">
-                <ArrowRightLeft className="h-5 w-5" /> Move / Relocate Tenant
+              <DialogTitle className="flex items-center gap-2 text-[var(--brand-700)] font-semibold">
+                <ArrowRightLeft className="h-5 w-5" /> Move Tenant
               </DialogTitle>
             </DialogHeader>
 
@@ -1287,7 +918,7 @@ const Tenants = () => {
                   checked={transferDeposit}
                   onCheckedChange={(c) => setTransferDeposit(Boolean(c))}
                 />
-                <Label htmlFor="transferDeposit" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                <Label htmlFor="transferDeposit" className="text-xs font-medium text-[var(--gray-700)] cursor-pointer">
                   Transfer existing paid Security Deposit to new stay
                 </Label>
               </div>
@@ -1304,9 +935,8 @@ const Tenants = () => {
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setMoveModalOpen(false)}>Cancel</Button>
+              <Button variant="secondary" onClick={() => setMoveModalOpen(false)}>Cancel</Button>
               <Button
-                className="bg-teal-600 hover:bg-teal-700 text-white font-bold gap-1.5"
                 onClick={handleConfirmMove}
                 disabled={moveMutation.isPending || !selectedTenantForMove || !targetRoomId}
               >
@@ -1318,56 +948,49 @@ const Tenants = () => {
 
         {/* MODAL 2: VACATE / MOVE-OUT TENANT MODAL */}
         <Dialog open={vacateModalOpen} onOpenChange={setVacateModalOpen}>
-          <DialogContent className="max-w-md rounded-2xl">
+          <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle className="text-base flex items-center gap-2 text-rose-600">
+              <DialogTitle className="text-base flex items-center gap-2 text-[#B42318]">
                 <UserMinus className="h-5 w-5" /> Vacate & Check Out Tenant
               </DialogTitle>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs text-[var(--gray-600)] mt-1">
                 Release bed allocation and complete stay for{" "}
-                <strong className="text-foreground">
+                <strong className="text-[var(--gray-900)]">
                   {selectedTenantForVacate ? tenantDisplayName(selectedTenantForVacate) : "tenant"}
-                </strong>. All financial transaction history and ledgers will remain safely preserved.
+                </strong>. All transaction history remains preserved.
               </p>
             </DialogHeader>
 
             <div className="space-y-4 py-2 text-xs">
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold">Move Out / Vacate Date</Label>
+                <Label className="text-xs font-medium">Move Out Date</Label>
                 <Input
                   type="date"
                   value={vacateDate}
                   onChange={(e) => setVacateDate(e.target.value)}
-                  className="h-10 text-xs rounded-xl"
+                  className="h-9 text-xs"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold">Checkout Reason / Exit Notes (Optional)</Label>
+                <Label className="text-xs font-medium">Checkout Reason (Optional)</Label>
                 <Textarea
                   value={vacateReason}
                   onChange={(e) => setVacateReason(e.target.value)}
-                  placeholder="e.g. Job transfer, completed college exams, personal reasons"
+                  placeholder="e.g. Job transfer, completed college exams"
                   rows={2}
-                  className="text-xs rounded-xl"
+                  className="text-xs"
                 />
-              </div>
-
-              <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200/80 dark:border-amber-900/50 flex gap-2.5 items-start">
-                <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
-                  Vacating will immediately update the bed status to Available for new bookings, while archiving this tenant profile without deleting historical rent receipts.
-                </p>
               </div>
             </div>
 
             <DialogFooter className="gap-2 sm:gap-0">
-              <Button variant="outline" size="sm" onClick={() => setVacateModalOpen(false)} className="rounded-xl text-xs">
+              <Button variant="secondary" size="sm" onClick={() => setVacateModalOpen(false)}>
                 Cancel
               </Button>
               <Button
                 size="sm"
-                className="rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white gap-1.5 shadow-xs"
+                variant="destructive"
                 onClick={handleConfirmVacate}
                 disabled={moveOutMutation.isPending}
               >
@@ -1379,53 +1002,45 @@ const Tenants = () => {
 
         {/* MODAL 3: INITIATE NOTICE PERIOD DIALOG */}
         <Dialog open={noticeModalOpen} onOpenChange={setNoticeModalOpen}>
-          <DialogContent className="max-w-md rounded-2xl">
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="text-base flex items-center gap-2 text-amber-700">
                 <Clock className="h-5 w-5 text-amber-600" /> Initiate Notice Period
               </DialogTitle>
-              <p className="text-xs text-muted-foreground mt-1">
-                Mark <strong className="text-foreground">{selectedTenantForNotice ? tenantDisplayName(selectedTenantForNotice) : "tenant"}</strong> as vacating. The tenant status will change to <span className="font-semibold text-amber-700">UNDER NOTICE</span>.
+              <p className="text-xs text-[var(--gray-600)] mt-1">
+                Mark <strong className="text-[var(--gray-900)]">{selectedTenantForNotice ? tenantDisplayName(selectedTenantForNotice) : "tenant"}</strong> as vacating. Status will change to <span className="font-semibold text-amber-700">On notice</span>.
               </p>
             </DialogHeader>
 
             <div className="space-y-4 py-2 text-xs">
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold">Scheduled Move-Out Date *</Label>
+                <Label className="text-xs font-medium">Scheduled Move-Out Date *</Label>
                 <Input
                   type="date"
                   value={noticeMoveOutDate}
                   onChange={(e) => setNoticeMoveOutDate(e.target.value)}
-                  className="h-10 text-xs rounded-xl"
+                  className="h-9 text-xs"
                   required
                 />
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-bold">Notice Reason / Notes</Label>
+                <Label className="text-xs font-medium">Notice Reason / Notes</Label>
                 <Input
                   value={noticeReason}
                   onChange={(e) => setNoticeReason(e.target.value)}
-                  placeholder="e.g. Relocating to another city, end of contract"
-                  className="h-10 text-xs rounded-xl"
+                  placeholder="e.g. Relocating to another city"
+                  className="h-9 text-xs"
                 />
-              </div>
-
-              <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200/80 dark:border-amber-900/50 flex gap-2.5 items-start">
-                <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
-                  The bed will remain allocated to the tenant until the move-out date is reached or Move-Out is finalized. Rent continues to accrue according to invoicing rules. You can cancel this notice at any time.
-                </p>
               </div>
             </div>
 
             <DialogFooter className="gap-2 sm:gap-0">
-              <Button variant="outline" size="sm" onClick={() => setNoticeModalOpen(false)} className="rounded-xl text-xs">
+              <Button variant="secondary" size="sm" onClick={() => setNoticeModalOpen(false)}>
                 Cancel
               </Button>
               <Button
                 size="sm"
-                className="rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white gap-1.5 shadow-xs"
                 onClick={handleConfirmSetNotice}
                 disabled={setNoticeMutation.isPending || !noticeMoveOutDate}
               >
@@ -1437,27 +1052,26 @@ const Tenants = () => {
 
         {/* MODAL 4: CANCEL NOTICE DIALOG */}
         <Dialog open={cancelNoticeAlertOpen} onOpenChange={setCancelNoticeAlertOpen}>
-          <DialogContent className="max-w-md rounded-2xl">
+          <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle className="text-base flex items-center gap-2 text-foreground">
-                <AlertCircle className="h-5 w-5 text-amber-600" /> Cancel Notice Period
+              <DialogTitle className="text-base flex items-center gap-2 text-[var(--gray-900)]">
+                Cancel Notice Period
               </DialogTitle>
-              <p className="text-xs text-muted-foreground mt-1">
-                Are you sure you want to cancel the move-out notice for <strong className="text-foreground">{selectedTenantForCancelNotice ? tenantDisplayName(selectedTenantForCancelNotice) : "tenant"}</strong>?
+              <p className="text-xs text-[var(--gray-600)] mt-1">
+                Are you sure you want to cancel the move-out notice for <strong className="text-[var(--gray-900)]">{selectedTenantForCancelNotice ? tenantDisplayName(selectedTenantForCancelNotice) : "tenant"}</strong>?
               </p>
             </DialogHeader>
 
-            <div className="py-2 text-xs text-muted-foreground">
-              This will return the tenant to normal <span className="font-semibold text-emerald-700">ACTIVE</span> stay status and remove the scheduled vacating deadline.
+            <div className="py-2 text-xs text-[var(--gray-600)]">
+              This will restore the tenant to Active stay status and remove the scheduled vacating deadline.
             </div>
 
             <DialogFooter className="gap-2 sm:gap-0">
-              <Button variant="outline" size="sm" onClick={() => setCancelNoticeAlertOpen(false)} className="rounded-xl text-xs">
+              <Button variant="secondary" size="sm" onClick={() => setCancelNoticeAlertOpen(false)}>
                 Keep Notice
               </Button>
               <Button
                 size="sm"
-                className="rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white shadow-xs"
                 onClick={handleConfirmCancelNotice}
                 disabled={cancelNoticeMutation.isPending}
               >

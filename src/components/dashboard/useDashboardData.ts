@@ -111,6 +111,10 @@ export function useDashboardData(propertyId: string | null) {
     (d?.unpaidTenants ?? []).forEach((row, i) => {
       const p = parseRentTenantRow(row);
       if (!p) return;
+      const amt = amountFromRow(row);
+      // P0 Bug 6: ₹0 tenant listed as Pending (aman singh, Room 301-123).
+      // Tenants with ₹0 due or already settled must not appear as Pending.
+      if (amt !== undefined && amt <= 0) return;
       const roomNumber = row.roomNumber ?? row.room_number;
       unpaid.push({
         key: `${p.roomTenantId}|${p.tenantId}|${i}`,
@@ -118,7 +122,7 @@ export function useDashboardData(propertyId: string | null) {
         tenantId: p.tenantId,
         name: String(row.tenantName ?? row.name ?? row.tenant_name ?? "Tenant"),
         roomNumber: roomNumber != null && roomNumber !== "" ? String(roomNumber) : undefined,
-        amount: amountFromRow(row),
+        amount: amt,
         raw: row,
       });
     });

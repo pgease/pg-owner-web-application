@@ -29,8 +29,6 @@ interface NavChild {
   url: string;
   permissionKey?: string;
   featureKey?: string;
-  /** Route exists but the screen is a placeholder. Shown with a subtle "Soon" tag. */
-  comingSoon?: boolean;
 }
 
 interface NavItem {
@@ -44,7 +42,7 @@ interface NavItem {
 
 /**
  * Navigation mirrors the routes in App.tsx. Labels use plain PG-owner language.
- * Actions (e.g. "Add tenant") live on their pages, not in navigation.
+ * Clean, operational structure with no "Coming soon" clutter in the primary nav.
  */
 const NAV_ITEMS: NavItem[] = [
   {
@@ -92,7 +90,6 @@ const NAV_ITEMS: NavItem[] = [
       { title: "Payment History", url: "/rent-payments/history", permissionKey: "account_view_dues" },
       { title: "Dues & Pending", url: "/rent-payments/dues", permissionKey: "account_view_dues" },
       { title: "Expenses", url: "/expenses", permissionKey: "expense_view", featureKey: "expense_tracking" },
-      { title: "Refunds", url: "/refunds", permissionKey: "refund_add", comingSoon: true },
     ],
   },
   {
@@ -104,7 +101,6 @@ const NAV_ITEMS: NavItem[] = [
       { title: "Group Chat", url: "/group-chat", permissionKey: "chat_view", featureKey: "pg_group_chat" },
       { title: "Food & Meals", url: "/food", permissionKey: "food_view_edit", featureKey: "food_menu_planner" },
       { title: "Night Out Passes", url: "/nightout", permissionKey: "nightout_view", featureKey: "nightout_guest_requests" },
-      { title: "Eviction", url: "/eviction", permissionKey: "eviction_approve", comingSoon: true },
     ],
   },
   {
@@ -133,7 +129,6 @@ const NAV_ITEMS: NavItem[] = [
       { title: "Settings", url: "/settings" },
       { title: "Plans & Billing", url: "/plans" },
       { title: "Refer & Earn", url: "/referrals" },
-      { title: "Feature Catalogue", url: "/feature-catalogue" },
       { title: "Activity Logs", url: "/activity-logs", featureKey: "audit_logs" },
     ],
   },
@@ -158,25 +153,55 @@ interface SidebarContentProps {
 const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: SidebarContentProps) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const { isOwner, can } = usePermissions();
-  const { isNavChildLocked: isFeatureNavLocked } = useFeatureAccess();
+  const featureAccess = useFeatureAccess();
+
+  const isFeatureNavLocked = (featureKey?: string) => {
+    if (!featureKey) return false;
+    if (typeof featureAccess?.isFeatureNavLocked === "function") {
+      return featureAccess.isFeatureNavLocked(featureKey);
+    }
+    if (typeof featureAccess?.isNavChildLocked === "function") {
+      return featureAccess.isNavChildLocked(featureKey);
+    }
+    return false;
+  };
+
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    NAV_ITEMS.forEach((item) => {
+      if (item.children) {
+        const matches = item.children.some(
+          (c) => location.pathname === c.url || (c.url !== "/" && location.pathname.startsWith(c.url)),
+        );
+        if (matches) initial[item.title] = true;
+      }
+    });
+    return initial;
+  });
+
+  const toggleGroup = (item: NavItem) => {
+    setOpenGroups((prev) => ({ ...prev, [item.title]: !prev[item.title] }));
+  };
+
+  const isGroupActive = (item: NavItem): boolean => {
+    if (location.pathname === item.url) return true;
+    if (item.children) {
+      return item.children.some(
+        (c) => location.pathname === c.url || (c.url !== "/" && location.pathname.startsWith(c.url)),
+      );
+    }
+    return item.url !== "/" && location.pathname.startsWith(item.url);
+  };
+
+  const isGroupOpen = (item: NavItem): boolean => {
+    if (openGroups[item.title] !== undefined) return openGroups[item.title];
+    return isGroupActive(item);
+  };
 
   const handleLogout = () => {
     authStorage.clear();
-    navigate("/login", { replace: true });
-  };
-
-  const isGroupActive = (item: NavItem) => {
-    if (!item.children) return location.pathname === item.url;
-    return item.children.some((c) => location.pathname === c.url);
-  };
-
-  /** A group is open if the user toggled it open, or (by default) it contains the active route. */
-  const isGroupOpen = (item: NavItem) => openGroups[item.title] ?? isGroupActive(item);
-
-  const toggleGroup = (item: NavItem) => {
-    setOpenGroups((prev) => ({ ...prev, [item.title]: !isGroupOpen(item) }));
+    navigate("/login");
   };
 
   const isLockedByPermission = (permissionKey?: string) => {
@@ -203,11 +228,11 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
         <button
           type="button"
           onClick={goToPlans}
-          className="flex w-full items-center justify-between gap-2 rounded-md px-3 py-1.5 text-left text-[13px] text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          className="flex h-[32px] w-full items-center justify-between gap-2 rounded-[4px] px-2.5 text-left text-[13px] text-[#6B7785] transition-colors hover:bg-[#F6F7F8] hover:text-[#18212B]"
           title="Available on the Pro plan. Click to view plans."
         >
           <span className="truncate">{child.title}</span>
-          <span className="inline-flex items-center gap-1 rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+          <span className="inline-flex items-center gap-1 rounded-[3px] bg-[#FFF7E6] px-1 py-0.2 text-[10px] font-semibold text-[#A15C07]">
             <Lock className="h-2.5 w-2.5" aria-hidden /> Pro
           </span>
         </button>
@@ -217,7 +242,7 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
     if (permLocked) {
       return (
         <div
-          className="flex w-full cursor-not-allowed items-center justify-between gap-2 rounded-md px-3 py-1.5 text-[13px] text-sidebar-muted/70"
+          className="flex h-[32px] w-full cursor-not-allowed items-center justify-between gap-2 rounded-[4px] px-2.5 text-[13px] text-[#98A2AE]"
           title="You don't have access to this section. Ask the PG owner."
           aria-disabled
         >
@@ -231,14 +256,11 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
       <NavLink
         to={child.url}
         end
-        className="flex items-center justify-between gap-2 rounded-md px-3 py-1.5 text-[13px] text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-        activeClassName="bg-sidebar-primary/10 font-medium text-sidebar-primary hover:bg-sidebar-primary/10 hover:text-sidebar-primary"
+        className="flex h-[32px] items-center justify-between gap-2 rounded-[4px] px-2.5 text-[13px] text-[#556270] transition-colors hover:bg-[#F6F7F8] hover:text-[#18212B]"
+        activeClassName="bg-[#E8F4F4] font-medium text-[#006B6B] border-l-2 border-[#008080] hover:bg-[#E8F4F4] hover:text-[#006B6B]"
         onClick={onMobileClose}
       >
         <span className="truncate">{child.title}</span>
-        {child.comingSoon ? (
-          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Soon</span>
-        ) : null}
       </NavLink>
     );
   };
@@ -261,8 +283,8 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
               end={!hasChildren}
               aria-label={item.title}
               className={cn(
-                "mx-auto flex h-10 w-10 items-center justify-center rounded-md text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                active && "bg-sidebar-primary/10 text-sidebar-primary hover:bg-sidebar-primary/10 hover:text-sidebar-primary",
+                "mx-auto flex h-[36px] w-[36px] items-center justify-center rounded-[4px] text-[#556270] transition-colors hover:bg-[#F6F7F8] hover:text-[#18212B]",
+                active && "bg-[#E8F4F4] text-[#006B6B] hover:bg-[#E8F4F4] hover:text-[#006B6B]",
               )}
               onClick={onMobileClose}
             >
@@ -286,16 +308,16 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
             onClick={() => toggleGroup(item)}
             aria-expanded={open}
             className={cn(
-              "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              active && "font-medium text-sidebar-primary",
+              "flex h-[36px] w-full items-center gap-2.5 rounded-[4px] px-3 text-[14px] leading-[20px] font-medium text-[#3D4A57] transition-colors hover:bg-[#F6F7F8] hover:text-[#18212B]",
+              active && "text-[#006B6B]",
             )}
           >
-            <Icon className={cn("h-[18px] w-[18px] shrink-0", active ? "text-sidebar-primary" : "text-sidebar-muted")} aria-hidden />
+            <Icon className={cn("h-[18px] w-[18px] shrink-0", active ? "text-[#008080]" : "text-[#6B7785]")} aria-hidden />
             <span className="flex-1 text-left">{item.title}</span>
-            <ChevronDown className={cn("h-3.5 w-3.5 text-sidebar-muted transition-transform", open && "rotate-180")} aria-hidden />
+            <ChevronDown className={cn("h-3.5 w-3.5 text-[#6B7785] transition-transform", open && "rotate-180")} aria-hidden />
           </button>
           {open ? (
-            <ul className="ml-[21px] mt-0.5 space-y-0.5 border-l border-sidebar-border pl-2.5">
+            <ul className="ml-[18px] mt-0.5 space-y-0.5 border-l border-[#E2E6EA] pl-2">
               {item.children!.map((child) => (
                 <li key={child.url}>{renderChild(child)}</li>
               ))}
@@ -310,12 +332,12 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
         <button
           type="button"
           onClick={goToPlans}
-          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          className="flex h-[36px] w-full items-center gap-2.5 rounded-[4px] px-3 text-[14px] leading-[20px] font-medium text-[#6B7785] transition-colors hover:bg-[#F6F7F8] hover:text-[#18212B]"
           title="Available on the Pro plan. Click to view plans."
         >
-          <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
+          <Icon className="h-[18px] w-[18px] shrink-0 text-[#6B7785]" aria-hidden />
           <span className="flex-1 text-left">{item.title}</span>
-          <span className="inline-flex items-center gap-1 rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+          <span className="inline-flex items-center gap-1 rounded-[3px] bg-[#FFF7E6] px-1.5 py-0.2 text-[10px] font-semibold text-[#A15C07]">
             <Lock className="h-2.5 w-2.5" aria-hidden /> Pro
           </span>
         </button>
@@ -325,7 +347,7 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
     if (topLocked) {
       return (
         <div
-          className="flex w-full cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-sm text-sidebar-muted/70"
+          className="flex h-[36px] w-full cursor-not-allowed items-center gap-2.5 rounded-[4px] px-3 text-[14px] leading-[20px] font-medium text-[#98A2AE]"
           title="You don't have access to this section. Ask the PG owner."
           aria-disabled
         >
@@ -340,11 +362,11 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
       <NavLink
         to={item.url}
         end={item.url === "/"}
-        className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-        activeClassName="bg-sidebar-primary/10 font-medium text-sidebar-primary hover:bg-sidebar-primary/10 hover:text-sidebar-primary"
+        className="flex h-[36px] items-center gap-2.5 rounded-[4px] px-3 text-[14px] leading-[20px] font-medium text-[#3D4A57] transition-colors hover:bg-[#F6F7F8] hover:text-[#18212B]"
+        activeClassName="bg-[#E8F4F4] text-[#006B6B] border-l-2 border-[#008080] hover:bg-[#E8F4F4] hover:text-[#006B6B]"
         onClick={onMobileClose}
       >
-        <Icon className={cn("h-[18px] w-[18px] shrink-0", active ? "text-sidebar-primary" : "text-sidebar-muted")} aria-hidden />
+        <Icon className={cn("h-[18px] w-[18px] shrink-0", active ? "text-[#008080]" : "text-[#6B7785]")} aria-hidden />
         <span>{item.title}</span>
       </NavLink>
     );
@@ -352,17 +374,17 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
 
   return (
     <>
-      {/* Brand */}
-      <div className={cn("flex h-14 items-center border-b border-sidebar-border", collapsed ? "justify-center px-2" : "justify-between px-4")}>
+      {/* Brand Header */}
+      <div className={cn("flex h-[56px] items-center border-b border-[#E2E6EA]", collapsed ? "justify-center px-2" : "justify-between px-4")}>
         <NavLink to="/dashboard" className="flex items-center gap-2.5" onClick={onMobileClose} aria-label="PG Ease dashboard">
-          <img src={pgeaseLogo} alt="" className="h-8 w-8 rounded-md object-cover" />
-          {!collapsed ? <span className="text-base font-semibold tracking-tight text-foreground">PG Ease</span> : null}
+          <img src={pgeaseLogo} alt="" className="h-7 w-7 rounded-[4px] object-cover" />
+          {!collapsed ? <span className="text-[16px] font-semibold tracking-tight text-[#18212B]">PG Ease</span> : null}
         </NavLink>
         {mobileOpen ? (
           <button
             type="button"
             onClick={onMobileClose}
-            className="rounded-md p-1.5 text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground md:hidden"
+            className="rounded-[4px] p-1.5 text-[#6B7785] hover:bg-[#EEF1F3] hover:text-[#18212B] md:hidden"
             aria-label="Close menu"
           >
             <X className="h-5 w-5" />
@@ -370,17 +392,17 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
         ) : null}
       </div>
 
-      {/* Primary navigation */}
+      {/* Primary Navigation */}
       <nav aria-label="Main" className="flex-1 overflow-y-auto scrollbar-thin px-2 py-3">
-        <ul className="space-y-0.5">
+        <ul className="space-y-1">
           {NAV_ITEMS.map((item) => (
             <li key={item.title}>{renderTopLevel(item)}</li>
           ))}
         </ul>
       </nav>
 
-      {/* Secondary: help + logout */}
-      <div className="space-y-0.5 border-t border-sidebar-border px-2 py-2">
+      {/* Secondary: Help + Logout */}
+      <div className="space-y-1 border-t border-[#E2E6EA] px-2 py-2">
         {renderTopLevel(HELP_ITEM)}
         {collapsed ? (
           <Tooltip delayDuration={0}>
@@ -389,7 +411,7 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
                 type="button"
                 onClick={handleLogout}
                 aria-label="Log out"
-                className="mx-auto flex h-10 w-10 items-center justify-center rounded-md text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-destructive"
+                className="mx-auto flex h-[36px] w-[36px] items-center justify-center rounded-[4px] text-[#6B7785] transition-colors hover:bg-[#FEF1F0] hover:text-[#B42318]"
               >
                 <LogOut className="h-[18px] w-[18px]" aria-hidden />
               </button>
@@ -402,21 +424,21 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
           <button
             type="button"
             onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-destructive"
+            className="flex h-[36px] w-full items-center gap-2.5 rounded-[4px] px-3 text-[14px] leading-[20px] font-medium text-[#556270] transition-colors hover:bg-[#FEF1F0] hover:text-[#B42318]"
           >
-            <LogOut className="h-[18px] w-[18px] shrink-0 text-sidebar-muted" aria-hidden />
+            <LogOut className="h-[18px] w-[18px] shrink-0 text-[#6B7785]" aria-hidden />
             <span>Log out</span>
           </button>
         )}
       </div>
 
-      {/* Collapse toggle (desktop only) */}
-      <div className="hidden border-t border-sidebar-border p-2 md:block">
+      {/* Collapse Toggle (Desktop) */}
+      <div className="hidden border-t border-[#E2E6EA] p-2 md:block">
         <button
           type="button"
           onClick={onToggle}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="flex w-full items-center justify-center rounded-md py-2 text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          className="flex h-[32px] w-full items-center justify-center rounded-[4px] text-[#6B7785] transition-colors hover:bg-[#EEF1F3] hover:text-[#18212B]"
         >
           <ChevronLeft className={cn("h-4 w-4 transition-transform duration-200", collapsed && "rotate-180")} aria-hidden />
         </button>
@@ -429,23 +451,23 @@ const AppSidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }: AppSideb
   return (
     <>
       {mobileOpen ? (
-        <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={onMobileClose} aria-hidden />
+        <div className="fixed inset-0 z-40 bg-[rgba(16,24,40,0.40)] md:hidden" onClick={onMobileClose} aria-hidden />
       ) : null}
 
-      {/* Desktop sidebar */}
+      {/* Desktop Sidebar: 240px or 64px, full viewport height, white surface, 1px right border */}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-50 hidden h-screen flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 md:flex",
-          collapsed ? "md:w-[68px]" : "md:w-[248px]",
+          "fixed left-0 top-0 z-40 hidden h-screen flex-col border-r border-[#E2E6EA] bg-white text-[#18212B] transition-[width] duration-200 md:flex",
+          collapsed ? "md:w-[64px]" : "md:w-[240px]",
         )}
       >
         <SidebarContent collapsed={collapsed} onToggle={onToggle} mobileOpen={false} onMobileClose={onMobileClose} />
       </aside>
 
-      {/* Mobile drawer */}
+      {/* Mobile Drawer */}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-50 flex h-screen w-[280px] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[transform,visibility] duration-200 md:hidden",
+          "fixed left-0 top-0 z-50 flex h-screen w-[260px] flex-col border-r border-[#E2E6EA] bg-white text-[#18212B] transition-[transform,visibility] duration-200 md:hidden",
           mobileOpen ? "translate-x-0 visible" : "-translate-x-full invisible",
         )}
         aria-hidden={!mobileOpen}

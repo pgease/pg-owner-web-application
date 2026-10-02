@@ -219,7 +219,7 @@ const Expenses = () => {
                   <SearchInput
                     placeholder="Search by description..."
                     value={searchQuery}
-                    onChange={setSearchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
 

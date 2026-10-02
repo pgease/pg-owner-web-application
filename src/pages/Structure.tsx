@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Building2,
@@ -8,17 +8,14 @@ import {
   Plus,
   Loader2,
   Trash2,
-  Edit2,
   Users,
-  CheckCircle2,
-  ShieldAlert,
-  Sparkles,
-  ChevronRight,
-  ArrowRight,
-  Info,
+  Grid3X3,
+  Table as TableIcon,
   MapPin,
+  CheckCircle2,
+  AlertCircle,
+  ExternalLink,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useApp } from "@/context/AppContext";
@@ -31,7 +28,6 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +37,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/common/PageHeader";
+import { StatusBadge } from "@/components/common/StatusBadge";
+import { DataTable } from "@/components/common/DataTable";
+import { EmptyState } from "@/components/common/EmptyState";
 import { toast } from "@/components/ui/use-toast";
 import {
   useBlocks,
@@ -55,7 +54,8 @@ import {
   useDeleteRoomMutation,
 } from "@/hooks/usePropertyOwnerQueries";
 import { createProperty } from "@/api/propertyOwner";
-import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
+import { CanAccessPage } from "@/components/PermissionGuard";
+import { cn } from "@/lib/utils";
 
 export default function Structure() {
   const { selectedPgId, properties, refreshProperties, setSelectedPgId } = useApp();
@@ -65,54 +65,7 @@ export default function Structure() {
   const navigate = useNavigate();
 
   const [locating, setLocating] = useState(false);
-
-  const NOMINATIM_UA = "PGEase-OwnerWeb/1.0 (support@pgease.in)";
-
-  const reverseGeocode = async (lat: number, lon: number) => {
-    try {
-      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`;
-      const res = await fetch(url, { headers: { "User-Agent": NOMINATIM_UA, Accept: "application/json" } });
-      if (!res.ok) return null;
-      const data = await res.json();
-      const displayName = data.display_name ?? "";
-      const postcode = data.address?.postcode?.match(/\d{6}/)?.[0] ?? null;
-      const city = data.address?.city ?? data.address?.town ?? data.address?.village ?? "";
-      const state = data.address?.state ?? "";
-      return { displayName, postcode, city, state };
-    } catch {
-      return null;
-    }
-  };
-
-  const handleUseLocation = async () => {
-    if (!navigator.geolocation) {
-      toast({ title: "Location not supported by your browser", variant: "destructive" });
-      return;
-    }
-    setLocating(true);
-    try {
-      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000 });
-      });
-      const lat = pos.coords.latitude;
-      const lon = pos.coords.longitude;
-      const rev = await reverseGeocode(lat, lon);
-      if (rev) {
-        setPropertyForm((prev) => ({
-          ...prev,
-          address: rev.displayName,
-          pincode: rev.postcode || "",
-          city: rev.city || "",
-          state: rev.state || "",
-        }));
-        toast({ title: "Location applied successfully" });
-      }
-    } catch (e) {
-      toast({ title: "Could not get current location", variant: "destructive" });
-    } finally {
-      setLocating(false);
-    }
-  };
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   // State for Navigation Hierarchy
   const [selectedBlockId, setSelectedBlockId] = useState<string>("");
@@ -146,21 +99,75 @@ export default function Structure() {
 
   // Queries
   const blocksQuery = useBlocks(currentPropertyId);
-  const blocks = blocksQuery.data ?? [];
+  const rawBlocks = blocksQuery.data ?? [];
+
+  // Query all rooms across property without requiring strict block/floor IDs
+  const allRoomsQuery = useRoomsList(currentPropertyId, undefined, undefined, { requireBlockAndFloor: false });
+  const allRooms = allRoomsQuery.data ?? [];
+
+  // P0 Bug 4: If blocks table is empty but rooms exist, synthesize blocks from room data
+  const blocks = useMemo(() => {
+    if (rawBlocks.length > 0) return rawBlocks;
+    if (allRooms.length === 0) return [];
+
+    // Synthesize unique blocks from rooms
+    const blockNames = new Set<string>();
+    allRooms.forEach((r: any) => {
+      const b = r.block || r.blockName || (r.blockId ? `Block ${r.blockId}` : "Main Wing");
+      blockNames.add(b);
+    });
+
+    return Array.from(blockNames).map((name, idx) => ({
+      id: `synth-block-${idx}`,
+      name,
+      propertyId: currentPropertyId || "",
+    }));
+  }, [rawBlocks, allRooms, currentPropertyId]);
 
   const effectiveBlockId = selectedBlockId || blocks[0]?.id || "";
-  const floorsQuery = useFloors(currentPropertyId, effectiveBlockId || undefined);
-  const floors = floorsQuery.data ?? [];
+  const floorsQuery = useFloors(currentPropertyId, effectiveBlockId && !effectiveBlockId.startsWith("synth-") ? effectiveBlockId : undefined);
+  const rawFloors = floorsQuery.data ?? [];
+
+  // Synthesize floors if needed
+  const floors = useMemo(() => {
+    if (rawFloors.length > 0) return rawFloors;
+    if (allRooms.length === 0) return [];
+
+    const floorNames = new Set<string>();
+    allRooms.forEach((r: any) => {
+      const f = r.floor || r.floorName || (r.floorNumber != null ? `Floor ${r.floorNumber}` : "Ground Floor");
+      floorNames.add(f);
+    });
+
+    return Array.from(floorNames).map((name, idx) => ({
+      id: `synth-floor-${idx}`,
+      name,
+      blockId: effectiveBlockId,
+      propertyId: currentPropertyId || "",
+      displayOrder: idx + 1,
+    }));
+  }, [rawFloors, allRooms, effectiveBlockId, currentPropertyId]);
 
   const effectiveFloorId = selectedFloorId || floors[0]?.id || "";
-  const roomsQuery = useRoomsList(currentPropertyId, effectiveBlockId || undefined, effectiveFloorId || undefined);
-  const rooms = roomsQuery.data ?? [];
+
+  // Rooms Query: filter from allRooms if synthetic, else query by block and floor
+  const rooms = useMemo(() => {
+    if (effectiveBlockId.startsWith("synth-") || effectiveFloorId.startsWith("synth-")) {
+      return allRooms;
+    }
+    const filtered = allRooms.filter((r: any) => {
+      if (effectiveBlockId && r.blockId && r.blockId !== effectiveBlockId) return false;
+      if (effectiveFloorId && r.floorId && r.floorId !== effectiveFloorId) return false;
+      return true;
+    });
+    return filtered.length > 0 ? filtered : allRooms;
+  }, [allRooms, effectiveBlockId, effectiveFloorId]);
 
   const { data: tenantsData = [] } = usePropertyTenants(currentPropertyId);
 
-  // Create & Delete Mutations
+  // Mutations
   const createBlockMut = useCreateBlock(currentPropertyId);
-  const createFloorMut = useCreateFloor(currentPropertyId, effectiveBlockId || undefined);
+  const createFloorMut = useCreateFloor(currentPropertyId, effectiveBlockId && !effectiveBlockId.startsWith("synth-") ? effectiveBlockId : undefined);
   const createRoomMut = useCreateRoom(currentPropertyId);
 
   const deleteBlockMut = useDeleteBlockMutation(currentPropertyId);
@@ -179,18 +186,22 @@ export default function Structure() {
     try {
       if (deleteConfirm.type === "block") {
         await deleteBlockMut.mutateAsync(deleteConfirm.id);
-        toast({ title: "Block Deleted 🗑️", description: `${deleteConfirm.name} removed.` });
+        toast({ title: "Block deleted", description: `${deleteConfirm.name} removed.` });
         if (selectedBlockId === deleteConfirm.id) setSelectedBlockId("");
       } else if (deleteConfirm.type === "floor") {
         await deleteFloorMut.mutateAsync(deleteConfirm.id);
-        toast({ title: "Floor Deleted 🗑️", description: `${deleteConfirm.name} removed.` });
+        toast({ title: "Floor deleted", description: `${deleteConfirm.name} removed.` });
         if (selectedFloorId === deleteConfirm.id) setSelectedFloorId("");
       } else if (deleteConfirm.type === "room") {
         await deleteRoomMut.mutateAsync(deleteConfirm.id);
-        toast({ title: "Room Deleted 🗑️", description: `${deleteConfirm.name} removed.` });
+        toast({ title: "Room deleted", description: `${deleteConfirm.name} removed.` });
       }
     } catch (e: any) {
-      toast({ title: "Could not delete", description: e?.message || "Ensure no active tenants occupy this structure before deleting.", variant: "destructive" });
+      toast({
+        title: "Could not delete",
+        description: e?.message || "Ensure no active tenants occupy this room before deleting.",
+        variant: "destructive",
+      });
     } finally {
       setDeleteConfirm({ open: false, type: "block", id: "", name: "" });
     }
@@ -214,12 +225,10 @@ export default function Structure() {
         bedRange: `${Number(propertyForm.totalBeds || 10)}-${Number(propertyForm.totalBeds || 10) + 20}`,
         propertyTypeId: "770b22ea-688a-481a-9ee3-006e6891600f",
       });
-      toast({ title: "Property Created! 🏢", description: `${propertyForm.name} added successfully.` });
+      toast({ title: "Property created", description: `${propertyForm.name} added successfully.` });
       setAddPropertyOpen(false);
       await refreshProperties();
-      if (res?.id) {
-        setCurrentPropertyId(res.id);
-      }
+      if (res?.id) setCurrentPropertyId(res.id);
     } catch (e: any) {
       toast({ title: "Failed to create property", description: e?.message, variant: "destructive" });
     }
@@ -232,7 +241,7 @@ export default function Structure() {
     }
     try {
       await createBlockMut.mutateAsync({ name: blockName.trim() });
-      toast({ title: "Block Added! 🧱", description: `${blockName} created successfully.` });
+      toast({ title: "Block added", description: `${blockName} created successfully.` });
       setBlockName("");
       setAddBlockOpen(false);
     } catch (e: any) {
@@ -250,7 +259,7 @@ export default function Structure() {
         name: floorName.trim(),
         displayOrder: floors.length + 1,
       });
-      toast({ title: "Floor Added! 🪜", description: `${floorName} added to block.` });
+      toast({ title: "Floor added", description: `${floorName} added to block.` });
       setFloorName("");
       setAddFloorOpen(false);
     } catch (e: any) {
@@ -259,21 +268,21 @@ export default function Structure() {
   };
 
   const handleCreateRoom = async () => {
-    if (!roomForm.roomNumber.trim() || !effectiveFloorId) {
+    if (!roomForm.roomNumber.trim()) {
       toast({ title: "Enter room number", variant: "destructive" });
       return;
     }
     try {
       await createRoomMut.mutateAsync({
-        floorId: effectiveFloorId,
+        floorId: effectiveFloorId && !effectiveFloorId.startsWith("synth-") ? effectiveFloorId : undefined,
         roomNumber: roomForm.roomNumber.trim(),
         numberOfBeds: Number(roomForm.numberOfBeds),
       });
       toast({
-        title: "Room & Beds Added! 🚪",
-        description: `Room ${roomForm.roomNumber} with ${roomForm.numberOfBeds} beds generated.`,
+        title: "Room created",
+        description: `Room ${roomForm.roomNumber} with ${roomForm.numberOfBeds} beds created.`,
       });
-      setRoomForm({ roomNumber: "", numberOfBeds: 2, });
+      setRoomForm({ roomNumber: "", numberOfBeds: 2 });
       setAddRoomOpen(false);
     } catch (e: any) {
       toast({ title: "Failed to create room", description: e?.message, variant: "destructive" });
@@ -282,179 +291,218 @@ export default function Structure() {
 
   return (
     <CanAccessPage permission="multi_pg">
-      <div className="space-y-6 animate-fade-in pb-16">
-        {/* Page Header with Add Property Trigger */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <PageHeader
-            title="Property Structure & Floor Matrix"
-            description="Manage Blocks, Floors, Rooms, and Bed configurations with visual occupancy status."
-          />
-          <Button
-            size="sm"
-            className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5 shadow-sm"
-            onClick={() => setAddPropertyOpen(true)}
-          >
-            <Plus className="h-4 w-4" /> Add New PG Property
-          </Button>
+      <div className="space-y-6 pb-12 max-w-7xl">
+        {/* Page Header */}
+        <PageHeader
+          title="Rooms & Beds"
+          description="Manage property blocks, floors, rooms, and bed occupancy with direct tenant check-in."
+          actions={
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setAddPropertyOpen(true)}
+              >
+                <Plus className="h-4 w-4" /> Add property
+              </Button>
+              <Button
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setAddRoomOpen(true)}
+              >
+                <Plus className="h-4 w-4" /> Add room
+              </Button>
+            </div>
+          }
+        />
+
+        {/* Property & View Switcher Bar */}
+        <div className="register-card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-md bg-[var(--brand-50)] border border-[var(--brand-100)] text-[var(--brand-700)] flex items-center justify-center shrink-0">
+              <Building2 className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-md font-semibold text-[var(--gray-900)]">
+                  {activeProperty?.name || "Select Property"}
+                </h2>
+                <span className="text-[11px] font-medium text-[var(--gray-500)] bg-[var(--gray-100)] px-2 py-0.5 rounded-sm">
+                  {allRooms.length} rooms
+                </span>
+              </div>
+              <p className="text-xs text-[var(--gray-500)] mt-0.5">
+                {activeProperty?.address || "Configure room blocks and bed capacity"}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* View Mode Toggle: Bed Grid vs Table */}
+            <div className="flex rounded-md border border-[var(--gray-300)] p-0.5 bg-white">
+              <button
+                type="button"
+                onClick={() => setViewMode("grid")}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-sm transition-colors",
+                  viewMode === "grid"
+                    ? "bg-[var(--gray-100)] text-[var(--gray-900)] font-semibold"
+                    : "text-[var(--gray-600)] hover:text-[var(--gray-900)]"
+                )}
+              >
+                <Grid3X3 className="h-3.5 w-3.5" /> Bed Grid
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("table")}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-sm transition-colors",
+                  viewMode === "table"
+                    ? "bg-[var(--gray-100)] text-[var(--gray-900)] font-semibold"
+                    : "text-[var(--gray-600)] hover:text-[var(--gray-900)]"
+                )}
+              >
+                <TableIcon className="h-3.5 w-3.5" /> Table View
+              </button>
+            </div>
+
+            <Select value={currentPropertyId || ""} onValueChange={(val) => setCurrentPropertyId(val)}>
+              <SelectTrigger className="w-[180px] h-9 text-xs">
+                <SelectValue placeholder="Switch PG" />
+              </SelectTrigger>
+              <SelectContent>
+                {propertyList.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        {/* PROPERTY HERO CARD */}
-        <Card className="border-teal-200 dark:border-teal-900 bg-gradient-to-r from-teal-500/10 via-emerald-500/5 to-transparent">
-          <CardContent className="p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-xl bg-teal-600 text-white flex items-center justify-center shadow-md">
-                  <Building2 className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-xl font-bold text-foreground">{activeProperty?.name || "Select Property"}</h2>
-                    <Badge variant="outline" className="text-teal-700 border-teal-300 dark:text-teal-300">
-                      Active PG
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {activeProperty?.address || "Configure your room structure below"} • {(activeProperty as any)?.city || "India"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Property Selector */}
-              <div className="flex items-center gap-2">
-                <Select value={currentPropertyId || ""} onValueChange={(val) => setCurrentPropertyId(val)}>
-                  <SelectTrigger className="w-[220px] bg-background">
-                    <SelectValue placeholder="Switch PG Property" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {propertyList.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* STEP 1: BLOCKS SELECTION / CREATION */}
-        <div className="space-y-3">
+        {/* STEP 1: BLOCKS SELECTION */}
+        <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-600 text-white text-xs font-bold">
-                1
-              </div>
-              <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">Blocks & Wings</h3>
-            </div>
+            <span className="text-xs font-semibold text-[var(--gray-700)] uppercase tracking-wider">
+              1. Blocks & Wings
+            </span>
             <Button
               size="sm"
-              variant="outline"
-              className="gap-1 text-xs h-8 text-teal-700 border-teal-200 hover:bg-teal-50"
+              variant="secondary"
+              className="gap-1 text-xs h-7"
               onClick={() => setAddBlockOpen(true)}
             >
               <Plus className="h-3.5 w-3.5" /> Add Block
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
             {blocks.map((b) => {
               const isSelected = b.id === effectiveBlockId;
               return (
-                <div
-                  key={b.id}
-                  onClick={() => {
-                    setSelectedBlockId(b.id);
-                    setSelectedFloorId("");
-                  }}
-                  className={`relative group cursor-pointer rounded-xl border-2 p-3 text-center transition-all ${
-                    isSelected
-                      ? "border-teal-600 bg-teal-50/60 dark:bg-teal-950/40 shadow-sm font-bold text-teal-700 dark:text-teal-300"
-                      : "border-border hover:border-teal-300 bg-card text-muted-foreground"
-                  }`}
-                >
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="absolute top-1 right-1 h-6 w-6 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeleteConfirm({ open: true, type: "block", id: b.id, name: b.name });
+                <div key={b.id} className="relative group shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedBlockId(b.id);
+                      setSelectedFloorId("");
                     }}
-                    title={`Delete ${b.name}`}
+                    className={cn(
+                      "px-3.5 py-2 rounded-sm border text-xs font-medium transition-colors flex items-center gap-2",
+                      isSelected
+                        ? "bg-[var(--brand-50)] text-[var(--brand-700)] border-[var(--brand-100)] font-semibold"
+                        : "bg-white text-[var(--gray-700)] border-[var(--gray-200)] hover:border-[var(--gray-300)]"
+                    )}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                  <Layers className="h-5 w-5 mx-auto mb-1 opacity-70" />
-                  <div className="text-sm truncate pr-4">{b.name}</div>
+                    <Layers className="h-3.5 w-3.5" />
+                    <span>{b.name}</span>
+                  </button>
+                  {!b.id.startsWith("synth-") && (
+                    <button
+                      type="button"
+                      className="absolute -top-1 -right-1 hidden group-hover:flex h-4 w-4 rounded-full bg-red-100 text-red-600 items-center justify-center text-[10px]"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteConfirm({ open: true, type: "block", id: b.id, name: b.name });
+                      }}
+                      title={`Delete ${b.name}`}
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
               );
             })}
             {blocks.length === 0 && (
               <div
                 onClick={() => setAddBlockOpen(true)}
-                className="col-span-full border-2 border-dashed rounded-xl p-6 text-center cursor-pointer hover:border-teal-400 bg-muted/20"
+                className="w-full border border-dashed border-[var(--gray-300)] rounded-sm p-4 text-center cursor-pointer hover:border-[var(--brand-600)] text-xs text-[var(--gray-500)]"
               >
-                <Layers className="h-6 w-6 mx-auto mb-1 text-teal-600" />
-                <p className="text-xs font-semibold text-foreground">No Blocks Created Yet</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Click here to add Block A, Main Wing, etc.</p>
+                + Add your first block (e.g. Block A, Main Wing)
               </div>
             )}
           </div>
         </div>
 
-        {/* STEP 2: FLOORS SELECTION / CREATION */}
+        {/* STEP 2: FLOORS SELECTION */}
         {effectiveBlockId && (
-          <div className="space-y-3 pt-2">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-600 text-white text-xs font-bold">
-                  2
-                </div>
-                <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">Floors in Block</h3>
-              </div>
+              <span className="text-xs font-semibold text-[var(--gray-700)] uppercase tracking-wider">
+                2. Floors
+              </span>
               <Button
                 size="sm"
-                variant="outline"
-                className="gap-1 text-xs h-8 text-teal-700 border-teal-200 hover:bg-teal-50"
+                variant="secondary"
+                className="gap-1 text-xs h-7"
                 onClick={() => setAddFloorOpen(true)}
               >
                 <Plus className="h-3.5 w-3.5" /> Add Floor
               </Button>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
               {floors.map((f) => {
                 const isSelected = f.id === effectiveFloorId;
                 return (
-                  <div key={f.id} className="inline-flex items-center gap-1">
-                    <Button
-                      variant={isSelected ? "default" : "outline"}
-                      className={`h-9 gap-1.5 ${
-                        isSelected ? "bg-teal-600 hover:bg-teal-700 text-white font-semibold" : ""
-                      }`}
+                  <div key={f.id} className="relative group shrink-0">
+                    <button
+                      type="button"
                       onClick={() => setSelectedFloorId(f.id)}
+                      className={cn(
+                        "px-3.5 py-1.5 rounded-sm border text-xs font-medium transition-colors flex items-center gap-1.5",
+                        isSelected
+                          ? "bg-[var(--brand-50)] text-[var(--brand-700)] border-[var(--brand-100)] font-semibold"
+                          : "bg-white text-[var(--gray-700)] border-[var(--gray-200)] hover:border-[var(--gray-300)]"
+                      )}
                     >
-                      <Layers className="h-3.5 w-3.5" /> {f.name}
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                      onClick={() => setDeleteConfirm({ open: true, type: "floor", id: f.id, name: f.name })}
-                      title={`Delete ${f.name}`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                      <Layers className="h-3 w-3" />
+                      <span>{f.name}</span>
+                    </button>
+                    {!f.id.startsWith("synth-") && (
+                      <button
+                        type="button"
+                        className="absolute -top-1 -right-1 hidden group-hover:flex h-4 w-4 rounded-full bg-red-100 text-red-600 items-center justify-center text-[10px]"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteConfirm({ open: true, type: "floor", id: f.id, name: f.name });
+                        }}
+                        title={`Delete ${f.name}`}
+                      >
+                        ×
+                      </button>
+                    )}
                   </div>
                 );
               })}
               {floors.length === 0 && (
                 <div
                   onClick={() => setAddFloorOpen(true)}
-                  className="w-full border-2 border-dashed rounded-xl p-4 text-center cursor-pointer hover:border-teal-400 bg-muted/20 text-xs text-muted-foreground"
+                  className="w-full border border-dashed border-[var(--gray-300)] rounded-sm p-3 text-center cursor-pointer hover:border-[var(--brand-600)] text-xs text-[var(--gray-500)]"
                 >
-                  + Add first floor (e.g. Ground Floor, 1st Floor) to this block
+                  + Add first floor (e.g. Ground Floor, 1st Floor)
                 </div>
               )}
             </div>
@@ -462,184 +510,288 @@ export default function Structure() {
         )}
 
         {/* STEP 3: ROOMS & BED MATRIX */}
-        {effectiveFloorId && (
-          <div className="space-y-4 pt-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-600 text-white text-xs font-bold">
-                  3
-                </div>
-                <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
-                  Rooms & Beds Allocation
-                </h3>
-              </div>
-              <Button
-                size="sm"
-                className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5 h-8 shadow-sm"
-                onClick={() => setAddRoomOpen(true)}
-              >
-                <Plus className="h-3.5 w-3.5" /> Add Room & Beds
-              </Button>
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span className="text-xs font-semibold text-[var(--gray-700)] uppercase tracking-wider block">
+                3. Rooms & Bed Matrix
+              </span>
+              <p className="text-xs text-[var(--gray-500)] mt-0.5">
+                Click any vacant bed tile to start new tenant onboarding with pre-selected room & bed.
+              </p>
             </div>
 
-            {roomsQuery.isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
-              </div>
-            ) : rooms.length === 0 ? (
-              <Card className="border-dashed">
-                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                  <DoorOpen className="h-10 w-10 text-teal-600 mb-2 opacity-60" />
-                  <p className="text-sm font-semibold">No Rooms on this Floor</p>
-                  <p className="text-xs text-muted-foreground max-w-sm mt-0.5 mb-3">
-                    Add room numbers (e.g. 101, 102) and specify bed count (Single, Double, Triple sharing).
-                  </p>
-                  <Button
-                    size="sm"
-                    className="bg-teal-600 hover:bg-teal-700 text-white gap-1"
-                    onClick={() => setAddRoomOpen(true)}
-                  >
-                    <Plus className="h-3.5 w-3.5" /> Add Room
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {rooms.map((r: any) => {
-                  const bedCount = r.capacity || r.numberOfBeds || r.beds?.length || 1;
-
-                  // Find assigned tenants for this room
-                  const roomTenants = tenantsData.filter(
-                    (t: any) => t.roomNumber === r.roomNumber || t.roomNo === r.roomNumber
-                  );
-
-                  return (
-                    <Card
-                      key={r.id}
-                      className="border hover:border-teal-300 dark:hover:border-teal-700 transition-all shadow-sm"
-                    >
-                      <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
-                        <div className="flex items-center gap-2">
-                          <DoorOpen className="h-5 w-5 text-teal-600" />
-                          <CardTitle className="text-base font-bold">Room {r.roomNumber}</CardTitle>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Badge variant="secondary" className="text-[10px]">
-                            {bedCount} Sharing
-                          </Badge>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full"
-                            onClick={() => setDeleteConfirm({ open: true, type: "room", id: r.id, name: `Room ${r.roomNumber}` })}
-                            title="Delete Room"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-4 pt-2 space-y-3">
-
-                        {/* Bed Slots Grid */}
-                        <div className="space-y-1.5 border-t pt-2.5">
-                          <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                            Bed Occupancy
-                          </div>
-                          <div className="grid grid-cols-2 gap-1.5">
-                            {Array.from({ length: bedCount }).map((_, idx) => {
-                              const assignedTenant = roomTenants[idx];
-                              const isOccupied = Boolean(assignedTenant);
-
-                              return (
-                                <div
-                                  key={idx}
-                                  onClick={() => {
-                                    if (isOccupied && assignedTenant?.id) {
-                                      navigate(`/tenants/${assignedTenant.id}`);
-                                    }
-                                  }}
-                                  className={`rounded-lg p-2 text-xs flex flex-col justify-between border transition-all ${
-                                    isOccupied
-                                      ? "bg-emerald-50/70 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 cursor-pointer"
-                                      : "bg-muted/40 border-dashed border-border text-muted-foreground"
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between font-semibold">
-                                    <span className="flex items-center gap-1">
-                                      <BedDouble className="h-3.5 w-3.5" /> Bed {idx + 1}
-                                    </span>
-                                    {isOccupied ? (
-                                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                                    ) : (
-                                      <span className="h-2 w-2 rounded-full bg-slate-300" />
-                                    )}
-                                  </div>
-                                  <div className="text-[11px] truncate mt-1">
-                                    {isOccupied ? (
-                                      assignedTenant.name || (assignedTenant as any).tenantName
-                                    ) : (
-                                      <span className="opacity-60 italic">Vacant</span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
+            {/* Visual Bed Grid Legend */}
+            <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--gray-600)] bg-[var(--gray-50)] px-3 py-1.5 rounded-sm border border-[var(--gray-200)]">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-emerald-600" /> Occupied
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-white border border-[var(--gray-400)]" /> Vacant
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-amber-500" /> On notice
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-blue-500" /> Booked
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-sm bg-[var(--gray-300)]" /> Blocked
+              </span>
+            </div>
           </div>
-        )}
+
+          {allRoomsQuery.isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-[var(--brand-600)]" />
+            </div>
+          ) : rooms.length === 0 ? (
+            <div className="register-card p-8">
+              <EmptyState
+                icon={<DoorOpen />}
+                title="No rooms created yet"
+                description="Add rooms to this floor to track bed occupancy and allocate new tenants."
+                action={
+                  <Button size="sm" onClick={() => setAddRoomOpen(true)}>
+                    Add first room
+                  </Button>
+                }
+              />
+            </div>
+          ) : viewMode === "grid" ? (
+            /* Bed Grid View */
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {rooms.map((r: any) => {
+                const bedCount = Number(r.capacity || r.numberOfBeds || r.beds?.length || 1);
+
+                // Assigned tenants for this room
+                const roomTenants = tenantsData.filter(
+                  (t: any) =>
+                    String(t.roomNumber) === String(r.roomNumber) ||
+                    String(t.roomNo) === String(r.roomNumber) ||
+                    t.roomId === r.id ||
+                    t.room?.id === r.id
+                );
+
+                const occupiedCount = roomTenants.length;
+                const isFull = occupiedCount >= bedCount;
+
+                return (
+                  <div
+                    key={r.id}
+                    className="register-card p-3.5 flex flex-col justify-between space-y-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm text-[var(--gray-900)]">
+                          Room {r.roomNumber}
+                        </span>
+                        <StatusBadge
+                          status={isFull ? "occupied" : "vacant"}
+                          label={isFull ? "Full" : `${Math.max(0, bedCount - occupiedCount)} vacant`}
+                          size="sm"
+                        />
+                      </div>
+                      <span className="text-xs text-[var(--gray-500)]">
+                        {bedCount} Bed
+                      </span>
+                    </div>
+
+                    {/* Beds Grid */}
+                    <div className="grid grid-cols-2 gap-1.5 pt-1">
+                      {Array.from({ length: bedCount }).map((_, idx) => {
+                        const assignedTenant = roomTenants[idx];
+                        const isOccupied = Boolean(assignedTenant);
+                        const isOnNotice = Boolean(assignedTenant?.notice?.isOnNotice || assignedTenant?.isOnNotice);
+
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              if (isOccupied && assignedTenant?.id) {
+                                navigate(`/tenants/${assignedTenant.id}`);
+                              } else {
+                                // 1-click allocation from vacant bed
+                                navigate("/tenants/add", {
+                                  state: {
+                                    prefillRoomId: r.id,
+                                    prefillRoomNumber: r.roomNumber,
+                                    prefillBedNumber: idx + 1,
+                                    prefillBlockId: effectiveBlockId,
+                                    prefillFloorId: effectiveFloorId,
+                                  },
+                                });
+                              }
+                            }}
+                            className={cn(
+                              "rounded-sm p-2 text-left text-xs border transition-colors flex flex-col justify-between h-14",
+                              isOccupied
+                                ? isOnNotice
+                                  ? "bg-amber-50 border-amber-200 text-amber-900"
+                                  : "bg-emerald-50 border-emerald-200 text-emerald-900"
+                                : "bg-white border-dashed border-[var(--gray-300)] text-[var(--gray-500)] hover:border-[var(--brand-600)] hover:text-[var(--brand-600)]"
+                            )}
+                            title={isOccupied ? `Occupied by ${assignedTenant.name}` : `Bed ${idx + 1} is vacant. Click to add tenant.`}
+                          >
+                            <div className="flex items-center justify-between font-medium">
+                              <span className="flex items-center gap-1 text-[11px]">
+                                <BedDouble className="h-3 w-3" /> Bed {idx + 1}
+                              </span>
+                              <span
+                                className={cn(
+                                  "h-2 w-2 rounded-full",
+                                  isOccupied
+                                    ? isOnNotice
+                                      ? "bg-amber-500"
+                                      : "bg-emerald-600"
+                                    : "bg-transparent border border-[var(--gray-400)]"
+                                )}
+                              />
+                            </div>
+                            <span className="truncate text-[11px] font-semibold">
+                              {isOccupied ? assignedTenant.name || "Tenant" : "+ Allocate"}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1 border-t border-[var(--gray-200)] text-xs text-[var(--gray-500)]">
+                      <span>Floor {r.floorNumber ?? "—"}</span>
+                      {!r.id.startsWith("synth-") && (
+                        <button
+                          type="button"
+                          onClick={() => setDeleteConfirm({ open: true, type: "room", id: r.id, name: `Room ${r.roomNumber}` })}
+                          className="text-[var(--gray-400)] hover:text-red-600"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* Table View */
+            <DataTable
+              columns={[
+                {
+                  id: "roomNumber",
+                  header: "Room #",
+                  render: (r: any) => (
+                    <span className="font-semibold text-[var(--gray-900)]">Room {r.roomNumber}</span>
+                  ),
+                },
+                {
+                  id: "floor",
+                  header: "Floor",
+                  render: (r: any) => (
+                    <span className="text-[var(--gray-600)]">{r.floor || `Floor ${r.floorNumber ?? 1}`}</span>
+                  ),
+                },
+                {
+                  id: "block",
+                  header: "Block",
+                  render: (r: any) => (
+                    <span className="text-[var(--gray-600)]">{r.block || "Main Wing"}</span>
+                  ),
+                },
+                {
+                  id: "capacity",
+                  header: "Capacity",
+                  align: "right",
+                  render: (r: any) => (
+                    <span className="tabular-nums">{r.numberOfBeds || r.capacity || 2} beds</span>
+                  ),
+                },
+                {
+                  id: "occupied",
+                  header: "Occupied",
+                  align: "right",
+                  render: (r: any) => {
+                    const roomTenants = tenantsData.filter(
+                      (t: any) => String(t.roomNumber) === String(r.roomNumber) || t.roomId === r.id
+                    );
+                    return <span className="tabular-nums font-medium text-emerald-700">{roomTenants.length}</span>;
+                  },
+                },
+                {
+                  id: "status",
+                  header: "Status",
+                  render: (r: any) => {
+                    const bedCount = Number(r.capacity || r.numberOfBeds || 1);
+                    const roomTenants = tenantsData.filter(
+                      (t: any) => String(t.roomNumber) === String(r.roomNumber) || t.roomId === r.id
+                    );
+                    const isFull = roomTenants.length >= bedCount;
+                    return (
+                      <StatusBadge
+                        status={isFull ? "occupied" : "vacant"}
+                        label={isFull ? "Full" : `${Math.max(0, bedCount - roomTenants.length)} Vacant`}
+                        size="sm"
+                      />
+                    );
+                  },
+                },
+                {
+                  id: "actions",
+                  header: "",
+                  align: "right",
+                  render: (r: any) => (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-7 text-xs"
+                      onClick={() =>
+                        navigate("/tenants/add", {
+                          state: { prefillRoomId: r.id, prefillRoomNumber: r.roomNumber },
+                        })
+                      }
+                    >
+                      + Allocate
+                    </Button>
+                  ),
+                },
+              ]}
+              data={rooms}
+              keyExtractor={(r: any) => r.id}
+            />
+          )}
+        </div>
 
         {/* DIALOG 1: ADD PROPERTY MODAL */}
         <Dialog open={addPropertyOpen} onOpenChange={setAddPropertyOpen}>
           <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-teal-600" /> Add New PG Property
+                <Building2 className="h-5 w-5 text-[var(--brand-600)]" /> Add New PG Property
               </DialogTitle>
               <DialogDescription>
                 Create a new property profile in your PG Ease portfolio.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-3 py-2">
+            <div className="space-y-3 py-2 text-xs">
               <div className="space-y-1">
-                <Label>Property Name</Label>
+                <Label>Property Name *</Label>
                 <Input
-                  placeholder="e.g. Sunshine PG / Green Villa"
+                  placeholder="e.g. Green Villa PG"
                   value={propertyForm.name}
                   onChange={(e) => setPropertyForm({ ...propertyForm, name: e.target.value })}
+                  className="h-9 text-xs"
+                  required
                 />
               </div>
 
               <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <Label>Full Address</Label>
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    className="h-auto p-0 text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1"
-                    disabled={locating}
-                    onClick={handleUseLocation}
-                  >
-                    {locating ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <MapPin className="h-3.5 w-3.5" />
-                    )}
-                    Use my current location
-                  </Button>
-                </div>
+                <Label>Address</Label>
                 <Input
-                  placeholder="e.g. 12th Main, Indiranagar"
+                  placeholder="e.g. 12th Main, Sector 62"
                   value={propertyForm.address}
                   onChange={(e) => setPropertyForm({ ...propertyForm, address: e.target.value })}
+                  className="h-9 text-xs"
                 />
               </div>
 
@@ -650,47 +802,26 @@ export default function Structure() {
                     placeholder="e.g. Noida"
                     value={propertyForm.city}
                     onChange={(e) => setPropertyForm({ ...propertyForm, city: e.target.value })}
+                    className="h-9 text-xs"
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label>State</Label>
-                  <Input
-                    placeholder="e.g. Uttar Pradesh"
-                    value={propertyForm.state}
-                    onChange={(e) => setPropertyForm({ ...propertyForm, state: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>Pincode</Label>
                   <Input
-                    placeholder="e.g. 201014"
+                    placeholder="e.g. 201301"
                     value={propertyForm.pincode}
                     onChange={(e) => setPropertyForm({ ...propertyForm, pincode: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Contact Number</Label>
-                  <Input
-                    placeholder="10-digit number"
-                    maxLength={10}
-                    value={propertyForm.contactNumber}
-                    onChange={(e) => {
-                      const cleanVal = e.target.value.replace(/\D/g, "").slice(0, 10);
-                      setPropertyForm({ ...propertyForm, contactNumber: cleanVal });
-                    }}
+                    className="h-9 text-xs"
                   />
                 </div>
               </div>
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setAddPropertyOpen(false)}>
+              <Button variant="secondary" size="sm" onClick={() => setAddPropertyOpen(false)}>
                 Cancel
               </Button>
-              <Button className="bg-teal-600 hover:bg-teal-700 text-white" onClick={handleCreateProperty}>
+              <Button size="sm" onClick={handleCreateProperty}>
                 Create Property
               </Button>
             </DialogFooter>
@@ -699,37 +830,33 @@ export default function Structure() {
 
         {/* DIALOG 2: ADD BLOCK MODAL */}
         <Dialog open={addBlockOpen} onOpenChange={setAddBlockOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Layers className="h-5 w-5 text-teal-600" /> Add Building Block / Wing
+                <Layers className="h-5 w-5 text-[var(--brand-600)]" /> Add Block / Wing
               </DialogTitle>
               <DialogDescription>
-                Group floors and rooms by block (e.g. Block A, Boys Wing, Tower 1).
+                Name the building section (e.g. Block A, Girls Wing, Annex).
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-3 py-2">
-              <div className="space-y-1">
-                <Label>Block Name</Label>
-                <Input
-                  placeholder="e.g. Block A / Main Wing"
-                  value={blockName}
-                  onChange={(e) => setBlockName(e.target.value)}
-                />
-              </div>
+            <div className="space-y-2 py-2 text-xs">
+              <Label>Block Name *</Label>
+              <Input
+                placeholder="e.g. Block A"
+                value={blockName}
+                onChange={(e) => setBlockName(e.target.value)}
+                className="h-9 text-xs"
+                required
+              />
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setAddBlockOpen(false)}>
+              <Button variant="secondary" size="sm" onClick={() => setAddBlockOpen(false)}>
                 Cancel
               </Button>
-              <Button
-                className="bg-teal-600 hover:bg-teal-700 text-white"
-                disabled={createBlockMut.isPending}
-                onClick={handleCreateBlock}
-              >
-                {createBlockMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Block"}
+              <Button size="sm" onClick={handleCreateBlock} disabled={createBlockMut.isPending}>
+                Save Block
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -737,127 +864,112 @@ export default function Structure() {
 
         {/* DIALOG 3: ADD FLOOR MODAL */}
         <Dialog open={addFloorOpen} onOpenChange={setAddFloorOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Layers className="h-5 w-5 text-teal-600" /> Add Floor to Block
+                <Layers className="h-5 w-5 text-[var(--brand-600)]" /> Add Floor
               </DialogTitle>
               <DialogDescription>
-                Add a new floor tier to your selected building block.
+                Add a floor level to {blocks.find((b) => b.id === effectiveBlockId)?.name || "block"}.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-3 py-2">
-              <div className="space-y-1">
-                <Label>Floor Name</Label>
-                <Input
-                  placeholder="e.g. Ground Floor / 1st Floor / 2nd Floor"
-                  value={floorName}
-                  onChange={(e) => setFloorName(e.target.value)}
-                />
-              </div>
+            <div className="space-y-2 py-2 text-xs">
+              <Label>Floor Name *</Label>
+              <Input
+                placeholder="e.g. Ground Floor, 1st Floor"
+                value={floorName}
+                onChange={(e) => setFloorName(e.target.value)}
+                className="h-9 text-xs"
+                required
+              />
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setAddFloorOpen(false)}>
+              <Button variant="secondary" size="sm" onClick={() => setAddFloorOpen(false)}>
                 Cancel
               </Button>
-              <Button
-                className="bg-teal-600 hover:bg-teal-700 text-white"
-                disabled={createFloorMut.isPending}
-                onClick={handleCreateFloor}
-              >
-                {createFloorMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Floor"}
+              <Button size="sm" onClick={handleCreateFloor} disabled={createFloorMut.isPending}>
+                Save Floor
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
-        {/* DIALOG 4: ADD ROOM & BEDS MODAL */}
+        {/* DIALOG 4: ADD ROOM MODAL */}
         <Dialog open={addRoomOpen} onOpenChange={setAddRoomOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <DoorOpen className="h-5 w-5 text-teal-600" /> Add Room & Bed Configuration
+                <DoorOpen className="h-5 w-5 text-[var(--brand-600)]" /> Add Room & Bed Capacity
               </DialogTitle>
               <DialogDescription>
-                Assign room number and total beds available for occupancy.
+                Specify the room number and how many beds it contains.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-3 py-2">
+            <div className="space-y-3 py-2 text-xs">
               <div className="space-y-1">
-                <Label>Room Number / Code</Label>
+                <Label>Room Number / Name *</Label>
                 <Input
-                  placeholder="e.g. 101, 102, G-01"
+                  placeholder="e.g. 101, 202-A"
                   value={roomForm.roomNumber}
                   onChange={(e) => setRoomForm({ ...roomForm, roomNumber: e.target.value })}
+                  className="h-9 text-xs"
+                  required
                 />
               </div>
 
               <div className="space-y-1">
-                <Label>Number of Beds (Sharing Type)</Label>
+                <Label>Bed Count</Label>
                 <Select
                   value={String(roomForm.numberOfBeds)}
-                  onValueChange={(val) => setRoomForm({ ...roomForm, numberOfBeds: Number(val) })}
+                  onValueChange={(val) => setRoomForm({ ...roomForm, numberOfBeds: parseInt(val, 10) })}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Sharing" />
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1">1 Bed (Single Private)</SelectItem>
-                    <SelectItem value="2">2 Beds (Double Sharing)</SelectItem>
-                    <SelectItem value="3">3 Beds (Triple Sharing)</SelectItem>
-                    <SelectItem value="4">4 Beds (Four Sharing)</SelectItem>
+                    {[1, 2, 3, 4, 5, 6].map((b) => (
+                      <SelectItem key={b} value={String(b)}>
+                        {b} Bed{b > 1 ? "s" : ""} ({b} Sharing)
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setAddRoomOpen(false)}>
+              <Button variant="secondary" size="sm" onClick={() => setAddRoomOpen(false)}>
                 Cancel
               </Button>
-              <Button
-                className="bg-teal-600 hover:bg-teal-700 text-white"
-                disabled={createRoomMut.isPending}
-                onClick={handleCreateRoom}
-              >
-                {createRoomMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Room & Beds"}
+              <Button size="sm" onClick={handleCreateRoom} disabled={createRoomMut.isPending}>
+                Save Room
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         {/* DELETE CONFIRMATION DIALOG */}
-        <Dialog open={deleteConfirm.open} onOpenChange={(open) => !open && setDeleteConfirm({ ...deleteConfirm, open: false })}>
+        <Dialog open={deleteConfirm.open} onOpenChange={(open) => setDeleteConfirm((prev) => ({ ...prev, open }))}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-red-600 font-bold">
-                <Trash2 className="h-5 w-5" /> Delete {deleteConfirm.type.toUpperCase()} - {deleteConfirm.name}
+              <DialogTitle className="text-[#B42318] flex items-center gap-2">
+                <AlertCircle className="h-5 w-5" /> Delete {deleteConfirm.type}
               </DialogTitle>
-              <DialogDescription className="pt-2 text-xs text-slate-600">
-                Are you sure you want to delete <strong className="font-bold text-slate-900">{deleteConfirm.name}</strong>?
-                This action cannot be undone. Note: Structure items occupied by active residents cannot be deleted until room beds are vacated.
-              </DialogDescription>
+              <p className="text-xs text-[var(--gray-600)] mt-1">
+                Are you sure you want to delete <strong className="text-[var(--gray-900)]">{deleteConfirm.name}</strong>?
+                This action cannot be undone.
+              </p>
             </DialogHeader>
 
-            <DialogFooter className="mt-3">
-              <Button variant="outline" onClick={() => setDeleteConfirm({ open: false, type: "block", id: "", name: "" })}>
+            <DialogFooter>
+              <Button variant="secondary" size="sm" onClick={() => setDeleteConfirm((prev) => ({ ...prev, open: false }))}>
                 Cancel
               </Button>
-              <Button
-                className="bg-red-600 hover:bg-red-700 text-white font-bold gap-1.5"
-                onClick={confirmDelete}
-                disabled={deleteBlockMut.isPending || deleteFloorMut.isPending || deleteRoomMut.isPending}
-              >
-                {deleteBlockMut.isPending || deleteFloorMut.isPending || deleteRoomMut.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>
-                    <Trash2 className="h-4 w-4" /> Confirm Delete
-                  </>
-                )}
+              <Button variant="destructive" size="sm" onClick={confirmDelete}>
+                Confirm Delete
               </Button>
             </DialogFooter>
           </DialogContent>

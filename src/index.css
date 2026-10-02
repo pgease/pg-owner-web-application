@@ -1,162 +1,117 @@
 /* ✅ ALWAYS FIRST */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap');
+
+/* ✅ Design System Tokens */
+@import './styles/tokens.css';
 
 /* ✅ Tailwind layers */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-
-/* ================= BASE VARIABLES ================= */
 @layer base {
-  :root {
-    --background: 0 0% 97%;
-    --foreground: 200 20% 12%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 200 20% 12%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 200 20% 12%;
-
-    --primary: 180 100% 25%;
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 180 15% 94%;
-    --secondary-foreground: 180 30% 20%;
-
-    --muted: 200 10% 94%;
-    --muted-foreground: 200 10% 45%;
-
-    --accent: 180 60% 90%;
-    --accent-foreground: 180 80% 20%;
-
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 100%;
-
-    --success: 142 71% 35%;
-    --success-foreground: 0 0% 100%;
-
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
-
-    --info: 217 91% 55%;
-    --info-foreground: 0 0% 100%;
-
-    --border: 200 15% 90%;
-    --input: 200 15% 90%;
-    --ring: 180 100% 25%;
-
-    --radius: 0.5rem;
-
-    /* App shell — light, neutral surface with PG Ease teal for active/selected states */
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 200 20% 25%;
-    --sidebar-primary: 180 100% 25%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 200 10% 96%;
-    --sidebar-accent-foreground: 200 20% 12%;
-    --sidebar-border: 200 15% 90%;
-    --sidebar-ring: 180 100% 25%;
-    --sidebar-muted: 200 10% 48%;
-
-    --primary-soft: 180 50% 12%;
-    --primary-glow: 180 100% 35%;
-
-    --chart-1: 180 100% 25%;
-    --chart-2: 180 60% 45%;
-    --chart-3: 180 40% 65%;
-    --chart-4: 38 92% 50%;
-    --chart-5: 0 72% 51%;
-  }
-
-  .dark {
-    --background: 200 20% 8%;
-    --foreground: 180 10% 92%;
-    --card: 200 18% 12%;
-    --card-foreground: 180 10% 92%;
-    --popover: 200 18% 12%;
-    --popover-foreground: 180 10% 92%;
-    --primary: 180 80% 40%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 200 15% 18%;
-    --secondary-foreground: 180 10% 85%;
-    --muted: 200 12% 18%;
-    --muted-foreground: 200 10% 55%;
-    --accent: 180 30% 18%;
-    --accent-foreground: 180 60% 70%;
-    --destructive: 0 62% 40%;
-    --destructive-foreground: 0 0% 100%;
-    --success: 142 60% 40%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 80% 50%;
-    --warning-foreground: 0 0% 100%;
-    --info: 217 80% 60%;
-    --info-foreground: 0 0% 100%;
-    --border: 200 12% 20%;
-    --input: 200 12% 20%;
-    --ring: 180 80% 40%;
-
-    --sidebar-background: 200 18% 10%;
-    --sidebar-foreground: 180 10% 85%;
-    --sidebar-primary: 180 80% 40%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 200 15% 16%;
-    --sidebar-accent-foreground: 180 10% 95%;
-    --sidebar-border: 200 12% 18%;
-    --sidebar-ring: 180 80% 40%;
-    --sidebar-muted: 200 10% 60%;
-  }
-
   * {
     @apply border-border;
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', system-ui, sans-serif;
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', 'Noto Sans Devanagari', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--gray-900);
+    background-color: var(--gray-50);
+  }
+
+  /* Universal tabular numerals for amounts, metrics, tables, dates */
+  .tabular-nums,
+  table,
+  input[type="number"],
+  [data-tabular="true"] {
+    font-variant-numeric: tabular-nums;
   }
 }
 
-
-/* ================= TYPOGRAPHY SCALE =================
-   Use these instead of ad-hoc font sizes so every page shares one hierarchy. */
+/* ================= TYPOGRAPHY SCALE (Section 4.1) =================
+   Use these consistent tokens across every page.
+*/
 @layer components {
-  .text-page-title {
-    @apply text-xl font-semibold tracking-tight text-foreground md:text-2xl;
-  }
-  .text-section-title {
-    @apply text-base font-semibold tracking-tight text-foreground;
-  }
-  .text-card-title {
-    @apply text-sm font-semibold text-foreground;
-  }
-  .text-label {
-    @apply text-xs font-medium text-muted-foreground;
-  }
+  /* text-xs: 12/16px 400-500: captions, helper text, badge text, table meta */
   .text-caption {
-    @apply text-xs text-muted-foreground;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 400;
+    color: var(--gray-600);
   }
-  .text-stat {
-    @apply text-2xl font-semibold tabular-nums tracking-tight text-foreground;
+
+  /* text-sm: 13/18px 400-500: table cells, secondary text, labels */
+  .text-body-sm {
+    font-size: 13px;
+    line-height: 18px;
+    font-weight: 400;
+  }
+
+  .text-label-sm {
+    font-size: 13px;
+    line-height: 18px;
+    font-weight: 500;
+    color: var(--gray-700);
+  }
+
+  /* text-base: 14/20px 400: default body, inputs, buttons */
+  .text-body-base {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 400;
+  }
+
+  /* text-md: 16/24px 500-600: card/section titles, drawer titles */
+  .text-section-title {
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 600;
+    color: var(--gray-900);
+    letter-spacing: 0;
+  }
+
+  /* text-lg: 18/26px 600: page sub-titles */
+  .text-page-subtitle {
+    font-size: 18px;
+    line-height: 26px;
+    font-weight: 600;
+    color: var(--gray-900);
+    letter-spacing: 0;
+  }
+
+  /* text-xl: 20/28px 600: page title (H1 in app) */
+  .text-page-title {
+    font-size: 20px;
+    line-height: 28px;
+    font-weight: 600;
+    color: var(--gray-900);
+    letter-spacing: 0;
+  }
+
+  /* text-2xl: 24/32px 600: KPI numbers */
+  .text-kpi {
+    font-size: 24px;
+    line-height: 32px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    color: var(--gray-900);
+  }
+
+  /* Operational Clean Card */
+  .register-card {
+    background-color: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    box-shadow: none;
   }
 }
 
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted)) transparent;
+    scrollbar-color: var(--gray-300) transparent;
   }
-  
-  .bg-gradient-flow {
-    background: linear-gradient(270deg, rgba(13, 148, 136, 0.08), rgba(16, 185, 129, 0.08), rgba(99, 102, 241, 0.08));
-    background-size: 600% 600%;
-    animation: flowGradient 16s ease infinite;
-  }
-}
-
-@keyframes flowGradient {
-  0% { background-position: 0% 50% }
-  50% { background-position: 100% 50% }
-  100% { background-position: 0% 50% }
 }

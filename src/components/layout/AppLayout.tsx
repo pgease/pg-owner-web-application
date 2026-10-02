@@ -38,10 +38,10 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#F6F7F8]">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:text-primary-foreground"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-[6px] focus:bg-[#008080] focus:px-3 focus:py-2 focus:text-sm focus:text-white"
       >
         Skip to main content
       </a>
@@ -51,11 +51,16 @@ const AppLayout = ({ children }: AppLayoutProps) => {
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
       />
-      <div className={cn("flex min-h-screen flex-col transition-[margin] duration-200", collapsed ? "md:ml-[68px]" : "md:ml-[248px]")}>
+      <div
+        className={cn(
+          "flex min-h-screen flex-col transition-[margin] duration-200",
+          collapsed ? "md:ml-[64px]" : "md:ml-[240px]",
+        )}
+      >
         <AppHeader onMenuToggle={() => setMobileOpen((v) => !v)} />
         <SubscriptionBanner />
-        <main id="main-content" className="flex-1 p-4 md:p-6">
-          <div className="mx-auto w-full max-w-[1400px]">{children}</div>
+        <main id="main-content" className="flex-1 p-3 sm:p-4 md:p-6 pb-28">
+          <div className="mx-auto w-full">{children}</div>
         </main>
       </div>
     </div>

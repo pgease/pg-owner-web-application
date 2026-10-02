@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
 import { PageHeader } from "@/components/common/PageHeader";
-import { StatCard } from "@/components/common/StatCard";
+import { MetricDisplay } from "@/components/common/MetricDisplay";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { useApp } from "@/context/AppContext";
@@ -65,7 +65,7 @@ const Dashboard = () => {
   if (!selectedPgId) {
     return (
       <div className="mx-auto max-w-lg pt-10">
-        <div className="rounded-lg border bg-card">
+        <div className="register-card p-6">
           <EmptyState
             icon={<Building2 />}
             title={list.length ? "Select a property to continue" : "Add your first property"}
@@ -84,19 +84,21 @@ const Dashboard = () => {
 
   const { beds, tenants, complaints, rent, loading, isError } = data;
   const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const currentMonthName = MONTHS[rent.month - 1];
+  const shortMonthName = currentMonthName.slice(0, 3);
 
   return (
     <CanAccessPage permission="dashboard_view">
-      <div className="space-y-6 pb-8">
+      <div className="space-y-6 pb-6">
         <PageHeader
           title={selectedPg?.name ?? "Dashboard"}
-          description={selectedPg?.address || `Here's what's happening at your PG in ${MONTHS[rent.month - 1]}.`}
+          description={selectedPg?.address || `Overview for ${currentMonthName} ${rent.year}`}
           actions={
             <>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-9 w-9"
+                size="sm"
+                className="h-9 w-9 p-0 text-[var(--gray-600)]"
                 onClick={data.refetchAll}
                 aria-label="Refresh dashboard"
                 disabled={data.isFetching}
@@ -110,22 +112,22 @@ const Dashboard = () => {
               </CanAccess>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-1.5">
+                  <Button variant="secondary" className="gap-1.5">
                     Quick actions <ChevronDown className="h-3.5 w-3.5 opacity-60" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52">
                   <DropdownMenuItem onClick={() => navigate("/rent-payments")} className="gap-2">
-                    <IndianRupee className="h-4 w-4" /> Record rent payment
+                    <IndianRupee className="h-4 w-4 text-[var(--brand-600)]" /> Record rent payment
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/my-pgs/structure")} className="gap-2">
-                    <BedDouble className="h-4 w-4" /> Add room or bed
+                    <BedDouble className="h-4 w-4 text-[var(--gray-600)]" /> Add room or bed
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/tenants/kyc")} className="gap-2">
-                    <ShieldCheck className="h-4 w-4" /> Verify KYC
+                    <ShieldCheck className="h-4 w-4 text-emerald-600" /> Verify KYC
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/complaints")} className="gap-2">
-                    <MessageSquareWarning className="h-4 w-4" /> View complaints
+                    <MessageSquareWarning className="h-4 w-4 text-amber-600" /> View complaints
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -134,7 +136,7 @@ const Dashboard = () => {
         />
 
         {isError ? (
-          <div className="rounded-lg border bg-card">
+          <div className="register-card p-6">
             <ErrorState
               title="Couldn't load your dashboard"
               description="We couldn't reach the server. Check your connection and try again."
@@ -144,60 +146,53 @@ const Dashboard = () => {
           </div>
         ) : (
           <>
-            {/* Overview */}
-            <section aria-label="Overview" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-              <StatCard
-                label="Occupied beds"
-                value={loading.rooms ? "" : `${beds.occupiedBeds}/${beds.totalBeds}`}
-                hint={loading.rooms ? undefined : `${beds.occupancyPct}% occupancy`}
-                icon={<BedDouble />}
-                tone="brand"
-                loading={loading.rooms}
-                onClick={() => navigate("/my-pgs/structure")}
-              />
-              <StatCard
-                label="Vacant beds"
-                value={beds.vacantBeds}
-                hint={beds.vacantBeds > 0 ? "Ready for new tenants" : "Fully occupied"}
-                icon={<BedDouble />}
-                tone={beds.vacantBeds > 0 ? "info" : "default"}
-                loading={loading.rooms}
-                onClick={() => navigate("/tenants/vacant-rooms")}
-              />
-              <StatCard
-                label="Tenants"
-                value={tenants.total}
-                hint={tenants.onNotice > 0 ? `${tenants.onNotice} on notice` : "Active tenants"}
-                icon={<Users />}
-                loading={loading.tenants}
-                onClick={() => navigate("/tenants")}
-              />
-              <StatCard
-                label="Rent collected"
+            {/* Overview Operational Metrics */}
+            <section aria-label="Key operational metrics" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+              <MetricDisplay
+                label={`Collected (${shortMonthName})`}
                 value={rent.collectedThisMonth != null ? formatInr(rent.collectedThisMonth) : "—"}
-                hint={rent.paidCount != null ? `${rent.paidCount} tenant${rent.paidCount === 1 ? "" : "s"} paid · ${MONTHS[rent.month - 1].slice(0, 3)}` : "This month"}
-                icon={<IndianRupee />}
+                subText={rent.paidCount != null ? `${rent.paidCount} tenant${rent.paidCount === 1 ? "" : "s"} paid` : "This month"}
                 tone="success"
                 loading={loading.rent}
-                onClick={() => navigate("/rent-payments")}
+                to="/rent-payments"
               />
-              <StatCard
-                label="Rent pending"
+              <MetricDisplay
+                label={`Pending (${shortMonthName})`}
                 value={rent.pendingAmount != null ? formatInr(rent.pendingAmount) : rent.unpaidCount != null ? rent.unpaidCount : "—"}
-                hint={rent.unpaidCount != null ? `${rent.unpaidCount} tenant${rent.unpaidCount === 1 ? "" : "s"} unpaid` : "This month"}
-                icon={<IndianRupee />}
+                subText={rent.unpaidCount != null ? `${rent.unpaidCount} tenant${rent.unpaidCount === 1 ? "" : "s"} pending` : "This month"}
+                tone={(rent.unpaidCount ?? 0) > 0 ? "warning" : "default"}
+                loading={loading.rent}
+                to="/rent-payments/dues"
+              />
+              <MetricDisplay
+                label="Overdue rent"
+                value={(rent.unpaidCount ?? 0) > 0 ? `${rent.unpaidCount}` : "0"}
+                subText={(rent.unpaidCount ?? 0) > 0 ? "Needs immediate reminder" : "None overdue"}
                 tone={(rent.unpaidCount ?? 0) > 0 ? "danger" : "default"}
                 loading={loading.rent}
-                onClick={() => navigate("/rent-payments/dues")}
+                to="/rent-payments/dues"
               />
-              <StatCard
+              <MetricDisplay
+                label="Occupied beds"
+                value={loading.rooms ? "" : `${beds.occupiedBeds}/${beds.totalBeds}`}
+                subText={loading.rooms ? undefined : `${beds.occupancyPct}% occupancy`}
+                loading={loading.rooms}
+                to="/my-pgs/structure"
+              />
+              <MetricDisplay
+                label="Vacant beds"
+                value={beds.vacantBeds}
+                subText={beds.vacantBeds > 0 ? "Ready for check-in" : "Fully occupied"}
+                loading={loading.rooms}
+                to="/tenants/vacant-rooms"
+              />
+              <MetricDisplay
                 label="Open complaints"
                 value={complaints.open}
-                hint={complaints.inProgress > 0 ? `${complaints.inProgress} in progress` : `${complaints.total} total`}
-                icon={<MessageSquareWarning />}
-                tone={complaints.open > 0 ? "warning" : "default"}
+                subText={complaints.inProgress > 0 ? `${complaints.inProgress} in progress` : `${complaints.total} total`}
+                tone={complaints.open > 0 ? "danger" : "default"}
                 loading={loading.complaints}
-                onClick={() => navigate("/complaints")}
+                to="/complaints"
               />
             </section>
 
@@ -211,8 +206,10 @@ const Dashboard = () => {
               </div>
             </div>
 
+            {/* Pending Rent Quick Collection */}
             <PendingRentCard data={data} />
 
+            {/* Rooms Structure / Bed Grid */}
             <RoomGrid data={data} />
           </>
         )}

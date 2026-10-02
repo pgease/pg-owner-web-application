@@ -143,53 +143,48 @@ export const EaseBuddyAI: React.FC<{
 
   return (
     <>
-      {/* Floating Action Button - Circular Section */}
+      {/* Floating Action Button - Positioned at bottom: 24px, right: 24px */}
       {!isOpen && (
-        <div className="fixed bottom-5 right-5 z-50 animate-fade-in">
+        <div className="fixed bottom-6 right-6 z-40 hidden sm:block">
           <button
             type="button"
             onClick={() => setIsOpen(true)}
-            className="group relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-tr from-teal-700 via-teal-600 to-emerald-500 text-white shadow-2xl shadow-teal-950/50 hover:shadow-teal-500/40 hover:scale-105 active:scale-95 transition-all border-2 border-teal-300/40"
-            title="Ease Buddy AI Assistant (Click to open chat)"
+            className="group relative flex h-12 w-12 items-center justify-center rounded-full bg-[var(--brand-600)] text-white shadow-pop hover:bg-[var(--brand-700)] active:bg-[var(--brand-800)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-600)] focus-visible:ring-offset-2 border border-white/20"
+            title="Ease Buddy AI Assistant"
             aria-label="Open Ease Buddy AI"
           >
-            <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-400 border border-[#0a1128]" />
-            </span>
-            <Bot className="h-6 w-6 text-white group-hover:scale-110 transition-transform" />
+            <Bot className="h-5 w-5 text-white" />
+            <span className="absolute top-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
           </button>
         </div>
       )}
 
-      {/* Floating AI Chat Window */}
+      {/* Ease Buddy Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-5 right-5 z-50 w-[92vw] sm:w-[380px] h-[520px] max-h-[85vh] rounded-3xl border border-teal-500/30 bg-[#0a1128]/95 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden text-white animate-scale-in">
+        <div className="fixed bottom-6 right-6 z-50 w-[92vw] sm:w-[380px] h-[520px] max-h-[85vh] rounded-md border border-[var(--gray-200)] bg-white shadow-overlay flex flex-col overflow-hidden text-[var(--gray-900)]">
           {/* Header */}
-          <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-teal-700/80 via-emerald-700/80 to-teal-800/80 border-b border-white/10 shrink-0">
+          <div className="flex items-center justify-between px-4 py-3 bg-[var(--gray-50)] border-b border-[var(--gray-200)] shrink-0">
             <div className="flex items-center gap-2.5">
-              <div className="relative">
-                <div className="h-9 w-9 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-white shadow-inner">
-                  <Bot className="h-5 w-5" />
-                </div>
-                <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-[#0a1128]" />
+              <div className="h-8 w-8 rounded-full bg-[var(--brand-50)] border border-[var(--brand-100)] flex items-center justify-center text-[var(--brand-600)]">
+                <Bot className="h-4 w-4" />
               </div>
               <div>
-                <div className="flex items-center gap-1.5">
-                  <h3 className="text-xs font-bold text-white">Ease Buddy AI</h3>
-                  <Badge className="bg-amber-400 text-slate-900 text-[9px] font-bold px-1.5 py-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-[var(--gray-900)]">Ease Buddy</h3>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-sm border border-emerald-200">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                     Online
-                  </Badge>
+                  </span>
                 </div>
-                <p className="text-[10px] text-teal-200">Your PG Operations Assistant</p>
+                <p className="text-xs text-[var(--gray-500)]">PG Operations Assistant</p>
               </div>
             </div>
 
             <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-white/70 hover:text-white hover:bg-white/10 rounded-lg"
+                size="sm"
+                className="h-8 w-8 p-0 text-[var(--gray-500)] hover:text-[var(--gray-900)] hover:bg-[var(--gray-100)] rounded-md"
                 onClick={handleClose}
                 aria-label="Close Ease Buddy"
               >
@@ -199,45 +194,45 @@ export const EaseBuddyAI: React.FC<{
           </div>
 
           {/* Quick Prompt Suggestions */}
-          <div className="bg-white/[0.03] border-b border-white/5 p-2 flex gap-1.5 overflow-x-auto shrink-0 scrollbar-none">
+          <div className="bg-[var(--gray-50)]/50 border-b border-[var(--gray-200)] px-3 py-2 flex gap-1.5 overflow-x-auto shrink-0 scrollbar-none">
             <button
               onClick={() => handleSend("Tell me about the 45-day Lite trial")}
-              className="text-[10px] whitespace-nowrap bg-teal-500/10 border border-teal-500/30 hover:bg-teal-500/20 text-teal-300 px-2.5 py-1 rounded-full transition-colors flex items-center gap-1 font-medium"
+              className="text-xs whitespace-nowrap bg-white border border-[var(--gray-300)] hover:border-[var(--brand-600)] hover:text-[var(--brand-600)] text-[var(--gray-700)] px-2.5 py-1 rounded-sm transition-colors flex items-center gap-1 font-medium shadow-none"
             >
-              <Sparkles className="h-2.5 w-2.5" /> 45-Day Trial
+              <Sparkles className="h-3 w-3 text-[var(--brand-600)]" /> 45-Day Trial
             </button>
             <button
               onClick={() => handleSend("What is the difference between Lite and Pro plans?")}
-              className="text-[10px] whitespace-nowrap bg-white/[0.05] border border-white/10 hover:bg-white/10 text-slate-300 px-2.5 py-1 rounded-full transition-colors flex items-center gap-1 font-medium"
+              className="text-xs whitespace-nowrap bg-white border border-[var(--gray-300)] hover:border-[var(--brand-600)] hover:text-[var(--brand-600)] text-[var(--gray-700)] px-2.5 py-1 rounded-sm transition-colors flex items-center gap-1 font-medium shadow-none"
             >
-              <CreditCard className="h-2.5 w-2.5" /> Lite vs Pro
+              <CreditCard className="h-3 w-3 text-[var(--gray-500)]" /> Lite vs Pro
             </button>
             <button
               onClick={() => handleSend("How does Direct UPI intent verification work?")}
-              className="text-[10px] whitespace-nowrap bg-white/[0.05] border border-white/10 hover:bg-white/10 text-slate-300 px-2.5 py-1 rounded-full transition-colors flex items-center gap-1 font-medium"
+              className="text-xs whitespace-nowrap bg-white border border-[var(--gray-300)] hover:border-[var(--brand-600)] hover:text-[var(--brand-600)] text-[var(--gray-700)] px-2.5 py-1 rounded-sm transition-colors flex items-center gap-1 font-medium shadow-none"
             >
-              <QrCode className="h-2.5 w-2.5" /> UPI Verification
+              <QrCode className="h-3 w-3 text-[var(--gray-500)]" /> UPI Verification
             </button>
             <button
               onClick={() => handleSend("How to get my PG website on Pro?")}
-              className="text-[10px] whitespace-nowrap bg-white/[0.05] border border-white/10 hover:bg-white/10 text-slate-300 px-2.5 py-1 rounded-full transition-colors flex items-center gap-1 font-medium"
+              className="text-xs whitespace-nowrap bg-white border border-[var(--gray-300)] hover:border-[var(--brand-600)] hover:text-[var(--brand-600)] text-[var(--gray-700)] px-2.5 py-1 rounded-sm transition-colors flex items-center gap-1 font-medium shadow-none"
             >
-              <Globe className="h-2.5 w-2.5" /> PG Website
+              <Globe className="h-3 w-3 text-[var(--gray-500)]" /> PG Website
             </button>
           </div>
 
           {/* Messages Area */}
-          <div className="flex-1 p-3.5 space-y-3 overflow-y-auto">
+          <div className="flex-1 p-4 space-y-3 overflow-y-auto bg-white">
             {messages.map((m) => (
               <div
                 key={m.id}
                 className={`flex flex-col ${m.sender === "user" ? "items-end" : "items-start"}`}
               >
                 <div
-                  className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
+                  className={`max-w-[85%] rounded-md px-3.5 py-2.5 text-xs leading-relaxed ${
                     m.sender === "user"
-                      ? "bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-br-none"
-                      : "bg-white/[0.07] text-slate-200 border border-white/10 rounded-bl-none"
+                      ? "bg-[var(--brand-600)] text-white"
+                      : "bg-[var(--gray-100)] text-[var(--gray-900)] border border-[var(--gray-200)]"
                   }`}
                 >
                   <p className="whitespace-pre-line">{m.text}</p>
@@ -249,7 +244,7 @@ export const EaseBuddyAI: React.FC<{
                       handleClose();
                       navigate(m.actionLink!.url);
                     }}
-                    className="mt-1.5 flex items-center gap-1 text-[11px] font-bold text-teal-400 hover:text-teal-300 hover:underline transition-colors"
+                    className="mt-1 flex items-center gap-1 text-xs font-medium text-[var(--brand-600)] hover:underline transition-colors"
                   >
                     <span>{m.actionLink.label}</span>
                     <ChevronRight className="h-3 w-3" />
@@ -261,7 +256,7 @@ export const EaseBuddyAI: React.FC<{
           </div>
 
           {/* Chat Input */}
-          <div className="p-2.5 border-t border-white/10 bg-[#070c1e] flex items-center gap-2 shrink-0">
+          <div className="p-3 border-t border-[var(--gray-200)] bg-[var(--gray-50)] flex items-center gap-2 shrink-0">
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -269,16 +264,16 @@ export const EaseBuddyAI: React.FC<{
                 if (e.key === "Enter") handleSend();
               }}
               placeholder="Ask Ease Buddy anything..."
-              className="h-10 text-xs bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus-visible:ring-teal-500 rounded-xl"
+              className="h-9 text-xs bg-white border-[var(--gray-300)] text-[var(--gray-900)] placeholder:text-[var(--gray-400)] focus-visible:ring-[var(--brand-600)] rounded-md"
             />
             <Button
-              size="icon"
+              size="sm"
               onClick={() => handleSend()}
               disabled={!input.trim()}
-              className="h-10 w-10 shrink-0 bg-teal-600 hover:bg-teal-500 text-white rounded-xl shadow-md disabled:opacity-40"
+              className="h-9 px-3 shrink-0"
               aria-label="Send message"
             >
-              <Send className="h-4 w-4" />
+              <Send className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>

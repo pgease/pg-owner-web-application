@@ -1,18 +1,14 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   IndianRupee,
   Loader2,
   Users,
   Wallet,
-  BedDouble,
   CheckCircle2,
   AlertCircle,
   History,
-  Search,
   Download,
-  Filter,
-  ArrowUpDown,
   Send,
   MessageSquare,
   Clock,
@@ -23,26 +19,24 @@ import {
   Link as LinkIcon,
   ChevronLeft,
   ChevronRight,
-  Calendar,
+  Eye,
+  Check,
+  X,
+  FileSpreadsheet,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/common/PageHeader";
+import { StatusBadge, type StatusBadgeProps } from "@/components/common/StatusBadge";
+import { MetricDisplay } from "@/components/common/MetricDisplay";
+import { SearchInput } from "@/components/common/SearchInput";
+import { ActionMenu } from "@/components/common/ActionMenu";
+import { DataTable } from "@/components/common/DataTable";
+import { EmptyState } from "@/components/common/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { StatusBadge } from "@/components/common/StatusBadge";
-import { HelpLink } from "@/components/common/HelpLink";
-import { PageHeader } from "@/components/common/PageHeader";
-import { useApp } from "@/context/AppContext";
-import { toast } from "@/components/ui/use-toast";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -50,292 +44,100 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { useApp } from "@/context/AppContext";
+import { toast } from "@/components/ui/use-toast";
 import {
   usePostManualRentMutation,
   useRentCollectionDashboard,
   usePropertyTenants,
   useRentCollectionHistory,
-  type RentCollectionHistoryParams,
 } from "@/hooks/usePropertyOwnerQueries";
-import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
+import { CanAccessPage } from "@/components/PermissionGuard";
 import { sendWhatsAppRentReminder, type RentDashboardTenantRow } from "@/api/propertyOwner";
 import { amountFromRow, formatInr, parseRentTenantRow } from "@/lib/rentDashboard";
 import { SharePaymentLinkDialog } from "@/components/tenants/SharePaymentLinkDialog";
+import { formatDate, formatINR, formatShortDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
-function TenantTable({
-  rows,
-  emptyLabel,
-  isUnpaid = false,
-  onRecordPay,
-  onSharePaymentLink,
-  propertyId,
-}: {
-  rows: RentDashboardTenantRow[];
-  emptyLabel: string;
-  isUnpaid?: boolean;
-  onRecordPay?: (row: RentDashboardTenantRow) => void;
-  onSharePaymentLink?: (row: RentDashboardTenantRow) => void;
-  propertyId?: string | null;
-}) {
-  if (rows.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground py-8 text-center border rounded-2xl bg-muted/10 font-medium">
-        {emptyLabel}
-      </p>
-    );
-  }
-  return (
-    <div className="rounded-2xl border border-border/80 overflow-x-auto shadow-xs bg-card">
-      <Table>
-        <TableHeader className="bg-muted/40 text-xs">
-          <TableRow>
-            <TableHead>Tenant</TableHead>
-            <TableHead>Room</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
-            {isUnpaid && <TableHead className="text-right">Action</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody className="text-xs">
-          {rows.map((row, i) => {
-            const parsed = parseRentTenantRow(row);
-            const amt = amountFromRow(row) ?? (Number((row as any).rentAmount) || 0);
-            const room = row.roomNumber ?? row.room_number ?? "—";
-            const tenantName = parsed?.label ?? String(row.tenantName ?? row.name ?? row.tenant_name ?? "Tenant");
-            const phone = row.phone || row.mobile || "";
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
 
-            return (
-              <TableRow key={parsed ? `${parsed.roomTenantId}-${i}` : i} className="hover:bg-muted/20">
-                <TableCell className="font-semibold text-foreground">
-                  <div className="flex items-center gap-2">
-                    <span className="h-7 w-7 rounded-full bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 flex items-center justify-center text-xs font-bold shrink-0">
-                      {tenantName.charAt(0).toUpperCase()}
-                    </span>
-                    <div>
-                      <p className="leading-none">{tenantName}</p>
-                      {phone && <p className="text-[10px] text-muted-foreground mt-0.5">{phone}</p>}
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell className="text-muted-foreground font-medium">Room {String(room)}</TableCell>
-                <TableCell className="text-right tabular-nums font-bold text-foreground">
-                  {formatInr(amt)}
-                </TableCell>
-                {isUnpaid && (
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-[11px] px-2.5 rounded-lg border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 gap-1 font-semibold"
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          const targetRoomTenantId = parsed?.roomTenantId || (row as any).roomTenantId || (row as any).id;
-                          if (propertyId && targetRoomTenantId) {
-                            try {
-                              const res = await sendWhatsAppRentReminder(propertyId, targetRoomTenantId, amt ? { customAmount: amt } : undefined);
-                              toast({
-                                title: "WhatsApp Reminder Sent",
-                                description: res?.message || `Sent official rent reminder to ${tenantName}.`,
-                              });
-                              return;
-                            } catch (err: any) {
-                              console.warn("Backend reminder API failed, falling back to direct link", err);
-                            }
-                          }
-                          const text = encodeURIComponent(
-                            `Hi ${tenantName}, this is a gentle reminder that your PG rent of ${amt != null ? formatInr(amt) : "due amount"} is pending for this month. Please pay to avoid late fees. Thank you!`
-                          );
-                          window.open(phone ? `https://wa.me/91${phone.replace(/\D/g, "")}?text=${text}` : `https://wa.me/?text=${text}`, "_blank");
-                        }}
-                      >
-                        <MessageSquare className="h-3 w-3" /> WhatsApp
-                      </Button>
-                      {onSharePaymentLink && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-[11px] px-2.5 rounded-lg border-teal-300 text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-950/30 gap-1 font-semibold"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSharePaymentLink(row);
-                          }}
-                          title="View dues breakdown and copy payment link"
-                        >
-                          <LinkIcon className="h-3 w-3" /> Pay Link
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="default"
-                        className="h-7 text-[11px] px-2.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRecordPay?.(row);
-                        }}
-                      >
-                        Record
-                      </Button>
-                    </div>
-                  </TableCell>
-                )}
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </div>
-  );
+interface PaymentVerificationItem {
+  id: string;
+  tenantId: string;
+  roomTenantId: string;
+  tenantName: string;
+  roomNumber: string;
+  amountClaimed: number;
+  utrNumber: string;
+  screenshotUrl?: string;
+  submittedAt: string;
+  status: "pending" | "approved" | "rejected";
+  rejectionReason?: string;
 }
 
-const RentPayments = () => {
+// Stored / simulated offline payment proofs for Lite Plan
+const INITIAL_VERIFICATIONS: PaymentVerificationItem[] = [
+  {
+    id: "ver-101",
+    tenantId: "t-101",
+    roomTenantId: "rt-101",
+    tenantName: "Rohan Verma",
+    roomNumber: "201",
+    amountClaimed: 8500,
+    utrNumber: "428910284719",
+    submittedAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
+    status: "pending",
+  },
+  {
+    id: "ver-102",
+    tenantId: "t-102",
+    roomTenantId: "rt-102",
+    tenantName: "Priya Sharma",
+    roomNumber: "105",
+    amountClaimed: 9000,
+    utrNumber: "UPI/428931982736",
+    submittedAt: new Date(Date.now() - 5 * 3600 * 1000).toISOString(),
+    status: "pending",
+  },
+];
+
+export const RentPayments = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { selectedPgId, properties, setSelectedPgId } = useApp();
+  const { selectedPgId, properties } = useApp();
   const selectedPg = useMemo(() => {
     return Array.isArray(properties) ? properties.find((p) => p.id === selectedPgId) : null;
   }, [properties, selectedPgId]);
 
-  const isHistoryView = location.pathname === "/rent-payments/history";
-  const isDuesView = location.pathname === "/rent-payments/dues";
-  const isCollectionView = !isHistoryView && !isDuesView;
-
   const [month, setMonth] = useState(() => new Date().getMonth() + 1);
   const [year, setYear] = useState(() => new Date().getFullYear());
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [density, setDensity] = useState<"default" | "compact">("default");
 
+  // Record Payment Dialog
   const [manualPaymentOpen, setManualPaymentOpen] = useState(false);
   const [roomTenantId, setRoomTenantId] = useState("");
   const [tenantId, setTenantId] = useState("");
   const [amountPaid, setAmountPaid] = useState("");
-  const [selectedUnpaidKey, setSelectedUnpaidKey] = useState<string>("");
+  const [paymentReference, setPaymentReference] = useState("");
+  const [paymentMode, setPaymentMode] = useState("UPI");
 
-  // Filters for History & Dues
-  const [historySearch, setHistorySearch] = useState("");
-  const [historyMode, setHistoryMode] = useState("all");
-  const [historyStatus, setHistoryStatus] = useState<"all" | "paid" | "partial" | "pending">("all");
-  const [historySortBy, setHistorySortBy] = useState<"paidAt" | "createdAt" | "periodMonth">("paidAt");
-  const [historySortOrder, setHistorySortOrder] = useState<"desc" | "asc">("desc");
-  const [historyStartDate, setHistoryStartDate] = useState("");
-  const [historyEndDate, setHistoryEndDate] = useState("");
-  const [historyPage, setHistoryPage] = useState(1);
-  const [historyLimit, setHistoryLimit] = useState(10);
-  const [duesSearch, setDuesSearch] = useState("");
-  const [duesFilter, setDuesFilter] = useState("all");
-  const [receiptDialogData, setReceiptDialogData] = useState<any | null>(null);
+  // Passbook Drawer
+  const [passbookDrawerOpen, setPassbookDrawerOpen] = useState(false);
+  const [selectedPassbookTenant, setSelectedPassbookTenant] = useState<any | null>(null);
 
-  const rentQuery = useRentCollectionDashboard(selectedPgId, month, year);
-  const dashboard = rentQuery.data;
-  const tenantsQuery = usePropertyTenants(selectedPgId);
-  const manualMut = usePostManualRentMutation(selectedPgId);
+  // Verification Queue
+  const [verifications, setVerifications] = useState<PaymentVerificationItem[]>(INITIAL_VERIFICATIONS);
+  const [activeVerification, setActiveVerification] = useState<PaymentVerificationItem | null>(null);
+  const [verificationDrawerOpen, setVerificationDrawerOpen] = useState(false);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
 
-  const historyParams = useMemo(() => {
-    const p: RentCollectionHistoryParams = {
-      page: historyPage,
-      limit: historyLimit,
-      sortBy: historySortBy,
-      sortOrder: historySortOrder,
-    };
-    if (historySearch.trim()) p.search = historySearch.trim();
-    if (historyStatus !== "all") p.status = historyStatus;
-    if (historyStartDate) p.startDate = historyStartDate;
-    if (historyEndDate) p.endDate = historyEndDate;
-    return p;
-  }, [historyPage, historyLimit, historySortBy, historySortOrder, historySearch, historyStatus, historyStartDate, historyEndDate]);
-
-  const historyQuery = useRentCollectionHistory(selectedPgId, historyParams);
-  const historyData = historyQuery.data;
-  const historyList = historyData?.data ?? [];
-  const historyPagination = historyData?.pagination;
-  const totalHistoryCount = historyPagination?.total ?? historyList.length;
-  const totalHistoryPages = Math.max(1, historyPagination?.totalPages ?? Math.ceil(totalHistoryCount / historyLimit));
-
-  const years = useMemo(() => {
-    const y = new Date().getFullYear();
-    return [y - 1, y, y + 1];
-  }, []);
-
-  const unpaidOptions = useMemo(() => {
-    const list = dashboard?.unpaidTenants ?? [];
-    const out: { key: string; label: string; roomTenantId: string; tenantId: string; suggestedAmount?: number }[] = [];
-    list.forEach((row, i) => {
-      const p = parseRentTenantRow(row);
-      if (!p) return;
-      const key = `${p.roomTenantId}|${p.tenantId}|${i}`;
-      out.push({
-        key,
-        label: p.label,
-        roomTenantId: p.roomTenantId,
-        tenantId: p.tenantId,
-        suggestedAmount: amountFromRow(row),
-      });
-    });
-    return out;
-  }, [dashboard?.unpaidTenants]);
-
-  const applyUnpaidSelection = (key: string) => {
-    setSelectedUnpaidKey(key);
-    const opt = unpaidOptions.find((o) => o.key === key);
-    if (opt) {
-      setRoomTenantId(opt.roomTenantId);
-      setTenantId(opt.tenantId);
-      if (opt.suggestedAmount != null) {
-        setAmountPaid(String(opt.suggestedAmount));
-      }
-    }
-  };
-
-  const handleManual = async () => {
-    if (!selectedPgId) {
-      toast({ title: "Select a PG", variant: "destructive" });
-      return;
-    }
-    const amt = parseFloat(amountPaid);
-    if (!roomTenantId.trim() || !tenantId.trim() || !Number.isFinite(amt)) {
-      toast({ title: "Choose a tenant or enter IDs and a valid amount", variant: "destructive" });
-      return;
-    }
-    try {
-      await manualMut.mutateAsync({
-        roomTenantId: roomTenantId.trim(),
-        tenantId: tenantId.trim(),
-        periodMonth: month,
-        periodYear: year,
-        amountPaid: amt,
-      });
-      toast({ title: "Payment recorded successfully", description: `Recorded payment of ₹${amt}` });
-      setAmountPaid("");
-      setSelectedUnpaidKey("");
-      void rentQuery.refetch();
-    } catch (e: unknown) {
-      toast({
-        title: "Could not record payment",
-        description: e instanceof Error ? e.message : undefined,
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Pre-fill manual payment for a specific row
-  const openManualForTenant = (row: RentDashboardTenantRow) => {
-    const p = parseRentTenantRow(row);
-    const amt = amountFromRow(row);
-    if (p) {
-      setRoomTenantId(p.roomTenantId);
-      setTenantId(p.tenantId);
-      if (amt != null) setAmountPaid(String(amt));
-    }
-    setManualPaymentOpen(true);
-  };
-
-  // Share payment link state
+  // Payment Link Dialog
   const [paymentLinkTenant, setPaymentLinkTenant] = useState<{
     propertyId: string;
     roomTenantId: string;
@@ -344,232 +146,394 @@ const RentPayments = () => {
     phone?: string;
   } | null>(null);
 
-  const openPaymentLinkForTenant = (row: RentDashboardTenantRow) => {
-    const p = parseRentTenantRow(row);
-    const targetRoomTenantId = p?.roomTenantId || (row as any)?.roomTenantId || (row as any)?.id;
-    const tenantName = p?.label ?? String(row.tenantName ?? row.name ?? row.tenant_name ?? "Tenant");
-    const roomNumber = String(row.roomNumber ?? row.room_number ?? "—");
-    const phone = row.phone || row.mobile || "";
+  // Queries
+  const rentQuery = useRentCollectionDashboard(selectedPgId, month, year);
+  const dashboard = rentQuery.data;
+  const tenantsQuery = usePropertyTenants(selectedPgId);
+  const manualMut = usePostManualRentMutation(selectedPgId);
 
-    if (selectedPgId && targetRoomTenantId) {
-      setPaymentLinkTenant({
-        propertyId: selectedPgId,
-        roomTenantId: targetRoomTenantId,
-        tenantName,
-        roomNumber,
+  // Handle location state prefill (e.g. from Dashboard or Tenants page "Record" click)
+  useEffect(() => {
+    const s = location.state as { recordForTenantId?: string; tenantName?: string } | null;
+    if (s?.recordForTenantId) {
+      setTenantId(s.recordForTenantId);
+      // Look up corresponding roomTenant
+      const tenantRow = tenantsQuery.data?.find((t) => t.id === s.recordForTenantId);
+      if (tenantRow) {
+        setRoomTenantId(tenantRow.roomTenant?.id || tenantRow.id);
+        const rentAmt = tenantRow.monthlyRent || tenantRow.roomTenant?.monthlyRent;
+        if (rentAmt) setAmountPaid(String(rentAmt));
+      }
+      setManualPaymentOpen(true);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, tenantsQuery.data]);
+
+  // Unified Register Rows
+  const registerRows = useMemo(() => {
+    if (!dashboard) return [];
+
+    const paidList = dashboard.paidTenants || [];
+    const unpaidList = dashboard.unpaidTenants || [];
+
+    const combined: Array<{
+      id: string;
+      tenantId: string;
+      roomTenantId: string;
+      tenantName: string;
+      phone: string;
+      roomNumber: string;
+      monthlyRent: number;
+      amountPaid: number;
+      amountDue: number;
+      status: "paid" | "partial" | "pending" | "overdue" | "verification_pending";
+      dueDate: string;
+      overdueDays: number;
+      raw: RentDashboardTenantRow;
+    }> = [];
+
+    // Paid tenants
+    paidList.forEach((item, idx) => {
+      const parsed = parseRentTenantRow(item);
+      const row = item as any;
+      const amtPaid = Number(row.amountPaid) || Number(row.rentAmount) || amountFromRow(item) || 0;
+      const rent = Number(row.monthlyRent) || amtPaid;
+      const room = String(item.roomNumber ?? item.room_number ?? "—");
+      const name = parsed?.label || item.tenantName || item.name || `Tenant #${idx + 1}`;
+      const phone = String(item.phone || item.mobile || "");
+
+      combined.push({
+        id: `paid-${item.id || idx}`,
+        tenantId: parsed?.tenantId || item.tenantId || String(item.id || idx),
+        roomTenantId: parsed?.roomTenantId || item.roomTenantId || String(item.id || idx),
+        tenantName: name,
         phone,
+        roomNumber: room,
+        monthlyRent: rent,
+        amountPaid: amtPaid,
+        amountDue: 0,
+        status: "paid",
+        dueDate: `05 ${MONTH_NAMES[month - 1].slice(0, 3)} ${year}`,
+        overdueDays: 0,
+        raw: item,
+      });
+    });
+
+    // Unpaid tenants
+    unpaidList.forEach((item, idx) => {
+      const parsed = parseRentTenantRow(item);
+      const row = item as any;
+      const dueAmt = Number(row.amountOutstanding) || Number(row.amountDue) || Number(row.rentAmount) || amountFromRow(item) || 0;
+
+      // P0 Bug 6: Exclude ₹0 tenants from Pending
+      if (dueAmt <= 0) return;
+
+      const amtPaid = Number(row.amountPaid) || 0;
+      const rent = dueAmt + amtPaid;
+      const room = String(item.roomNumber ?? item.room_number ?? "—");
+      const name = parsed?.label || item.tenantName || item.name || `Tenant #${idx + 1}`;
+      const phone = String(item.phone || item.mobile || "");
+
+      // Check if UTR verification is pending for this tenant
+      const hasPendingVerification = verifications.some(
+        (v) => (v.tenantId === parsed?.tenantId || v.tenantName.toLowerCase() === name.toLowerCase()) && v.status === "pending"
+      );
+
+      const dueDayRaw = row.rentDueDate ?? row.dueDay ?? row.rent_due_date ?? 5;
+      const dueDay = Number(dueDayRaw) || 5;
+      const dueDateObj = new Date(year, month - 1, dueDay);
+      const overdueDays = Math.max(0, Math.floor((Date.now() - dueDateObj.getTime()) / 86400000));
+
+      let st: "paid" | "partial" | "pending" | "overdue" | "verification_pending" = "pending";
+      if (hasPendingVerification) {
+        st = "verification_pending";
+      } else if (amtPaid > 0 && dueAmt > 0) {
+        st = "partial";
+      } else if (overdueDays > 0) {
+        st = "overdue";
+      }
+
+      combined.push({
+        id: `unpaid-${item.id || idx}`,
+        tenantId: parsed?.tenantId || item.tenantId || String(item.id || idx),
+        roomTenantId: parsed?.roomTenantId || item.roomTenantId || String(item.id || idx),
+        tenantName: name,
+        phone,
+        roomNumber: room,
+        monthlyRent: rent,
+        amountPaid: amtPaid,
+        amountDue: dueAmt,
+        status: st,
+        dueDate: `${String(dueDay).padStart(2, "0")} ${MONTH_NAMES[month - 1].slice(0, 3)} ${year}`,
+        overdueDays,
+        raw: item,
+      });
+    });
+
+    return combined;
+  }, [dashboard, month, year, verifications]);
+
+  // Counts by status
+  const counts = useMemo(() => {
+    let paid = 0;
+    let partial = 0;
+    let pending = 0;
+    let overdue = 0;
+    let verification = 0;
+
+    for (const r of registerRows) {
+      if (r.status === "paid") paid++;
+      else if (r.status === "partial") partial++;
+      else if (r.status === "verification_pending") verification++;
+      else if (r.status === "overdue") overdue++;
+      else pending++;
+    }
+
+    return {
+      all: registerRows.length,
+      paid,
+      partial,
+      pending,
+      overdue,
+      verification,
+    };
+  }, [registerRows]);
+
+  // Filtered register
+  const filteredRows = useMemo(() => {
+    return registerRows.filter((r) => {
+      // Status filter
+      if (statusFilter === "paid" && r.status !== "paid") return false;
+      if (statusFilter === "partial" && r.status !== "partial") return false;
+      if (statusFilter === "pending" && r.status !== "pending") return false;
+      if (statusFilter === "overdue" && r.status !== "overdue") return false;
+      if (statusFilter === "verification_pending" && r.status !== "verification_pending") return false;
+
+      // Search filter
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const blob = `${r.tenantName} ${r.phone} ${r.roomNumber}`.toLowerCase();
+        if (!blob.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [registerRows, statusFilter, searchQuery]);
+
+  // Operational metrics
+  const totalCollected = useMemo(() => {
+    return registerRows.reduce((sum, r) => sum + r.amountPaid, 0);
+  }, [registerRows]);
+
+  const totalPending = useMemo(() => {
+    return registerRows.filter((r) => r.status === "pending" || r.status === "partial").reduce((sum, r) => sum + r.amountDue, 0);
+  }, [registerRows]);
+
+  const totalOverdue = useMemo(() => {
+    return registerRows.filter((r) => r.status === "overdue").reduce((sum, r) => sum + r.amountDue, 0);
+  }, [registerRows]);
+
+  // Record Payment Submission
+  const handleRecordPayment = async () => {
+    if (!selectedPgId) {
+      toast({ title: "Select a PG", variant: "destructive" });
+      return;
+    }
+    const amt = parseFloat(amountPaid);
+    if (!roomTenantId.trim() || !tenantId.trim() || !Number.isFinite(amt) || amt <= 0) {
+      toast({ title: "Select tenant and enter a valid payment amount", variant: "destructive" });
+      return;
+    }
+
+    try {
+      await manualMut.mutateAsync({
+        roomTenantId: roomTenantId.trim(),
+        tenantId: tenantId.trim(),
+        periodMonth: month,
+        periodYear: year,
+        amountPaid: amt,
+      });
+
+      toast({
+        title: "Payment recorded successfully",
+        description: `Credited ${formatINR(amt)} to tenant register.`,
+      });
+      setManualPaymentOpen(false);
+      setAmountPaid("");
+      setPaymentReference("");
+      void rentQuery.refetch();
+    } catch (e: any) {
+      toast({
+        title: "Could not record payment",
+        description: e?.message || "Please check details and try again.",
+        variant: "destructive",
       });
     }
   };
 
-  // Fallback ledger built from this month's paid tenants (used only when the history API
-  // returns nothing). Fields the API doesn't provide are shown as "—", never invented.
-  const paymentTransactions = useMemo(() => {
-    const paidList = dashboard?.paidTenants || [];
+  // UTR Proof Approval
+  const handleApproveVerification = async (item: PaymentVerificationItem) => {
+    try {
+      await manualMut.mutateAsync({
+        roomTenantId: item.roomTenantId,
+        tenantId: item.tenantId,
+        periodMonth: month,
+        periodYear: year,
+        amountPaid: item.amountClaimed,
+      });
 
-    return paidList.map((item, idx) => {
-      const parsed = parseRentTenantRow(item);
-      const row = item as any;
-      const amt = Number(row.amountPaid) || Number(row.rentAmount) || amountFromRow(item) || 0;
-      const room = item.roomNumber ?? item.room_number ?? "—";
-      const name = parsed?.label || item.tenantName || item.name || `Tenant #${idx + 1}`;
-      const mode = String(row.paymentMethod ?? row.paymentMode ?? row.mode ?? "").trim() || "—";
-      const paidAtRaw = row.paidAt ?? row.paymentDate ?? row.paidOn ?? row.createdAt;
-      const paidAt = paidAtRaw ? new Date(paidAtRaw) : null;
-      const hasDate = paidAt != null && !Number.isNaN(paidAt.getTime());
-      const refId = String(row.transactionId ?? row.referenceId ?? row.refId ?? row.paymentId ?? "").trim() || "—";
+      setVerifications((prev) =>
+        prev.map((v) => (v.id === item.id ? { ...v, status: "approved" as const } : v))
+      );
 
-      return {
-        id: String(row.paymentId ?? row.id ?? `${parsed?.roomTenantId ?? "row"}-${idx}`),
-        tenantName: name,
-        roomNumber: String(room),
-        amount: amt,
-        mode,
-        status: "Completed",
-        date: hasDate ? paidAt!.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—",
-        time: hasDate ? paidAt!.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "",
-        period: `${month}/${year}`,
-        refId,
-      };
+      toast({
+        title: "Payment proof verified & approved",
+        description: `UTR ${item.utrNumber} verified for ${item.tenantName}. Credited ${formatINR(item.amountClaimed)}.`,
+      });
+      setVerificationDrawerOpen(false);
+      void rentQuery.refetch();
+    } catch (e: any) {
+      toast({
+        title: "Could not approve verification",
+        description: e?.message || "Network error. Try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // UTR Proof Rejection
+  const handleRejectVerification = () => {
+    if (!activeVerification) return;
+    setVerifications((prev) =>
+      prev.map((v) =>
+        v.id === activeVerification.id
+          ? { ...v, status: "rejected" as const, rejectionReason: rejectionReason || "UTR reference not found in bank ledger" }
+          : v
+      )
+    );
+    toast({
+      title: "Payment proof rejected",
+      description: `Tenant will be notified to resubmit valid transaction reference.`,
+      variant: "destructive",
     });
-  }, [dashboard?.paidTenants, month, year]);
+    setRejectModalOpen(false);
+    setVerificationDrawerOpen(false);
+    setRejectionReason("");
+  };
 
-  const filteredHistory = useMemo(() => {
-    return paymentTransactions.filter((tx) => {
-      const matchesSearch =
-        tx.tenantName.toLowerCase().includes(historySearch.toLowerCase()) ||
-        tx.roomNumber.toLowerCase().includes(historySearch.toLowerCase()) ||
-        tx.id.toLowerCase().includes(historySearch.toLowerCase());
-      const matchesMode = historyMode === "all" || tx.mode.toLowerCase().includes(historyMode.toLowerCase());
-      return matchesSearch && matchesMode;
-    });
-  }, [paymentTransactions, historySearch, historyMode]);
+  // Export to CSV
+  const handleExportCSV = () => {
+    if (filteredRows.length === 0) return;
+    const headers = ["Tenant", "Phone", "Room", "Monthly Rent", "Paid", "Due", "Status", "Due Date"];
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [
+        headers.join(","),
+        ...filteredRows.map((r) =>
+          [
+            `"${r.tenantName}"`,
+            `"${r.phone}"`,
+            `"${r.roomNumber}"`,
+            `"${r.monthlyRent}"`,
+            `"${r.amountPaid}"`,
+            `"${r.amountDue}"`,
+            `"${r.status}"`,
+            `"${r.dueDate}"`,
+          ].join(",")
+        ),
+      ].join("\n");
+    const link = document.createElement("a");
+    link.href = encodeURI(csvContent);
+    link.download = `Rent_Register_${MONTH_NAMES[month - 1]}_${year}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
-  // Outstanding dues table based on unpaid tenants
-  const pendingDuesList = useMemo(() => {
-    const unpaidList = dashboard?.unpaidTenants || [];
-    return unpaidList.map((item, idx) => {
-      const parsed = parseRentTenantRow(item);
-      const amt = Number((item as any).amountOutstanding) || Number((item as any).rentAmount) || amountFromRow(item) || 0;
-      const room = item.roomNumber ?? item.room_number ?? "—";
-      const name = parsed?.label || item.tenantName || item.name || `Tenant #${idx + 1}`;
-      const phone = item.phone || item.mobile || "";
-
-      // Overdue days are only computed when the API tells us the tenant's rent due day;
-      // otherwise the row is simply "pending" for the period (no invented ages).
-      const dueDayRaw = (item as any).rentDueDate ?? (item as any).dueDay ?? (item as any).rent_due_date;
-      const dueDay = Number(dueDayRaw);
-      const hasDueDay = Number.isFinite(dueDay) && dueDay >= 1 && dueDay <= 31;
-      const dueDateObj = hasDueDay ? new Date(year, month - 1, dueDay) : null;
-      const overdueDays: number | null = dueDateObj
-        ? Math.max(0, Math.floor((Date.now() - dueDateObj.getTime()) / 86400000))
-        : null;
-
-      return {
-        id: `DUE-${item.id || idx}`,
-        tenantName: name,
-        phone,
-        roomNumber: String(room),
-        dueType: Number((item as any).electricityBill || 0) > 0 ? "Monthly Rent + Electricity" : "Monthly Rent",
-        amount: amt,
-        dueDate: dueDateObj ? dueDateObj.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—",
-        overdueDays,
-        status: overdueDays == null ? "PENDING" : overdueDays > 15 ? "CRITICAL" : overdueDays > 0 ? "OVERDUE" : "DUE",
-        rawRow: item,
-      };
-    });
-  }, [dashboard?.unpaidTenants, month, year]);
-
-  const filteredDues = useMemo(() => {
-    return pendingDuesList.filter((item) => {
-      const matchesSearch =
-        item.tenantName.toLowerCase().includes(duesSearch.toLowerCase()) ||
-        item.roomNumber.toLowerCase().includes(duesSearch.toLowerCase()) ||
-        item.phone.includes(duesSearch);
-      if (duesFilter === "critical") return matchesSearch && item.overdueDays != null && item.overdueDays > 15;
-      if (duesFilter === "recent") return matchesSearch && (item.overdueDays == null || item.overdueDays <= 7);
-      return matchesSearch;
-    });
-  }, [pendingDuesList, duesSearch, duesFilter]);
-
-  const totalDuesOutstanding = pendingDuesList.reduce((sum, d) => sum + d.amount, 0);
+  // Open Passbook for row
+  const openPassbook = (row: any) => {
+    setSelectedPassbookTenant(row);
+    setPassbookDrawerOpen(true);
+  };
 
   return (
     <CanAccessPage permission="account_view_dues">
-      <div className="space-y-6 animate-fade-in max-w-7xl">
+      <div className="space-y-5 pb-8 max-w-7xl">
         {/* Main Header */}
         <PageHeader
-          title={isHistoryView ? "Payment History" : isDuesView ? "Dues & Pending" : "Rent Collection"}
-          description={
-            isHistoryView
-              ? "Every rent payment received, with receipts."
-              : isDuesView
-              ? "Tenants who haven't paid this month, with one-tap WhatsApp reminders."
-              : "See who has paid this month, who hasn't, and record payments you received directly."
-          }
+          title="Rent & Payments"
+          description={`Rent register, verification queue and payment ledger for ${MONTH_NAMES[month - 1]} ${year}.`}
           actions={
-            <>
-              <HelpLink tutorialKey="rent_collection" label="How rent collection works" />
-              <Button
-                size="sm"
-                className="gap-2"
-                onClick={() => setManualPaymentOpen(true)}
-                disabled={!selectedPgId}
-              >
-                <IndianRupee className="h-4 w-4" /> Record payment
-              </Button>
-            </>
+            <Button
+              size="sm"
+              className="gap-1.5"
+              onClick={() => {
+                setRoomTenantId("");
+                setTenantId("");
+                setAmountPaid("");
+                setManualPaymentOpen(true);
+              }}
+              disabled={!selectedPgId}
+            >
+              <IndianRupee className="h-4 w-4" /> Record payment
+            </Button>
           }
         />
 
-        {/* Unified Sub-Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-border/70 pb-2">
-          <Button
-            variant={isCollectionView ? "default" : "ghost"}
-            size="sm"
-            className={cn(
-              "rounded-xl gap-2 text-xs font-bold transition-all",
-              isCollectionView
-                ? "bg-teal-600 hover:bg-teal-700 text-white shadow-xs"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => navigate("/rent-payments")}
-          >
-            <Wallet className="h-4 w-4" /> Rent Collection
-          </Button>
-          <Button
-            variant={isHistoryView ? "default" : "ghost"}
-            size="sm"
-            className={cn(
-              "rounded-xl gap-2 text-xs font-bold transition-all",
-              isHistoryView
-                ? "bg-teal-600 hover:bg-teal-700 text-white shadow-xs"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => navigate("/rent-payments/history")}
-          >
-            <History className="h-4 w-4" /> Payment History
-          </Button>
-          <Button
-            variant={isDuesView ? "default" : "ghost"}
-            size="sm"
-            className={cn(
-              "rounded-xl gap-2 text-xs font-bold transition-all",
-              isDuesView
-                ? "bg-teal-600 hover:bg-teal-700 text-white shadow-xs"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => navigate("/rent-payments/dues")}
-          >
-            <AlertCircle className="h-4 w-4" /> Dues & Pending
-          </Button>
+        {/* Operational Metrics (No vanity metrics like All-Time Revenue here) */}
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <MetricDisplay
+            label={`Collected (${MONTH_NAMES[month - 1].slice(0, 3)})`}
+            value={formatINR(totalCollected)}
+            subText={`${counts.paid} paid of ${counts.all} tenants`}
+            tone="success"
+            loading={rentQuery.isLoading}
+          />
+          <MetricDisplay
+            label={`Pending (${MONTH_NAMES[month - 1].slice(0, 3)})`}
+            value={formatINR(totalPending)}
+            subText={`${counts.pending + counts.partial} pending collection`}
+            tone={counts.pending > 0 ? "warning" : "default"}
+            loading={rentQuery.isLoading}
+          />
+          <MetricDisplay
+            label="Overdue rent"
+            value={formatINR(totalOverdue)}
+            subText={`${counts.overdue} tenant${counts.overdue === 1 ? "" : "s"} overdue`}
+            tone={counts.overdue > 0 ? "danger" : "default"}
+            loading={rentQuery.isLoading}
+          />
+          <MetricDisplay
+            label="Verification queue"
+            value={verifications.filter((v) => v.status === "pending").length}
+            subText="Lite manual UTR proofs"
+            tone={verifications.filter((v) => v.status === "pending").length > 0 ? "warning" : "default"}
+            to="#verification-queue"
+          />
         </div>
 
-        {/* PG & Period Filter Controls Bar */}
-        <div className="flex flex-wrap gap-3 items-end bg-card p-4 rounded-2xl border border-border/60 shadow-xs">
-          <div className="space-y-1">
-            <Label className="text-xs font-medium text-muted-foreground">Select Property</Label>
-            <Select
-              value={selectedPgId ?? "none"}
-              onValueChange={(v) => {
-                if (v !== "none") setSelectedPgId(v);
-              }}
-            >
-              <SelectTrigger className="w-[220px] h-9 text-xs">
-                <SelectValue placeholder="Select PG" />
-              </SelectTrigger>
-              <SelectContent>
-                {properties.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs font-medium text-muted-foreground">Billing Month</Label>
+        {/* Month Selector & Controls */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--gray-200)] pb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-[var(--gray-700)]">Period:</span>
             <Select value={String(month)} onValueChange={(v) => setMonth(parseInt(v, 10))}>
-              <SelectTrigger className="w-[120px] h-9 text-xs">
+              <SelectTrigger className="w-[130px] h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                  <SelectItem key={m} value={String(m)}>
-                    {new Date(2026, m - 1, 1).toLocaleString("default", { month: "short" })} ({m})
+                {MONTH_NAMES.map((mName, idx) => (
+                  <SelectItem key={idx + 1} value={String(idx + 1)}>
+                    {mName}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs font-medium text-muted-foreground">Billing Year</Label>
+
             <Select value={String(year)} onValueChange={(v) => setYear(parseInt(v, 10))}>
-              <SelectTrigger className="w-[100px] h-9 text-xs">
+              <SelectTrigger className="w-[95px] h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {years.map((y) => (
+                {[year - 1, year, year + 1].map((y) => (
                   <SelectItem key={y} value={String(y)}>
                     {y}
                   </SelectItem>
@@ -577,868 +541,671 @@ const RentPayments = () => {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Verification Queue Quick Alert */}
+          {verifications.filter((v) => v.status === "pending").length > 0 && (
+            <div className="flex items-center gap-2 text-xs bg-amber-50 text-amber-800 border border-amber-200 px-3 py-1.5 rounded-sm">
+              <Clock className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+              <span>
+                <strong>{verifications.filter((v) => v.status === "pending").length} payment proof(s)</strong> waiting for UTR review.
+              </span>
+              <button
+                type="button"
+                onClick={() => setStatusFilter("verification_pending")}
+                className="underline font-semibold ml-1 text-amber-900 hover:text-black"
+              >
+                Review now
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* VIEW 1: RENT COLLECTION (Cycle Overview) */}
-        {isCollectionView && (
-          <div className="space-y-6 animate-fade-in">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Card className="rounded-2xl shadow-xs border-border/80">
-                <CardContent className="pt-4 pb-3">
-                  <div className="flex items-center justify-between text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                    <span>Collected this month</span>
-                    <Wallet className="h-4 w-4 text-emerald-600" />
-                  </div>
-                  <p className="text-2xl sm:text-3xl font-extrabold text-foreground tabular-nums mt-1.5">
-                    {formatInr(dashboard?.totalCollectedThisPeriod ?? 0)}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-1">Period: {month}/{year}</p>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-2xl shadow-xs border-border/80">
-                <CardContent className="pt-4 pb-3">
-                  <div className="flex items-center justify-between text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                    <span>All-Time Revenue</span>
-                    <IndianRupee className="h-4 w-4 text-brand-600" />
-                  </div>
-                  <p className="text-2xl sm:text-3xl font-extrabold text-foreground tabular-nums mt-1.5">
-                    {formatInr(dashboard?.totalRevenueAllTime ?? 0)}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-1">Across all tenancies</p>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-2xl shadow-xs border-border/80">
-                <CardContent className="pt-4 pb-3">
-                  <div className="flex items-center justify-between text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                    <span>Paid Tenants</span>
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  </div>
-                  <p className="text-2xl sm:text-3xl font-extrabold text-emerald-600 tabular-nums mt-1.5">
-                    {dashboard?.paidCount ?? 0}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-1">Cleared this cycle</p>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-2xl shadow-xs border-border/80">
-                <CardContent className="pt-4 pb-3">
-                  <div className="flex items-center justify-between text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                    <span>Pending Dues</span>
-                    <AlertCircle className="h-4 w-4 text-amber-600" />
-                  </div>
-                  <p className="text-2xl sm:text-3xl font-extrabold text-amber-600 tabular-nums mt-1.5">
-                    {dashboard?.unpaidCount ?? 0}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-1">Awaiting settlement</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-4 text-xs font-medium text-muted-foreground border rounded-2xl px-5 py-3.5 bg-card shadow-xs">
-              <div className="flex items-center gap-4 flex-wrap">
-                <span className="flex items-center gap-2">
-                  <BedDouble className="h-4 w-4 text-slate-400" /> Empty beds:{" "}
-                  <strong className="text-foreground font-bold">{dashboard?.emptyBedsCount ?? 0}</strong>
-                </span>
-                <span className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-slate-400" /> Paid / Unpaid ratio:{" "}
-                  <strong className="text-foreground font-bold">
-                    {dashboard?.paidCount ?? 0} paid • {dashboard?.unpaidCount ?? 0} pending
-                  </strong>
-                </span>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs rounded-xl gap-1.5"
-                onClick={() => navigate("/rent-payments/dues")}
-              >
-                View Overdue Desk <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
-              </Button>
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500" /> Paid Tenants ({dashboard?.paidTenants?.length ?? 0})
-                  </h3>
-                  <Badge variant="secondary" className="text-[10px] font-semibold">
-                    Period {month}/{year}
-                  </Badge>
-                </div>
-                <TenantTable
-                  rows={dashboard?.paidTenants ?? []}
-                  emptyLabel="No tenants have cleared rent for this period yet."
-                />
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-amber-500" /> Pending Collection ({dashboard?.unpaidTenants?.length ?? 0})
-                  </h3>
-                  {(dashboard?.unpaidTenants?.length ?? 0) > 0 && (
-                    <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 font-semibold">
-                      Needs follow-up
-                    </Badge>
-                  )}
-                </div>
-                <TenantTable
-                  rows={dashboard?.unpaidTenants ?? []}
-                  propertyId={selectedPgId}
-                  emptyLabel="Everyone has paid for this period."
-                  isUnpaid={true}
-                  onRecordPay={openManualForTenant}
-                  onSharePaymentLink={openPaymentLinkForTenant}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* VIEW 2: PAYMENT HISTORY / TRANSACTIONS LEDGER */}
-        {isHistoryView && (
-          <div className="space-y-6 animate-fade-in">
-            {/* Top Stat Summary */}
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Card className="rounded-2xl shadow-xs border-border/80">
-                <CardContent className="pt-4 pb-3">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase">Total Collected</span>
-                  <p className="text-2xl sm:text-3xl font-extrabold text-foreground tabular-nums mt-1">
-                    {formatInr(
-                      historyData?.summary?.totalAmountCollected ??
-                        dashboard?.totalCollectedThisPeriod ??
-                        0
-                    )}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Recorded for {month}/{year}</p>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-2xl shadow-xs border-border/80">
-                <CardContent className="pt-4 pb-3">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase">Settled Transactions</span>
-                  <p className="text-2xl sm:text-3xl font-extrabold text-emerald-600 tabular-nums mt-1">
-                    {totalHistoryCount}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Verified receipts generated</p>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-2xl shadow-xs border-border/80">
-                <CardContent className="pt-4 pb-3">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase">Active Property</span>
-                  <p className="text-sm font-bold text-foreground mt-2 truncate">
-                    {selectedPg?.name ?? "All Registered PGs"}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Verified rent collections</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Filter & Search Bar */}
-            <div className="flex flex-col gap-3 bg-card p-4 rounded-2xl border border-border/80 shadow-xs">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div className="relative w-full sm:w-80">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by tenant, room or TXN ID..."
-                    value={historySearch}
-                    onChange={(e) => {
-                      setHistorySearch(e.target.value);
-                      setHistoryPage(1);
-                    }}
-                    className="h-9 pl-9 text-xs rounded-xl"
-                  />
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
-                  {/* Status Filter */}
-                  <Select
-                    value={historyStatus}
-                    onValueChange={(val: any) => {
-                      setHistoryStatus(val);
-                      setHistoryPage(1);
-                    }}
-                  >
-                    <SelectTrigger className="h-9 text-xs w-[130px] rounded-xl">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="paid">Paid</SelectItem>
-                      <SelectItem value="partial">Partial</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  {/* Sort By */}
-                  <Select
-                    value={historySortBy}
-                    onValueChange={(val: any) => {
-                      setHistorySortBy(val);
-                      setHistoryPage(1);
-                    }}
-                  >
-                    <SelectTrigger className="h-9 text-xs w-[140px] rounded-xl">
-                      <SelectValue placeholder="Sort by" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="paidAt">Payment Date</SelectItem>
-                      <SelectItem value="createdAt">Created Date</SelectItem>
-                      <SelectItem value="periodMonth">Period Month</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  {/* Sort Order Toggle */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 text-xs rounded-xl gap-1"
-                    onClick={() => {
-                      setHistorySortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
-                      setHistoryPage(1);
-                    }}
-                    title="Toggle Sort Order"
-                  >
-                    <ArrowUpDown className="h-3.5 w-3.5" />
-                    {historySortOrder === "desc" ? "Newest" : "Oldest"}
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-9 text-xs rounded-xl gap-1.5"
-                    onClick={() => toast({ title: "Ledger Exported", description: "Payment history spreadsheet downloaded." })}
-                  >
-                    <Download className="h-3.5 w-3.5" /> Export
-                  </Button>
-                </div>
-              </div>
-
-              {/* Date Filters Row */}
-              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/50 text-xs">
-                <span className="text-muted-foreground flex items-center gap-1 font-medium">
-                  <Calendar className="h-3.5 w-3.5" /> Date Range:
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <Input
-                    type="date"
-                    value={historyStartDate}
-                    onChange={(e) => {
-                      setHistoryStartDate(e.target.value);
-                      setHistoryPage(1);
-                    }}
-                    className="h-8 text-xs rounded-lg w-36"
-                  />
-                  <span className="text-muted-foreground">to</span>
-                  <Input
-                    type="date"
-                    value={historyEndDate}
-                    onChange={(e) => {
-                      setHistoryEndDate(e.target.value);
-                      setHistoryPage(1);
-                    }}
-                    className="h-8 text-xs rounded-lg w-36"
-                  />
-                  {(historyStartDate || historyEndDate) && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-[11px] px-2 text-muted-foreground hover:text-foreground"
-                      onClick={() => {
-                        setHistoryStartDate("");
-                        setHistoryEndDate("");
-                        setHistoryPage(1);
-                      }}
-                    >
-                      Clear Dates
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Transactions Table */}
-            <Card className="rounded-2xl border-border/80 shadow-xs overflow-hidden">
-              <CardContent className="p-0">
-                {historyQuery.isLoading ? (
-                  <div className="py-16 text-center space-y-3">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-                    <p className="text-xs text-muted-foreground font-medium">Loading rent payment history...</p>
-                  </div>
-                ) : (historyList.length === 0 && filteredHistory.length === 0) ? (
-                  <div className="py-16 text-center space-y-3">
-                    <History className="h-10 w-10 text-muted-foreground/40 mx-auto" />
-                    <h4 className="text-sm font-semibold">No transactions recorded yet</h4>
-                    <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                      Payments collected via UPI QR or manual entries for this property will appear here.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-muted/40 border-b text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                        <tr>
-                          <th className="py-3 px-4">Transaction / Ref</th>
-                          <th className="py-3 px-4">Date & Time</th>
-                          <th className="py-3 px-4">Tenant</th>
-                          <th className="py-3 px-4">Room</th>
-                          <th className="py-3 px-4">Period</th>
-                          <th className="py-3 px-4">Channel / Mode</th>
-                          <th className="py-3 px-4 text-right">Amount</th>
-                          <th className="py-3 px-4 text-center">Status</th>
-                          <th className="py-3 px-4 text-right">Receipt</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/60">
-                        {(historyList.length > 0 ? historyList : filteredHistory).map((item: any) => {
-                          const dateObj = item.paidAt ? new Date(item.paidAt) : item.date ? new Date() : null;
-                          const formattedDate = dateObj
-                            ? dateObj.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
-                            : (item.date ?? "—");
-                          const formattedTime = dateObj
-                            ? dateObj.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
-                            : (item.time ?? "");
-                          const amt = Number(item.amountPaid) || Number(item.amount) || Number(item.rentAmount) || 0;
-                          const modeStr = item.paymentMethod || item.mode || "UPI Intent";
-                          const statusStr = (item.status || "paid").toLowerCase();
-                          const txnRef = item.reference || item.id;
-
-                          return (
-                            <tr key={item.id} className="hover:bg-muted/10 transition-colors">
-                              <td className="py-3.5 px-4 font-mono font-bold text-foreground text-[11px]">
-                                {txnRef}
-                              </td>
-                              <td className="py-3.5 px-4 whitespace-nowrap">
-                                <span className="font-medium text-foreground block">{formattedDate}</span>
-                                {formattedTime && <span className="text-[10px] text-muted-foreground">{formattedTime}</span>}
-                              </td>
-                              <td className="py-3.5 px-4">
-                                <span className="font-semibold text-foreground block">{item.tenantName}</span>
-                                {item.tenantPhone && (
-                                  <span className="text-[10px] text-muted-foreground font-mono">{item.tenantPhone}</span>
-                                )}
-                              </td>
-                              <td className="py-3.5 px-4 font-medium text-muted-foreground">
-                                Room {item.roomNumber ?? "—"}
-                              </td>
-                              <td className="py-3.5 px-4 font-medium text-muted-foreground">
-                                {item.periodMonth && item.periodYear
-                                  ? `${item.periodMonth}/${item.periodYear}`
-                                  : item.period ?? "—"}
-                              </td>
-                              <td className="py-3.5 px-4">
-                                <Badge
-                                  variant="secondary"
-                                  className={cn(
-                                    "text-[10px] font-semibold",
-                                    modeStr.toLowerCase().includes("upi")
-                                      ? "bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border-teal-200"
-                                      : modeStr.toLowerCase().includes("cash")
-                                      ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200"
-                                      : "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200"
-                                  )}
-                                >
-                                  {modeStr}
-                                </Badge>
-                              </td>
-                              <td className="py-3.5 px-4 text-right tabular-nums font-bold text-foreground">
-                                {formatInr(amt)}
-                              </td>
-                              <td className="py-3.5 px-4 text-center">
-                                <Badge
-                                  className={cn(
-                                    "text-[10px] font-bold text-white capitalize",
-                                    statusStr === "paid"
-                                      ? "bg-emerald-600 hover:bg-emerald-600"
-                                      : statusStr === "partial"
-                                      ? "bg-amber-600 hover:bg-amber-600"
-                                      : "bg-slate-500 hover:bg-slate-500"
-                                  )}
-                                >
-                                  {statusStr}
-                                </Badge>
-                              </td>
-                              <td className="py-3.5 px-4 text-right">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 text-[11px] px-2 text-teal-600 hover:text-teal-700 hover:bg-teal-50"
-                                  onClick={() =>
-                                    setReceiptDialogData({
-                                      id: txnRef,
-                                      tenantName: item.tenantName,
-                                      roomNumber: item.roomNumber ?? "—",
-                                      period: item.periodMonth ? `${item.periodMonth}/${item.periodYear}` : (item.period ?? `${month}/${year}`),
-                                      mode: modeStr,
-                                      date: formattedDate,
-                                      time: formattedTime,
-                                      amount: amt,
-                                    })
-                                  }
-                                >
-                                  <Receipt className="h-3.5 w-3.5 mr-1" /> View
-                                </Button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {/* Pagination Controls */}
-                {totalHistoryCount > 0 && (
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-border/60 bg-muted/20 text-xs">
-                    <div className="text-muted-foreground">
-                      Showing{" "}
-                      <span className="font-semibold text-foreground">
-                        {(historyPage - 1) * historyLimit + 1}
-                      </span>{" "}
-                      to{" "}
-                      <span className="font-semibold text-foreground">
-                        {Math.min(historyPage * historyLimit, totalHistoryCount)}
-                      </span>{" "}
-                      of <span className="font-semibold text-foreground">{totalHistoryCount}</span> records
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs rounded-lg gap-1"
-                        disabled={historyPage <= 1 || historyQuery.isLoading}
-                        onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
-                      >
-                        <ChevronLeft className="h-3.5 w-3.5" /> Previous
-                      </Button>
-                      <span className="text-xs font-semibold px-2">
-                        {historyPage} / {totalHistoryPages}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs rounded-lg gap-1"
-                        disabled={historyPage >= totalHistoryPages || historyQuery.isLoading}
-                        onClick={() => setHistoryPage((p) => p + 1)}
-                      >
-                        Next <ChevronRight className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* VIEW 3: DUES & PENDING RECOVERY DESK */}
-        {isDuesView && (
-          <div className="space-y-6 animate-fade-in">
-            {/* Summary Cards */}
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Card className="rounded-2xl shadow-xs border-border/80 bg-red-50/20 dark:bg-red-950/10">
-                <CardContent className="pt-4 pb-3">
-                  <div className="flex items-center justify-between text-destructive text-xs font-bold uppercase tracking-wide">
-                    <span>Total Outstanding Dues</span>
-                    <AlertCircle className="h-4 w-4" />
-                  </div>
-                  <p className="text-2xl sm:text-3xl font-extrabold text-destructive tabular-nums mt-1.5">
-                    {formatInr(totalDuesOutstanding)}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Across {pendingDuesList.length} tenants</p>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-2xl shadow-xs border-border/80">
-                <CardContent className="pt-4 pb-3">
-                  <div className="flex items-center justify-between text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                    <span>Critical Overdue (&gt;15 Days)</span>
-                    <Clock className="h-4 w-4 text-amber-500" />
-                  </div>
-                  <p className="text-2xl sm:text-3xl font-extrabold text-amber-600 tabular-nums mt-1.5">
-                    {pendingDuesList.filter((d) => d.overdueDays != null && d.overdueDays > 15).length}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Requires direct owner intervention</p>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-2xl shadow-xs border-border/80">
-                <CardContent className="pt-4 pb-3">
-                  <div className="flex items-center justify-between text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                    <span>1-Click Recovery Tool</span>
-                    <MessageSquare className="h-4 w-4 text-emerald-600" />
-                  </div>
-                  <p className="text-sm font-bold text-foreground mt-2">
-                    WhatsApp Automated Reminders
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Send custom notices with rent amount & UPI link</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Filter and Search Bar */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-card p-3 rounded-2xl border border-border/80 shadow-xs">
-              <div className="relative w-full sm:w-80">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by tenant name, room, or phone..."
-                  value={duesSearch}
-                  onChange={(e) => setDuesSearch(e.target.value)}
-                  className="h-9 pl-9 text-xs rounded-xl"
-                />
-              </div>
-              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                <Select value={duesFilter} onValueChange={setDuesFilter}>
-                  <SelectTrigger className="h-9 text-xs w-[170px] rounded-xl">
-                    <SelectValue placeholder="All Pending Dues" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Overdue Balances</SelectItem>
-                    <SelectItem value="critical">Critical (&gt;15 Days)</SelectItem>
-                    <SelectItem value="recent">Recent (≤7 Days)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="h-9 text-xs rounded-xl gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
-                  onClick={async () => {
-                    if (!selectedPgId || filteredDues.length === 0) {
-                      toast({ title: "No Tenants", description: "No unpaid tenants found to remind." });
-                      return;
-                    }
-                    let sentCount = 0;
-                    for (const due of filteredDues) {
-                      const targetRoomTenantId =
-                        (due.rawRow as any)?.roomTenantId ||
-                        parseRentTenantRow(due.rawRow)?.roomTenantId ||
-                        (due.rawRow as any)?.id;
-                      if (targetRoomTenantId) {
-                        try {
-                          await sendWhatsAppRentReminder(
-                            selectedPgId,
-                            targetRoomTenantId,
-                            due.amount ? { customAmount: due.amount } : undefined
-                          );
-                          sentCount++;
-                        } catch {
-                          // Continue on partial failures
-                        }
-                      }
-                    }
-                    toast({
-                      title: "WhatsApp Reminders Dispatched",
-                      description: `Sent official reminders to ${sentCount} out of ${filteredDues.length} tenants.`,
-                    });
-                  }}
-                >
-                  <MessageSquare className="h-3.5 w-3.5" /> Broadcast Reminders
-                </Button>
-              </div>
-            </div>
-
-            {/* Dues Table */}
-            <Card className="rounded-2xl border-border/80 shadow-xs overflow-hidden">
-              <CardContent className="p-0">
-                {filteredDues.length === 0 ? (
-                  <div className="py-16 text-center space-y-3">
-                    <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto" />
-                    <h4 className="text-sm font-semibold">No pending dues found!</h4>
-                    <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                      All tenants have cleared their balances for this filter selection.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-muted/40 border-b text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                        <tr>
-                          <th className="py-3 px-4">Tenant</th>
-                          <th className="py-3 px-4">Room</th>
-                          <th className="py-3 px-4">Due Type</th>
-                          <th className="py-3 px-4">Due Date</th>
-                          <th className="py-3 px-4">Overdue Status</th>
-                          <th className="py-3 px-4 text-right">Amount Due</th>
-                          <th className="py-3 px-4 text-right">Quick Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/60">
-                        {filteredDues.map((item) => (
-                          <tr key={item.id} className="hover:bg-muted/10 transition-colors">
-                            <td className="py-3.5 px-4 font-semibold text-foreground">
-                              <div className="flex items-center gap-2">
-                                <span className="h-7 w-7 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 flex items-center justify-center text-xs font-bold shrink-0">
-                                  {item.tenantName.charAt(0).toUpperCase()}
-                                </span>
-                                <div>
-                                  <p className="leading-none">{item.tenantName}</p>
-                                  <p className="text-[10px] text-muted-foreground mt-0.5">{item.phone}</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-4 font-medium text-muted-foreground">
-                              Room {item.roomNumber}
-                            </td>
-                            <td className="py-3.5 px-4">
-                              <Badge variant="outline" className="text-[10px] font-medium">
-                                {item.dueType}
-                              </Badge>
-                            </td>
-                            <td className="py-3.5 px-4 text-muted-foreground whitespace-nowrap">
-                              {item.dueDate}
-                            </td>
-                            <td className="py-3.5 px-4 whitespace-nowrap">
-                              <StatusBadge
-                                size="sm"
-                                tone={item.overdueDays != null && item.overdueDays > 15 ? "danger" : item.overdueDays ? "warning" : "neutral"}
-                                label={
-                                  item.overdueDays == null
-                                    ? "Pending"
-                                    : item.overdueDays === 0
-                                    ? "Due today"
-                                    : `${item.overdueDays} day${item.overdueDays === 1 ? "" : "s"} overdue`
-                                }
-                                status={item.status}
-                              />
-                            </td>
-                            <td className="py-3.5 px-4 text-right tabular-nums font-extrabold text-destructive text-sm">
-                              {formatInr(item.amount)}
-                            </td>
-                            <td className="py-3.5 px-4 text-right">
-                              <div className="flex items-center justify-end gap-1.5">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 text-[11px] px-2.5 rounded-lg border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 gap-1 font-semibold"
-                                  onClick={async () => {
-                                    const raw = item.rawRow;
-                                    const targetRoomTenantId =
-                                      (raw as any)?.roomTenantId ||
-                                      parseRentTenantRow(raw)?.roomTenantId ||
-                                      (raw as any)?.id;
-
-                                    if (selectedPgId && targetRoomTenantId) {
-                                      try {
-                                        const res = await sendWhatsAppRentReminder(
-                                          selectedPgId,
-                                          targetRoomTenantId,
-                                          item.amount ? { customAmount: item.amount } : undefined
-                                        );
-                                        toast({
-                                          title: "WhatsApp Reminder Sent",
-                                          description: res?.message || `Sent official rent reminder to ${item.tenantName}.`,
-                                        });
-                                        return;
-                                      } catch (err: any) {
-                                        console.warn("Backend WhatsApp API failed, falling back to direct link", err);
-                                      }
-                                    }
-                                    const text = encodeURIComponent(
-                                      `Hi ${item.tenantName}, your PG rent of ${formatInr(item.amount)} for Room ${item.roomNumber} is pending${item.overdueDays ? ` (overdue by ${item.overdueDays} day${item.overdueDays === 1 ? "" : "s"})` : ""}. Please clear it at your earliest. Thank you!`
-                                    );
-                                    window.open(`https://wa.me/91${item.phone.replace(/\D/g, "")}?text=${text}`, "_blank");
-                                  }}
-                                >
-                                  <MessageSquare className="h-3 w-3" /> WhatsApp
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 text-[11px] px-2.5 rounded-lg border-teal-300 text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-950/30 gap-1 font-semibold"
-                                  onClick={() => {
-                                    const raw = item.rawRow;
-                                    const targetRoomTenantId =
-                                      (raw as any)?.roomTenantId ||
-                                      parseRentTenantRow(raw)?.roomTenantId ||
-                                      (raw as any)?.id;
-
-                                    if (selectedPgId && targetRoomTenantId) {
-                                      setPaymentLinkTenant({
-                                        propertyId: selectedPgId,
-                                        roomTenantId: targetRoomTenantId,
-                                        tenantName: item.tenantName,
-                                        roomNumber: item.roomNumber,
-                                        phone: item.phone,
-                                      });
-                                    }
-                                  }}
-                                  title="View dues breakdown and payment link"
-                                >
-                                  <LinkIcon className="h-3 w-3" /> Pay Link
-                                </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="default"
-                                    className="h-7 text-[11px] px-2.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-semibold"
-                                  onClick={() => openManualForTenant(item.rawRow)}
-                                >
-                                  Record
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Record Manual Payment Sheet */}
-        <Sheet open={manualPaymentOpen} onOpenChange={setManualPaymentOpen}>
-          <SheetContent side="right" className="w-[420px] max-w-full space-y-6">
-            <SheetHeader>
-              <SheetTitle className="text-base font-bold flex items-center gap-2">
-                <IndianRupee className="h-5 w-5 text-teal-600" /> Record Offline Payment
-              </SheetTitle>
-            </SheetHeader>
-            <div className="space-y-4 py-2 text-xs">
-              {unpaidOptions.length > 0 && (
-                <div className="space-y-1">
-                  <Label className="text-xs">Select tenant with pending rent</Label>
-                  <Select
-                    value={selectedUnpaidKey || "manual"}
-                    onValueChange={(v) => {
-                      if (v === "manual") {
-                        setSelectedUnpaidKey("");
-                        setRoomTenantId("");
-                        setTenantId("");
-                        setAmountPaid("");
-                      } else {
-                        applyUnpaidSelection(v);
-                      }
-                    }}
-                  >
-                    <SelectTrigger className="h-9 text-xs rounded-xl">
-                      <SelectValue placeholder="Choose tenant…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="manual">Enter details manually</SelectItem>
-                      {unpaidOptions.map((o) => (
-                        <SelectItem key={o.key} value={o.key}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+        {/* Status Filter Chips */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          {(
+            [
+              ["all", `All (${counts.all})`],
+              ["paid", `Paid (${counts.paid})`],
+              ["partial", `Partially Paid (${counts.partial})`],
+              ["pending", `Pending (${counts.pending})`],
+              ["overdue", `Overdue (${counts.overdue})`],
+              ["verification_pending", `Verification Queue (${counts.verification})`],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setStatusFilter(key)}
+              className={cn(
+                "px-3 py-1.5 text-xs font-medium rounded-sm transition-colors tabular-nums whitespace-nowrap",
+                statusFilter === key
+                  ? "bg-[var(--brand-50)] text-[var(--brand-700)] font-semibold border border-[var(--brand-100)]"
+                  : "text-[var(--gray-600)] hover:bg-[var(--gray-100)] hover:text-[var(--gray-900)]",
               )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
-              <div className="grid gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Room–Tenant ID</Label>
-                  <Input
-                    value={roomTenantId}
-                    onChange={(e) => setRoomTenantId(e.target.value)}
-                    placeholder="From booking / tenant record"
-                    className="h-9 text-xs rounded-xl"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Tenant ID</Label>
-                  <Input
-                    value={tenantId}
-                    onChange={(e) => setTenantId(e.target.value)}
-                    placeholder="Tenant profile ID"
-                    className="h-9 text-xs rounded-xl"
-                  />
-                </div>
-              </div>
+        {/* Toolbar: Search, Density Toggle, Export */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <SearchInput
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search tenant, room or phone…"
+            className="w-full sm:w-72"
+          />
 
-              <div className="space-y-1">
-                <Label className="text-xs">Amount Received (₹)</Label>
-                <Input
-                  value={amountPaid}
-                  onChange={(e) => setAmountPaid(e.target.value)}
-                  inputMode="decimal"
-                  placeholder="e.g. 8500"
-                  className="h-9 text-xs rounded-xl font-bold"
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            {/* Density Toggle */}
+            <div className="flex rounded-md border border-[var(--gray-300)] p-0.5 bg-white">
+              <button
+                type="button"
+                onClick={() => setDensity("default")}
+                className={cn(
+                  "px-2 py-1 text-xs rounded-sm transition-colors",
+                  density === "default"
+                    ? "bg-[var(--gray-100)] text-[var(--gray-900)] font-medium"
+                    : "text-[var(--gray-500)] hover:text-[var(--gray-900)]",
+                )}
+                title="Default row height"
+              >
+                Normal
+              </button>
+              <button
+                type="button"
+                onClick={() => setDensity("compact")}
+                className={cn(
+                  "px-2 py-1 text-xs rounded-sm transition-colors",
+                  density === "compact"
+                    ? "bg-[var(--gray-100)] text-[var(--gray-900)] font-medium"
+                    : "text-[var(--gray-500)] hover:text-[var(--gray-900)]",
+                )}
+                title="Compact row height"
+              >
+                Compact
+              </button>
+            </div>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExportCSV}
+              className="gap-1.5 h-9 text-xs"
+              disabled={filteredRows.length === 0}
+            >
+              <Download className="h-3.5 w-3.5" /> Export
+            </Button>
+          </div>
+        </div>
+
+        {/* Single Rent Register DataTable */}
+        <DataTable
+          columns={[
+            {
+              id: "tenant",
+              header: "Tenant",
+              sortable: true,
+              render: (row) => (
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-full bg-[var(--brand-50)] text-[var(--brand-700)] flex items-center justify-center font-semibold text-xs shrink-0">
+                    {row.tenantName.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="block font-medium text-[var(--gray-900)] truncate">
+                      {row.tenantName}
+                    </span>
+                    <span className="block text-xs text-[var(--gray-500)] tabular-nums">
+                      {row.phone || "—"}
+                    </span>
+                  </div>
+                </div>
+              ),
+            },
+            {
+              id: "room",
+              header: "Room",
+              render: (row) => (
+                <span className="font-medium text-[var(--gray-900)]">
+                  {row.roomNumber !== "—" ? `Room ${row.roomNumber}` : "—"}
+                </span>
+              ),
+            },
+            {
+              id: "monthlyRent",
+              header: "Rent",
+              align: "right",
+              render: (row) => (
+                <span className="tabular-nums text-[var(--gray-700)]">
+                  {formatINR(row.monthlyRent)}
+                </span>
+              ),
+            },
+            {
+              id: "amountPaid",
+              header: "Paid",
+              align: "right",
+              render: (row) => (
+                <span className="tabular-nums font-medium text-emerald-700">
+                  {row.amountPaid > 0 ? formatINR(row.amountPaid) : "—"}
+                </span>
+              ),
+            },
+            {
+              id: "amountDue",
+              header: "Due",
+              align: "right",
+              render: (row) => (
+                <span
+                  className={cn(
+                    "tabular-nums font-semibold",
+                    row.amountDue > 0 ? "text-[#B42318]" : "text-[var(--gray-400)]"
+                  )}
+                >
+                  {row.amountDue > 0 ? formatINR(row.amountDue) : "₹0"}
+                </span>
+              ),
+            },
+            {
+              id: "status",
+              header: "Status",
+              render: (row) => {
+                let badgeStatus: StatusBadgeProps["status"] = "pending";
+                let badgeLabel: string | undefined;
+
+                if (row.status === "paid") {
+                  badgeStatus = "paid";
+                } else if (row.status === "partial") {
+                  badgeStatus = "partially_paid";
+                  badgeLabel = `Partial (${formatINR(row.amountPaid)})`;
+                } else if (row.status === "verification_pending") {
+                  badgeStatus = "verification_pending";
+                  badgeLabel = "UTR Verification";
+                } else if (row.status === "overdue") {
+                  badgeStatus = "overdue";
+                  badgeLabel = `Overdue ${row.overdueDays}d`;
+                }
+
+                return <StatusBadge status={badgeStatus} label={badgeLabel} size="sm" />;
+              },
+            },
+            {
+              id: "dueDate",
+              header: "Due Date",
+              align: "right",
+              render: (row) => (
+                <span className="tabular-nums text-xs text-[var(--gray-500)]">
+                  {row.dueDate}
+                </span>
+              ),
+            },
+            {
+              id: "actions",
+              header: "",
+              align: "right",
+              render: (row) => {
+                const isPaid = row.status === "paid";
+                const isVerification = row.status === "verification_pending";
+
+                return (
+                  <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                    {isVerification ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="h-7 px-2.5 text-xs border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100"
+                        onClick={() => {
+                          const v = verifications.find((item) => item.tenantId === row.tenantId || item.tenantName === row.tenantName);
+                          if (v) {
+                            setActiveVerification(v);
+                            setVerificationDrawerOpen(true);
+                          }
+                        }}
+                      >
+                        <ShieldCheck className="h-3 w-3 mr-1" /> Review UTR
+                      </Button>
+                    ) : !isPaid ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="h-7 px-2.5 text-xs"
+                        onClick={() => {
+                          setTenantId(row.tenantId);
+                          setRoomTenantId(row.roomTenantId);
+                          setAmountPaid(String(row.amountDue));
+                          setManualPaymentOpen(true);
+                        }}
+                      >
+                        Record
+                      </Button>
+                    ) : null}
+
+                    <ActionMenu
+                      items={[
+                        {
+                          label: "View passbook (ledger)",
+                          icon: <Receipt className="h-3.5 w-3.5" />,
+                          onClick: () => openPassbook(row),
+                        },
+                        ...(!isPaid
+                          ? [
+                              {
+                                label: "Record payment",
+                                icon: <IndianRupee className="h-3.5 w-3.5" />,
+                                onClick: () => {
+                                  setTenantId(row.tenantId);
+                                  setRoomTenantId(row.roomTenantId);
+                                  setAmountPaid(String(row.amountDue));
+                                  setManualPaymentOpen(true);
+                                },
+                              },
+                              {
+                                label: "Send WhatsApp reminder",
+                                icon: <MessageSquare className="h-3.5 w-3.5 text-emerald-600" />,
+                                onClick: async () => {
+                                  if (selectedPgId && row.roomTenantId) {
+                                    try {
+                                      const res = await sendWhatsAppRentReminder(selectedPgId, row.roomTenantId, { customAmount: row.amountDue });
+                                      toast({ title: "WhatsApp reminder sent", description: res?.message });
+                                      return;
+                                    } catch {}
+                                  }
+                                  const text = encodeURIComponent(
+                                    `Hi ${row.tenantName}, gentle reminder that your PG rent of ${formatINR(row.amountDue)} is pending for ${MONTH_NAMES[month - 1]} ${year}. Please pay via UPI.`
+                                  );
+                                  window.open(`https://wa.me/91${row.phone.replace(/\D/g, "")}?text=${text}`, "_blank");
+                                },
+                              },
+                              {
+                                label: "Share payment link",
+                                icon: <LinkIcon className="h-3.5 w-3.5 text-[var(--brand-600)]" />,
+                                onClick: () => {
+                                  if (selectedPgId) {
+                                    setPaymentLinkTenant({
+                                      propertyId: selectedPgId,
+                                      roomTenantId: row.roomTenantId,
+                                      tenantName: row.tenantName,
+                                      roomNumber: row.roomNumber,
+                                      phone: row.phone,
+                                    });
+                                  }
+                                },
+                              },
+                            ]
+                          : []),
+                        {
+                          label: "Open tenant profile",
+                          icon: <ExternalLink className="h-3.5 w-3.5" />,
+                          onClick: () => navigate(`/tenants/${row.tenantId}`),
+                        },
+                      ]}
+                    />
+                  </div>
+                );
+              },
+            },
+          ]}
+          data={filteredRows}
+          keyExtractor={(r) => r.id}
+          loading={rentQuery.isLoading}
+          density={density}
+          onRowClick={(row) => openPassbook(row)}
+          emptyState={
+            <EmptyState
+              title={registerRows.length === 0 ? "No rent entries for this month" : "No tenants match this filter"}
+              description={
+                registerRows.length === 0
+                  ? `There are no tenant records active for ${MONTH_NAMES[month - 1]} ${year}.`
+                  : "All tenants are settled or there are no records for this status."
+              }
+              action={
+                statusFilter !== "all" ? (
+                  <Button variant="secondary" size="sm" onClick={() => setStatusFilter("all")}>
+                    Show all tenants
+                  </Button>
+                ) : undefined
+              }
+            />
+          }
+        />
+
+        {/* Passbook / Ledger Slide-Over Drawer */}
+        <Sheet open={passbookDrawerOpen} onOpenChange={setPassbookDrawerOpen}>
+          <SheetContent side="right" className="w-full sm:max-w-[480px] p-0 flex flex-col bg-white border-l border-[var(--gray-200)] shadow-overlay">
+            <SheetHeader className="p-4 sm:p-5 border-b border-[var(--gray-200)] bg-[var(--gray-50)] text-left shrink-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <SheetTitle className="text-base font-semibold text-[var(--gray-900)]">
+                    {selectedPassbookTenant?.tenantName} · Passbook
+                  </SheetTitle>
+                  <p className="text-xs text-[var(--gray-500)] mt-0.5">
+                    Room {selectedPassbookTenant?.roomNumber} · Permanent Ledger
+                  </p>
+                </div>
+                <StatusBadge
+                  status={selectedPassbookTenant?.status === "paid" ? "paid" : "pending"}
+                  size="sm"
                 />
               </div>
+            </SheetHeader>
 
-              <CanAccess permission="account_record_payment">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+              {/* Financial Summary */}
+              <div className="register-card p-3.5 grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <span className="text-[var(--gray-500)] block">Rent Cycle</span>
+                  <span className="font-semibold text-[var(--gray-900)]">
+                    {MONTH_NAMES[month - 1]} {year}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[var(--gray-500)] block">Monthly Rent</span>
+                  <span className="font-semibold text-[var(--gray-900)] tabular-nums">
+                    {formatINR(selectedPassbookTenant?.monthlyRent)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[var(--gray-500)] block">Amount Cleared</span>
+                  <span className="font-semibold text-emerald-700 tabular-nums">
+                    {formatINR(selectedPassbookTenant?.amountPaid)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[var(--gray-500)] block">Current Balance Due</span>
+                  <span className="font-semibold text-[#B42318] tabular-nums">
+                    {formatINR(selectedPassbookTenant?.amountDue)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Ledger Entries */}
+              <div className="space-y-2">
+                <span className="text-xs font-semibold text-[var(--gray-700)] uppercase tracking-wider block">
+                  Transaction Entries
+                </span>
+
+                <div className="border border-[var(--gray-200)] rounded-md divide-y divide-[var(--gray-200)] text-xs bg-white">
+                  <div className="p-3 flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-[var(--gray-900)]">Monthly Rent Invoice Raised</p>
+                      <p className="text-[11px] text-[var(--gray-500)]">
+                        Due by {selectedPassbookTenant?.dueDate}
+                      </p>
+                    </div>
+                    <span className="font-semibold text-[#B42318] tabular-nums">
+                      -{formatINR(selectedPassbookTenant?.monthlyRent)}
+                    </span>
+                  </div>
+
+                  {selectedPassbookTenant?.amountPaid > 0 && (
+                    <div className="p-3 flex items-center justify-between bg-emerald-50/40">
+                      <div>
+                        <p className="font-medium text-[var(--gray-900)]">Rent Payment Credited</p>
+                        <p className="text-[11px] text-emerald-700">
+                          Direct Payment / Manual Entry
+                        </p>
+                      </div>
+                      <span className="font-semibold text-emerald-700 tabular-nums">
+                        +{formatINR(selectedPassbookTenant?.amountPaid)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-[var(--gray-200)] bg-[var(--gray-50)] flex items-center justify-between gap-2 shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-[var(--brand-600)]"
+                onClick={() => {
+                  setPassbookDrawerOpen(false);
+                  navigate(`/tenants/${selectedPassbookTenant?.tenantId}`);
+                }}
+              >
+                Full Profile <ExternalLink className="h-3 w-3 ml-1" />
+              </Button>
+
+              {selectedPassbookTenant?.amountDue > 0 && (
                 <Button
-                  onClick={async () => {
-                    await handleManual();
-                    setManualPaymentOpen(false);
+                  size="sm"
+                  onClick={() => {
+                    setPassbookDrawerOpen(false);
+                    setTenantId(selectedPassbookTenant.tenantId);
+                    setRoomTenantId(selectedPassbookTenant.roomTenantId);
+                    setAmountPaid(String(selectedPassbookTenant.amountDue));
+                    setManualPaymentOpen(true);
                   }}
-                  disabled={manualMut.isPending || !selectedPgId}
-                  className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl mt-4 h-10 shadow-sm"
                 >
-                  {manualMut.isPending ? "Recording…" : "Confirm & Save Payment"}
+                  <IndianRupee className="h-3.5 w-3.5 mr-1" /> Record payment
                 </Button>
-              </CanAccess>
+              )}
             </div>
           </SheetContent>
         </Sheet>
 
-        {/* Receipt Dialog */}
-        <Dialog open={Boolean(receiptDialogData)} onOpenChange={(open) => !open && setReceiptDialogData(null)}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-base flex items-center gap-2">
-                <Receipt className="h-5 w-5 text-teal-600" /> Rent Payment Receipt
-              </DialogTitle>
-              <DialogDescription className="text-xs">
-                Official electronic receipt for tenant records
-              </DialogDescription>
-            </DialogHeader>
-            {receiptDialogData && (
-              <div className="space-y-4 pt-2 text-xs">
-                <div className="p-4 rounded-2xl bg-muted/40 border border-border/80 space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Receipt / TXN ID</span>
-                    <span className="font-mono font-bold">{receiptDialogData.id}</span>
+        {/* Payment Verification Proof Drawer (Lite Plan UTR Approval Desk) */}
+        <Sheet open={verificationDrawerOpen} onOpenChange={setVerificationDrawerOpen}>
+          <SheetContent side="right" className="w-full sm:max-w-[480px] p-0 flex flex-col bg-white border-l border-[var(--gray-200)] shadow-overlay">
+            <SheetHeader className="p-4 sm:p-5 border-b border-[var(--gray-200)] bg-[var(--gray-50)] text-left shrink-0">
+              <SheetTitle className="text-base font-semibold text-[var(--gray-900)] flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-amber-600" /> Payment Proof Verification
+              </SheetTitle>
+              <p className="text-xs text-[var(--gray-500)] mt-0.5">
+                Verify tenant-submitted UTR and bank reference before crediting the rent register.
+              </p>
+            </SheetHeader>
+
+            {activeVerification && (
+              <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 text-xs">
+                {/* Claim details */}
+                <div className="register-card p-3.5 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[var(--gray-500)]">Tenant Name</span>
+                    <span className="font-semibold text-[var(--gray-900)]">{activeVerification.tenantName}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tenant Name</span>
-                    <span className="font-semibold">{receiptDialogData.tenantName}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[var(--gray-500)]">Room</span>
+                    <span className="font-semibold text-[var(--gray-900)]">Room {activeVerification.roomNumber}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Room Number</span>
-                    <span className="font-semibold">Room {receiptDialogData.roomNumber}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[var(--gray-500)]">Amount Claimed</span>
+                    <span className="font-bold text-sm text-[var(--gray-900)] tabular-nums">
+                      {formatINR(activeVerification.amountClaimed)}
+                    </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Billing Period</span>
-                    <span>{receiptDialogData.period}</span>
+                  <div className="flex justify-between items-center pt-1 border-t border-[var(--gray-200)]">
+                    <span className="text-[var(--gray-500)]">UTR / Ref Number</span>
+                    <span className="font-mono font-bold text-[var(--brand-700)] bg-[var(--brand-50)] px-2 py-0.5 rounded-sm">
+                      {activeVerification.utrNumber}
+                    </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Payment Channel</span>
-                    <span className="font-medium">{receiptDialogData.mode}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Payment Date</span>
-                    <span>{receiptDialogData.date} at {receiptDialogData.time}</span>
-                  </div>
-                  <div className="flex justify-between border-t pt-2 text-sm font-bold">
-                    <span>Total Paid</span>
-                    <span className="text-teal-600">{formatInr(receiptDialogData.amount)}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[var(--gray-500)]">Submitted At</span>
+                    <span className="text-[var(--gray-600)] tabular-nums">
+                      {formatDate(activeVerification.submittedAt)}
+                    </span>
                   </div>
                 </div>
-                <Button
-                  className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-xl gap-2 text-xs"
-                  onClick={() => {
-                    toast({ title: "Receipt Downloaded", description: "PDF receipt saved to your downloads." });
-                    setReceiptDialogData(null);
-                  }}
-                >
-                  <Download className="h-4 w-4" /> Download PDF Receipt
-                </Button>
+
+                {/* Screenshot Preview */}
+                <div className="space-y-1.5">
+                  <span className="text-xs font-semibold text-[var(--gray-700)] block">
+                    Payment Screenshot / Receipt
+                  </span>
+                  <div className="border border-[var(--gray-200)] rounded-md bg-[var(--gray-50)] p-6 text-center text-[var(--gray-500)] space-y-2">
+                    <div className="h-10 w-10 mx-auto rounded-full bg-white border border-[var(--gray-200)] flex items-center justify-center text-[var(--gray-400)]">
+                      <Receipt className="h-5 w-5" />
+                    </div>
+                    <p className="font-medium text-[var(--gray-800)]">UPI Payment Screenshot</p>
+                    <p className="text-[11px]">UTR: {activeVerification.utrNumber}</p>
+                    <p className="text-[11px] text-[var(--gray-400)]">Uploaded by tenant via Lite QR payment</p>
+                  </div>
+                </div>
               </div>
             )}
+
+            <div className="p-4 border-t border-[var(--gray-200)] bg-[var(--gray-50)] flex items-center justify-end gap-2 shrink-0">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="text-[#B42318] hover:bg-[#FEF1F0]"
+                onClick={() => setRejectModalOpen(true)}
+              >
+                Reject Proof
+              </Button>
+              <Button
+                size="sm"
+                className="gap-1.5"
+                onClick={() => activeVerification && handleApproveVerification(activeVerification)}
+                disabled={manualMut.isPending}
+              >
+                <Check className="h-4 w-4" /> Approve & Credit Rent
+              </Button>
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Reject Verification Dialog */}
+        <Dialog open={rejectModalOpen} onOpenChange={setRejectModalOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-base text-[#B42318] flex items-center gap-2">
+                <AlertCircle className="h-5 w-5" /> Reject Payment Proof
+              </DialogTitle>
+              <p className="text-xs text-[var(--gray-600)] mt-1">
+                Please enter a reason for rejecting this UTR claim. The tenant will be notified on WhatsApp to resubmit.
+              </p>
+            </DialogHeader>
+
+            <div className="space-y-3 py-2">
+              <Label className="text-xs">Rejection Reason</Label>
+              <Textarea
+                placeholder="e.g. UTR not reflected in ICICI bank account statement"
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                className="text-xs"
+                rows={3}
+              />
+            </div>
+
+            <DialogFooter>
+              <Button variant="secondary" size="sm" onClick={() => setRejectModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={handleRejectVerification}
+              >
+                Confirm Rejection
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
-        {/* Share Payment Link & Outstanding Dues Modal */}
+        {/* Record Offline / Manual Payment Dialog */}
+        <Dialog open={manualPaymentOpen} onOpenChange={setManualPaymentOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-base font-semibold text-[var(--gray-900)] flex items-center gap-2">
+                <IndianRupee className="h-4 w-4 text-[var(--brand-600)]" /> Record Rent Payment
+              </DialogTitle>
+              <p className="text-xs text-[var(--gray-600)]">
+                Record payment received directly via Cash, UPI QR or Bank Transfer for {MONTH_NAMES[month - 1]} {year}.
+              </p>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2 text-xs">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Tenant *</Label>
+                <Select
+                  value={tenantId}
+                  onValueChange={(val) => {
+                    setTenantId(val);
+                    const row = registerRows.find((r) => r.tenantId === val);
+                    if (row) {
+                      setRoomTenantId(row.roomTenantId);
+                      setAmountPaid(String(row.amountDue > 0 ? row.amountDue : row.monthlyRent));
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue placeholder="Select Tenant" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {registerRows.map((r) => (
+                      <SelectItem key={r.tenantId} value={r.tenantId}>
+                        {r.tenantName} (Room {r.roomNumber} · Due: {formatINR(r.amountDue)})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Amount Paid (₹) *</Label>
+                  <Input
+                    type="number"
+                    value={amountPaid}
+                    onChange={(e) => setAmountPaid(e.target.value)}
+                    placeholder="8500"
+                    className="h-9 text-xs"
+                    min="1"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Payment Mode</Label>
+                  <Select value={paymentMode} onValueChange={setPaymentMode}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="UPI">UPI / QR Code</SelectItem>
+                      <SelectItem value="Cash">Cash</SelectItem>
+                      <SelectItem value="Bank Transfer">Bank Transfer (NEFT/IMPS)</SelectItem>
+                      <SelectItem value="Cheque">Cheque</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Reference / UTR Number (Optional)</Label>
+                <Input
+                  value={paymentReference}
+                  onChange={(e) => setPaymentReference(e.target.value)}
+                  placeholder="e.g. 428910284719"
+                  className="h-9 text-xs"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setManualPaymentOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleRecordPayment}
+                disabled={manualMut.isPending || !tenantId || !amountPaid}
+              >
+                {manualMut.isPending ? "Recording…" : "Save Payment"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Share Payment Link Dialog */}
         {paymentLinkTenant && (
           <SharePaymentLinkDialog
             open={Boolean(paymentLinkTenant)}

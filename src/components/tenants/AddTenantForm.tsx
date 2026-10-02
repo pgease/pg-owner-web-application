@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,14 +62,22 @@ export function AddTenantForm({ onSuccess, onCancel, showFooter = true }: AddTen
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [otherDetailsOpen, setOtherDetailsOpen] = useState(false);
 
+  const location = useLocation();
+  const navState = (location.state as {
+    prefillRoomId?: string;
+    prefillBedNumber?: string | number;
+    prefillBlockId?: string;
+    prefillFloorId?: string;
+  } | null);
+
   // --- STEP 1: Tenant Details State ---
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [tenantType, setTenantType] = useState("Student");
-  const [selectedBlockId, setSelectedBlockId] = useState<string>("");
-  const [selectedFloorId, setSelectedFloorId] = useState<string>("");
-  const [selectedRoomId, setSelectedRoomId] = useState<string>("");
-  const [bedNumber, setBedNumber] = useState("1");
+  const [selectedBlockId, setSelectedBlockId] = useState<string>(() => navState?.prefillBlockId || "");
+  const [selectedFloorId, setSelectedFloorId] = useState<string>(() => navState?.prefillFloorId || "");
+  const [selectedRoomId, setSelectedRoomId] = useState<string>(() => navState?.prefillRoomId || "");
+  const [bedNumber, setBedNumber] = useState<string>(() => String(navState?.prefillBedNumber || "1"));
   const [bookedBy, setBookedBy] = useState("");
   const [referredBy, setReferredBy] = useState("");
   const [sendWhatsappReminder, setSendWhatsappReminder] = useState(true);

@@ -472,9 +472,9 @@ export default function Login() {
 
         {/* Footer */}
         <div className="relative z-10 flex items-center justify-between text-xs text-white/40 pt-4 border-t border-white/5">
-          <span>© {new Date().getFullYear()} PG Ease Solutions Pvt. Ltd.</span>
+          <span>© 2026 PG Ease Solutions Pvt. Ltd.</span>
           <span className="flex items-center gap-1.5 text-white/50">
-            <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> SOC2 Compliant
+            <CheckCircle2 className="h-3.5 w-3.5 text-primary" /> 256-bit Encrypted
           </span>
         </div>
       </div>

@@ -227,7 +227,7 @@ export default function LeadsPage() {
                   <SearchInput
                     placeholder="Search by name or phone..."
                     value={search}
-                    onChange={setSearch}
+                    onChange={(e) => setSearch(e.target.value)}
                   />
                 </div>
 

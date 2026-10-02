@@ -19,28 +19,30 @@ function RoomTile({ room, onClick }: { room: DashboardRoom; onClick: () => void 
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col gap-3 rounded-lg border bg-card p-3.5 text-left transition-colors hover:border-primary/40 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="register-card flex flex-col gap-3 p-3.5 text-left transition-colors hover:border-[var(--brand-600)] hover:bg-[var(--gray-50)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-600)]"
       aria-label={`Room ${room.roomNumber}, ${room.occupiedBeds} of ${room.totalBeds} beds occupied`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold">Room {room.roomNumber}</span>
+        <span className="text-sm font-semibold text-[var(--gray-900)]">Room {room.roomNumber}</span>
         <StatusBadge status={room.isFull ? "occupied" : "vacant"} label={room.isFull ? "Full" : `${room.availableBeds} vacant`} size="sm" />
       </div>
-      <div className="flex flex-wrap items-center gap-1" aria-hidden>
+      <div className="flex flex-wrap items-center gap-1.5" aria-hidden>
         {Array.from({ length: icons }).map((_, idx) => (
           <span
             key={idx}
             className={cn(
-              "flex h-6 w-6 items-center justify-center rounded border",
-              idx < room.occupiedBeds ? "border-primary/30 bg-primary/10 text-primary" : "border-border bg-muted/40 text-muted-foreground/60",
+              "flex h-6 w-6 items-center justify-center rounded-sm border text-xs",
+              idx < room.occupiedBeds
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-[var(--gray-300)] bg-white text-[var(--gray-400)]",
             )}
           >
             <BedDouble className="h-3.5 w-3.5" />
           </span>
         ))}
-        {overflow > 0 ? <span className="pl-1 text-xs text-muted-foreground">+{overflow}</span> : null}
+        {overflow > 0 ? <span className="pl-1 text-xs text-[var(--gray-500)]">+{overflow}</span> : null}
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-xs text-[var(--gray-500)]">
         {room.occupiedBeds}/{room.totalBeds} beds occupied
         {room.floorNumber != null ? ` · Floor ${room.floorNumber}` : ""}
       </p>
@@ -77,11 +79,11 @@ export function RoomGrid({ data }: { data: DashboardData }) {
   return (
     <section aria-labelledby="rooms-heading" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="rooms-heading" className="text-section-title">
-          Rooms
+        <h2 id="rooms-heading" className="text-md font-semibold text-[var(--gray-900)]">
+          Rooms & Beds
         </h2>
         {rooms.length > 0 ? (
-          <div className="flex items-center gap-1 rounded-md border bg-card p-0.5" role="tablist" aria-label="Filter rooms">
+          <div className="flex items-center gap-1 rounded-md border border-[var(--gray-200)] bg-white p-0.5" role="tablist" aria-label="Filter rooms">
             {(
               [
                 ["all", "All"],
@@ -99,11 +101,13 @@ export function RoomGrid({ data }: { data: DashboardData }) {
                   setShowAll(false);
                 }}
                 className={cn(
-                  "rounded px-2.5 py-1 text-xs font-medium tabular-nums transition-colors",
-                  filter === key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                  "rounded-sm px-2.5 py-1 text-xs font-medium tabular-nums transition-colors",
+                  filter === key
+                    ? "bg-[var(--brand-50)] text-[var(--brand-700)] font-semibold border border-[var(--brand-100)]"
+                    : "text-[var(--gray-600)] hover:bg-[var(--gray-100)] hover:text-[var(--gray-900)]",
                 )}
               >
-                {label} <span className="opacity-70">{counts[key]}</span>
+                {label} <span className="opacity-70">({counts[key]})</span>
               </button>
             ))}
           </div>
@@ -113,11 +117,11 @@ export function RoomGrid({ data }: { data: DashboardData }) {
       {loading.rooms ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-[112px] rounded-lg" />
+            <Skeleton key={i} className="h-[112px] rounded-md" />
           ))}
         </div>
       ) : rooms.length === 0 ? (
-        <div className="rounded-lg border border-dashed">
+        <div className="register-card p-4">
           <EmptyState
             compact
             icon={<BedDouble />}
@@ -131,14 +135,14 @@ export function RoomGrid({ data }: { data: DashboardData }) {
           />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-lg border border-dashed">
+        <div className="register-card p-4">
           <EmptyState
             compact
             icon={<BedDouble />}
             title={filter === "vacant" ? "No vacant beds right now" : "No full rooms"}
-            description={filter === "vacant" ? "Every bed is occupied. Nice." : "No room is fully occupied yet."}
+            description={filter === "vacant" ? "Every bed is occupied." : "No room is fully occupied yet."}
             action={
-              <Button size="sm" variant="outline" onClick={() => setFilter("all")}>
+              <Button size="sm" variant="secondary" onClick={() => setFilter("all")}>
                 Show all rooms
               </Button>
             }
@@ -152,8 +156,8 @@ export function RoomGrid({ data }: { data: DashboardData }) {
             ))}
           </div>
           {hidden > 0 ? (
-            <div className="flex justify-center">
-              <Button variant="ghost" size="sm" onClick={() => setShowAll(true)}>
+            <div className="flex justify-center pt-2">
+              <Button variant="secondary" size="sm" onClick={() => setShowAll(true)}>
                 Show {hidden} more room{hidden === 1 ? "" : "s"}
               </Button>
             </div>

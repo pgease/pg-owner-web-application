@@ -93,33 +93,48 @@ export function AttentionList({ data }: { data: DashboardData }) {
   }
 
   if (credits.isBlocked || credits.isLow) {
-    items.push({
-      id: "credits",
-      icon: <Coins />,
-      tone: credits.isBlocked ? "danger" : "warning",
-      title: credits.isBlocked ? "Verification credits exhausted" : `Only ${credits.remaining} verification credit${credits.remaining === 1 ? "" : "s"} left`,
-      description: "Top up to keep sending KYC requests",
-      to: "/tenants/kyc",
-      count: credits.remaining ?? 0,
-    });
+    const remaining = credits.remaining ?? 0;
+    if (remaining <= 0 || credits.isBlocked) {
+      items.push({
+        id: "credits",
+        icon: <Coins className="h-4 w-4" />,
+        tone: "danger",
+        title: "No verification credits left · Top up",
+        description: "Top up to keep sending KYC requests and agreements",
+        to: "/tenants/kyc",
+        count: 0,
+      });
+    } else {
+      items.push({
+        id: "credits",
+        icon: <Coins className="h-4 w-4" />,
+        tone: "warning",
+        title: `Only ${remaining} verification credit${remaining === 1 ? "" : "s"} left`,
+        description: "Top up to keep sending KYC requests",
+        to: "/tenants/kyc",
+        count: remaining,
+      });
+    }
   }
 
   const isLoading = loading.rent || loading.tenants || loading.complaints;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <CardTitle>Needs your attention</CardTitle>
+    <div className="register-card p-4">
+      <div className="flex items-center justify-between pb-3 border-b border-[var(--gray-200)]">
+        <h3 className="text-md font-semibold text-[var(--gray-900)]">Needs your attention</h3>
         {!isLoading && items.length > 0 ? (
-          <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{items.length}</span>
+          <span className="rounded-full bg-[var(--gray-100)] px-2 py-0.5 text-xs font-medium text-[var(--gray-700)]">
+            {items.length}
+          </span>
         ) : null}
-      </CardHeader>
-      <CardContent className="pt-0">
+      </div>
+      <div className="pt-3">
         {isLoading && items.length === 0 ? (
           <ul className="space-y-2">
             {[0, 1, 2].map((i) => (
-              <li key={i} className="flex items-center gap-3 rounded-md border p-3">
-                <Skeleton className="h-9 w-9 rounded-md" />
+              <li key={i} className="flex items-center gap-3 rounded-md border border-[var(--gray-200)] p-3">
+                <Skeleton className="h-8 w-8 rounded-md" />
                 <div className="flex-1 space-y-1.5">
                   <Skeleton className="h-4 w-2/3" />
                   <Skeleton className="h-3 w-1/2" />
@@ -128,13 +143,13 @@ export function AttentionList({ data }: { data: DashboardData }) {
             ))}
           </ul>
         ) : items.length === 0 ? (
-          <div className="flex items-center gap-3 rounded-md border border-dashed p-4">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-success/10 text-success">
+          <div className="flex items-center gap-3 rounded-md border border-dashed border-[var(--gray-200)] p-4 bg-[var(--gray-50)]">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
               <CheckCircle2 className="h-4 w-4" />
             </span>
             <div>
-              <p className="text-sm font-medium">All clear for today</p>
-              <p className="text-xs text-muted-foreground">No pending rent, KYC, complaints or notices right now.</p>
+              <p className="text-sm font-medium text-[var(--gray-900)]">All clear for today</p>
+              <p className="text-xs text-[var(--gray-600)]">No pending rent, KYC, complaints or notices right now.</p>
             </div>
           </div>
         ) : (
@@ -144,22 +159,31 @@ export function AttentionList({ data }: { data: DashboardData }) {
                 <button
                   type="button"
                   onClick={() => navigate(item.to)}
-                  className="flex w-full items-center gap-3 rounded-md border p-3 text-left transition-colors hover:border-primary/40 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex w-full items-center gap-3 rounded-md border border-[var(--gray-200)] bg-white p-3 text-left transition-colors hover:border-[var(--brand-600)] hover:bg-[var(--gray-50)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-600)]"
                 >
-                  <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-md [&_svg]:h-4 [&_svg]:w-4", TONE_ICON[item.tone])}>
+                  <span
+                    className={cn(
+                      "flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-xs font-semibold",
+                      item.tone === "danger"
+                        ? "bg-[#FEF1F0] text-[#B42318] border border-[#F6C7C2]"
+                        : item.tone === "warning"
+                        ? "bg-[#FFF7E6] text-[#A15C07] border border-[#F5D9A8]"
+                        : "bg-[#EEF5FF] text-[#1D5FC2] border border-[#BFD6F6]"
+                    )}
+                  >
                     {item.icon}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium leading-snug">{item.title}</span>
-                    <span className="block text-xs text-muted-foreground">{item.description}</span>
+                    <span className="block text-sm font-medium text-[var(--gray-900)] leading-snug">{item.title}</span>
+                    <span className="block text-xs text-[var(--gray-600)] mt-0.5">{item.description}</span>
                   </span>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <ChevronRight className="h-4 w-4 shrink-0 text-[var(--gray-400)]" aria-hidden />
                 </button>
               </li>
             ))}
           </ul>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

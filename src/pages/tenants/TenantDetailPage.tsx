@@ -43,6 +43,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { formatOrdinalDay, formatHumanEnum } from "@/lib/formatters";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -884,7 +885,8 @@ export default function TenantDetailPage() {
   const handleCancelEditing = () => {
     if (tenant) {
       const rt = (tenant as any).roomTenant || (tenant as any).currentStay || {};
-      setForm({
+      setForm((prev) => ({
+        ...prev,
         name: tenant.name ?? "",
         monthlyRent: String(tenant.monthlyRent ?? rt.rentAmount ?? (tenant as any).rentAmount ?? ""),
         securityDeposit: String(tenant.securityDeposit ?? rt.securityDeposit ?? ""),
@@ -966,7 +968,7 @@ export default function TenantDetailPage() {
         accountNumber: (tenant as any).accountNumber ?? "",
         ifscCode: (tenant as any).ifscCode ?? "",
         upiId: (tenant as any).upiId ?? "",
-      });
+      }));
     }
     setEditing(false);
   };
@@ -1296,61 +1298,14 @@ export default function TenantDetailPage() {
             </Link>
           </Button>
           <div className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 border-emerald-300 text-emerald-700 dark:text-emerald-300 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950 font-bold shadow-xs"
-                >
-                  <MessageSquare className="h-4 w-4 text-emerald-600" /> WhatsApp
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem
-                  onClick={() => setPaymentLinkOpen(true)}
-                  className="cursor-pointer gap-2"
-                >
-                  <Link2 className="h-3.5 w-3.5 text-teal-600" /> Share Payment Link & Dues
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => handleSendWhatsAppReminder("rent")}
-                  className="cursor-pointer gap-2"
-                >
-                  <IndianRupee className="h-3.5 w-3.5 text-emerald-600" /> Send Rent Due Reminder
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => handleSendWhatsAppReminder("kyc")}
-                  className="cursor-pointer gap-2"
-                >
-                  <ShieldCheck className="h-3.5 w-3.5 text-blue-600" /> Send Aadhaar KYC Link
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => handleSendWhatsAppReminder("agreement")}
-                  className="cursor-pointer gap-2"
-                >
-                  <FileText className="h-3.5 w-3.5 text-purple-600" /> Send Agreement Signing Link
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPaymentLinkOpen(true)}
-              className="gap-1.5 border-teal-300 text-teal-700 dark:text-teal-300 dark:border-teal-800 hover:bg-teal-50 dark:hover:bg-teal-950 font-bold shadow-xs"
-            >
-              <Link2 className="h-4 w-4 text-teal-600" /> Payment Link
-            </Button>
-
             {editing ? (
               <div className="flex items-center gap-2">
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   onClick={handleCancelEditing}
                   disabled={isSaving}
-                  className="h-8 px-3 text-xs font-semibold"
+                  className="h-9 px-3 text-xs"
                 >
                   Cancel
                 </Button>
@@ -1358,73 +1313,95 @@ export default function TenantDetailPage() {
                   size="sm"
                   onClick={handleSaveProfile}
                   disabled={isSaving}
-                  className="h-8 px-3.5 text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white gap-1.5 shadow-sm"
+                  className="h-9 px-4 text-xs font-semibold gap-1.5"
                 >
                   {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                   Save Changes
                 </Button>
               </div>
             ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 border-teal-600 text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-950 font-bold shadow-xs"
-                onClick={() => setEditing(true)}
-              >
-                <Pencil className="h-3.5 w-3.5" /> Edit Profile
-              </Button>
-            )}
-
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 border-teal-300 text-teal-700 font-bold hover:bg-teal-50 shadow-xs"
-              onClick={() => {
-                if (!subAccess.canPerformOperations) {
-                  setGateFeature("Tenant Relocation");
-                  setGateModalOpen(true);
-                } else {
-                  setMoveModalOpen(true);
-                }
-              }}
-            >
-              <ArrowRightLeft className="h-4 w-4" /> Move Tenant
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 border-blue-200 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 font-semibold"
-              onClick={() => setActivityDrawerOpen(true)}
-            >
-              <History className="h-4 w-4" /> Activity Log
-            </Button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted">
-                  <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-36">
-                <DropdownMenuItem onClick={() => setEditing(true)} className="cursor-pointer gap-2">
-                  <Pencil className="h-3.5 w-3.5" /> Edit profile
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    if (!subAccess.canDeleteTenant) {
-                      setGateFeature("Delete Tenant");
-                      setGateModalOpen(true);
-                      return;
-                    }
-                    toast({ title: "Delete action triggered", description: "This tenant will be removed." });
-                  }}
-                  className="text-destructive focus:bg-destructive/10 focus:text-destructive cursor-pointer gap-2"
+              <>
+                <Button
+                  size="sm"
+                  className="gap-1.5 font-medium"
+                  onClick={() => setRecordPaymentOpen(true)}
                 >
-                  <Trash2 className="h-3.5 w-3.5" /> Delete user
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <IndianRupee className="h-4 w-4" /> Record payment
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => handleSendWhatsAppReminder("rent")}
+                >
+                  <Send className="h-3.5 w-3.5" /> Send reminder
+                </Button>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="secondary" size="sm" className="h-9 w-9 p-0" aria-label="More actions">
+                      <MoreVertical className="h-4 w-4 text-[var(--gray-600)]" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuItem
+                      onClick={() => setPaymentLinkOpen(true)}
+                      className="cursor-pointer gap-2"
+                    >
+                      <Link2 className="h-4 w-4 text-[var(--brand-600)]" /> Share payment link
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setEditing(true)}
+                      className="cursor-pointer gap-2"
+                    >
+                      <Pencil className="h-4 w-4 text-[var(--gray-600)]" /> Edit profile
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        if (!subAccess.canPerformOperations) {
+                          setGateFeature("Tenant Relocation");
+                          setGateModalOpen(true);
+                        } else {
+                          setMoveModalOpen(true);
+                        }
+                      }}
+                      className="cursor-pointer gap-2"
+                    >
+                      <ArrowRightLeft className="h-4 w-4 text-[var(--gray-600)]" /> Move tenant
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setNoticeOpen(true)}
+                      className="cursor-pointer gap-2"
+                    >
+                      <Clock className="h-4 w-4 text-amber-600" /> Give notice
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setActivityDrawerOpen(true)}
+                      className="cursor-pointer gap-2"
+                    >
+                      <History className="h-4 w-4 text-blue-600" /> Activity log
+                    </DropdownMenuItem>
+                    {tenant?.phone && (
+                      <>
+                        <DropdownMenuItem asChild>
+                          <a href={`tel:${phoneDigits(tenant.phone)}`} className="cursor-pointer gap-2">
+                            <Phone className="h-4 w-4 text-emerald-600" /> Call tenant
+                          </a>
+                        </DropdownMenuItem>
+                        {waLink(tenant.phone) && (
+                          <DropdownMenuItem asChild>
+                            <a href={waLink(tenant.phone)!} target="_blank" rel="noreferrer" className="cursor-pointer gap-2">
+                              <MessageCircle className="h-4 w-4 text-emerald-600" /> WhatsApp
+                            </a>
+                          </DropdownMenuItem>
+                        )}
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            )}
           </div>
         </div>
 
@@ -1610,11 +1587,11 @@ export default function TenantDetailPage() {
                         <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Aadhaar KYC</span>
                         {isKycDone ? (
                           <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 text-[10px] font-semibold">
-                            Verified ✓
+                            Verified
                           </Badge>
                         ) : isKycRequested ? (
                           <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border-blue-300 text-[10px] font-semibold">
-                            Dispatched ⏳
+                            Link Sent
                           </Badge>
                         ) : (
                           <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-300 text-[10px] font-semibold">
@@ -1709,9 +1686,7 @@ export default function TenantDetailPage() {
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">Add Rent On</span>
                           <span className="font-semibold text-foreground">
-                            {form.rentDueDate || tenant.rentDueDate
-                              ? `${form.rentDueDate || tenant.rentDueDate}st of every month`
-                              : "1st of every month"}
+                            {formatOrdinalDay(form.rentDueDate || tenant.rentDueDate || 1)} of every month
                           </span>
                         </div>
                       </div>
@@ -1929,7 +1904,7 @@ export default function TenantDetailPage() {
                     ) : (
                       <DetailRow
                         label="Add Rent On"
-                        value={`${form.rentDueDate || "1"}st of every cycle`}
+                        value={`${formatOrdinalDay(form.rentDueDate || "1")} of every cycle`}
                       />
                     )}
 

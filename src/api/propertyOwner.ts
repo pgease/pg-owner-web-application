@@ -21,6 +21,7 @@ export interface RequestOtpPayload {
 export interface RequestOtpResponse {
   message: string;
   expiresIn: number;
+  devOtp?: string;
 }
 
 export interface PropertyOwner {

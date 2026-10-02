@@ -1,18 +1,35 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { UtensilsCrossed, Clock, Edit2, Save, Coffee, Sun, Moon, Check } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Clock, Edit2, Save, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useApp } from "@/context/AppContext";
 import { toast } from "@/components/ui/use-toast";
-import { getDiningSchedule, updateDiningSchedule, type DiningDaySchedule } from "@/api/propertyOwner";
+import {
+  getDiningSchedule,
+  updateDiningSchedule,
+  type DiningDaySchedule,
+} from "@/api/propertyOwner";
 import { CanAccessPage } from "@/components/PermissionGuard";
+import { PageHeader } from "@/components/common/PageHeader";
+import { EmptyState } from "@/components/common/EmptyState";
 
 // Order starts from MONDAY (1) to SUNDAY (0)
 const DAYS_MAP = [
@@ -98,8 +115,16 @@ export default function FoodDiningPage() {
     if (rawList.length > 0) {
       const merged = DAYS_MAP.map((d) => {
         const found = rawList.find((item: any) => item.dayOfWeek === d.dayOfWeek);
+        if (found) {
+          return {
+            dayOfWeek: d.dayOfWeek,
+            breakfast: found.breakfast || { menu: "Not set", startTime: "08:30", endTime: "09:30" },
+            lunch: found.lunch || { menu: "Not set", startTime: "13:00", endTime: "14:30" },
+            dinner: found.dinner || { menu: "Not set", startTime: "20:30", endTime: "22:00" },
+          };
+        }
         return (
-          found || {
+          DEFAULT_SCHEDULE.find((def) => def.dayOfWeek === d.dayOfWeek) || {
             dayOfWeek: d.dayOfWeek,
             breakfast: { menu: "Not set", startTime: "08:30", endTime: "09:30" },
             lunch: { menu: "Not set", startTime: "13:00", endTime: "14:30" },
@@ -112,38 +137,18 @@ export default function FoodDiningPage() {
   }, [diningData]);
 
   const updateMutation = useMutation({
-    mutationFn: async (updatedSchedule: DiningDaySchedule[]) => {
+    mutationFn: async (newSchedule: DiningDaySchedule[]) => {
       if (!selectedPgId) return;
-      const payload = {
-        schedule: updatedSchedule.map((s) => ({
-          dayOfWeek: Number(s.dayOfWeek),
-          breakfast: {
-            menu: s.breakfast?.menu || "",
-            startTime: formatHHmm(s.breakfast?.startTime, "08:30"),
-            endTime: formatHHmm(s.breakfast?.endTime, "09:30"),
-          },
-          lunch: {
-            menu: s.lunch?.menu || "",
-            startTime: formatHHmm(s.lunch?.startTime, "13:00"),
-            endTime: formatHHmm(s.lunch?.endTime, "14:30"),
-          },
-          dinner: {
-            menu: s.dinner?.menu || "",
-            startTime: formatHHmm(s.dinner?.startTime, "20:30"),
-            endTime: formatHHmm(s.dinner?.endTime, "22:00"),
-          },
-        })),
-      };
-      return updateDiningSchedule(selectedPgId, payload);
+      return updateDiningSchedule(selectedPgId, newSchedule);
     },
     onSuccess: () => {
-      toast({ title: "Dining Schedule Saved 🍲", description: "Food menu and timings updated successfully." });
+      toast({ title: "Dining Schedule Saved", description: "Food menu and meal timings updated." });
+      queryClient.invalidateQueries({ queryKey: ["diningSchedule", selectedPgId] });
       setSlotEditModal({ open: false, dayOfWeek: 1, mealType: "breakfast" });
       setBulkTimingsModalOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["diningSchedule", selectedPgId] });
     },
     onError: (e: any) => {
-      toast({ title: "Failed to save schedule", description: e?.message, variant: "destructive" });
+      toast({ title: "Failed to update schedule", description: e?.message, variant: "destructive" });
     },
   });
 
@@ -218,56 +223,68 @@ export default function FoodDiningPage() {
 
   return (
     <CanAccessPage permission="food_view_edit">
-      <div className="w-full max-w-6xl mx-auto space-y-6 animate-fade-in pb-24">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-page-title flex items-center gap-2">
-              <UtensilsCrossed className="h-6 w-6 text-primary" /> Food & Meals
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Manage weekly food menus and meal timing slots for residents at {selectedPg?.name || "your PG"}.
-            </p>
+      <div className="space-y-6">
+        <PageHeader
+          title="Food & Dining Schedule"
+          description={`Weekly meal menus and dining times for residents at ${selectedPg?.name || "your PG"}.`}
+          action={
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-[var(--gray-300)] gap-1.5"
+                onClick={() => setBulkTimingsModalOpen(true)}
+              >
+                <Clock className="h-3.5 w-3.5" /> Set meal timings
+              </Button>
+
+              <Button
+                size="sm"
+                className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white gap-1.5 font-medium"
+                onClick={() => updateMutation.mutate(schedule)}
+                disabled={updateMutation.isPending || !selectedPgId}
+              >
+                <Save className="h-3.5 w-3.5" />
+                {updateMutation.isPending ? "Saving..." : "Save schedule"}
+              </Button>
+            </div>
+          }
+        />
+
+        {!selectedPgId ? (
+          <div className="bg-white rounded-md border border-[var(--gray-200)] p-8">
+            <EmptyState
+              icon={<Building2 className="h-10 w-10 text-[var(--gray-400)]" />}
+              title="Select a property"
+              description="Choose a PG from the switcher in the top bar to view and manage dining schedules."
+            />
           </div>
+        ) : (
+          <div className="bg-white rounded-md border border-[var(--gray-200)] p-4 space-y-4">
+            <div className="flex items-center justify-between border-b border-[var(--gray-200)] pb-3">
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--gray-900)]">
+                  Weekly Menu & Timing Matrix
+                </h3>
+                <p className="text-xs text-[var(--gray-500)]">
+                  Weekly schedule from Monday to Sunday. Click on any meal slot to update menu or timings.
+                </p>
+              </div>
+            </div>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              className="gap-1.5 font-bold text-teal-700 border-teal-200 hover:bg-teal-50 shadow-xs"
-              onClick={() => setBulkTimingsModalOpen(true)}
-            >
-              <Clock className="h-4 w-4" /> Set Timings Across Days
-            </Button>
-
-            <Button
-              className="bg-teal-600 hover:bg-teal-700 text-white font-bold gap-1.5 shadow-sm"
-              onClick={() => updateMutation.mutate(schedule)}
-              disabled={updateMutation.isPending}
-            >
-              <Save className="h-4 w-4" /> {updateMutation.isPending ? "Saving..." : "Save Schedule"}
-            </Button>
-          </div>
-        </div>
-
-        {/* WEEKLY FOOD TIMETABLE */}
-        <Card className="border-border shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-bold">Weekly Food Menu & Timings Matrix</CardTitle>
-            <CardDescription className="text-xs">
-              Weekly schedule starts from Monday. Click the edit icon on any meal slot to update its menu or timing.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
             {isLoading ? (
-              <div className="py-12 text-center text-sm text-muted-foreground">Loading food schedule...</div>
+              <div className="py-12 text-center text-sm text-[var(--gray-500)]">
+                Loading food schedule...
+              </div>
             ) : (
-              <div className="rounded-xl border border-slate-200 overflow-x-auto bg-white shadow-xs">
-                <Table className="min-w-[850px]">
-                  <TableHeader className="bg-slate-100/80">
-                    <TableRow>
-                      <TableHead className="font-bold text-slate-900 w-[140px] text-sm">Day of Week</TableHead>
-                      <TableHead className="font-bold text-slate-900 text-sm">Breakfast ☕</TableHead>
-                      <TableHead className="font-bold text-slate-900 text-sm">Lunch ☀️</TableHead>
-                      <TableHead className="font-bold text-slate-900 text-sm">Dinner 🌙</TableHead>
+              <div className="overflow-x-auto rounded border border-[var(--gray-200)]">
+                <Table className="min-w-[800px]">
+                  <TableHeader className="bg-[var(--gray-100)] text-xs text-[var(--gray-600)]">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="py-2.5 px-3 w-[120px]">Day of Week</TableHead>
+                      <TableHead className="py-2.5 px-3">Breakfast</TableHead>
+                      <TableHead className="py-2.5 px-3">Lunch</TableHead>
+                      <TableHead className="py-2.5 px-3">Dinner</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -275,79 +292,79 @@ export default function FoodDiningPage() {
                       const daySchedule = schedule.find((s) => s.dayOfWeek === day.dayOfWeek);
 
                       return (
-                        <TableRow key={day.dayOfWeek} className="hover:bg-slate-50/80 transition-colors">
-                          <TableCell className="font-bold text-slate-900 text-base">
+                        <TableRow key={day.dayOfWeek} className="hover:bg-[var(--gray-50)] transition-colors">
+                          <TableCell className="py-3 px-3 font-semibold text-sm text-[var(--gray-900)] align-top">
                             {day.label}
                           </TableCell>
 
                           {/* BREAKFAST CELL */}
-                          <TableCell>
-                            <div className="flex items-start justify-between gap-2 bg-teal-50/50 p-3 rounded-xl border border-teal-200/80">
+                          <TableCell className="py-3 px-3 align-top">
+                            <div className="rounded border border-[var(--gray-200)] bg-[var(--gray-50)] p-2.5 flex items-start justify-between gap-2">
                               <div className="space-y-1">
-                                <div className="font-bold text-slate-900 text-base leading-snug">
+                                <div className="text-sm font-medium text-[var(--gray-900)] leading-snug">
                                   {daySchedule?.breakfast?.menu || "Not set"}
                                 </div>
-                                <div className="text-xs font-bold text-teal-800 flex items-center gap-1.5 bg-teal-100/70 w-fit px-2 py-0.5 rounded-md">
-                                  <Clock className="h-3.5 w-3.5" />
-                                  {to12HourDisplay(daySchedule?.breakfast?.startTime)} - {to12HourDisplay(daySchedule?.breakfast?.endTime)}
+                                <div className="text-[11px] text-[var(--gray-600)] tabular-nums flex items-center gap-1">
+                                  <Clock className="h-3 w-3 text-[var(--gray-400)]" />
+                                  {to12HourDisplay(daySchedule?.breakfast?.startTime)} – {to12HourDisplay(daySchedule?.breakfast?.endTime)}
                                 </div>
                               </div>
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                className="h-7 w-7 text-teal-700 hover:bg-teal-200/60 rounded-full shrink-0"
+                                className="h-6 w-6 text-[var(--gray-400)] hover:text-[var(--gray-800)] shrink-0"
                                 onClick={() => handleOpenSlotEdit(day.dayOfWeek, "breakfast")}
-                                title={`Edit Breakfast for ${day.label}`}
+                                aria-label={`Edit Breakfast for ${day.label}`}
                               >
-                                <Edit2 className="h-3.5 w-3.5" />
+                                <Edit2 className="h-3 w-3" />
                               </Button>
                             </div>
                           </TableCell>
 
                           {/* LUNCH CELL */}
-                          <TableCell>
-                            <div className="flex items-start justify-between gap-2 bg-amber-50/50 p-3 rounded-xl border border-amber-200/80">
+                          <TableCell className="py-3 px-3 align-top">
+                            <div className="rounded border border-[var(--gray-200)] bg-[var(--gray-50)] p-2.5 flex items-start justify-between gap-2">
                               <div className="space-y-1">
-                                <div className="font-bold text-slate-900 text-base leading-snug">
+                                <div className="text-sm font-medium text-[var(--gray-900)] leading-snug">
                                   {daySchedule?.lunch?.menu || "Not set"}
                                 </div>
-                                <div className="text-xs font-bold text-amber-800 flex items-center gap-1.5 bg-amber-100/70 w-fit px-2 py-0.5 rounded-md">
-                                  <Clock className="h-3.5 w-3.5" />
-                                  {to12HourDisplay(daySchedule?.lunch?.startTime)} - {to12HourDisplay(daySchedule?.lunch?.endTime)}
+                                <div className="text-[11px] text-[var(--gray-600)] tabular-nums flex items-center gap-1">
+                                  <Clock className="h-3 w-3 text-[var(--gray-400)]" />
+                                  {to12HourDisplay(daySchedule?.lunch?.startTime)} – {to12HourDisplay(daySchedule?.lunch?.endTime)}
                                 </div>
                               </div>
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                className="h-7 w-7 text-amber-700 hover:bg-amber-200/60 rounded-full shrink-0"
+                                className="h-6 w-6 text-[var(--gray-400)] hover:text-[var(--gray-800)] shrink-0"
                                 onClick={() => handleOpenSlotEdit(day.dayOfWeek, "lunch")}
-                                title={`Edit Lunch for ${day.label}`}
+                                aria-label={`Edit Lunch for ${day.label}`}
                               >
-                                <Edit2 className="h-3.5 w-3.5" />
+                                <Edit2 className="h-3 w-3" />
                               </Button>
                             </div>
                           </TableCell>
 
                           {/* DINNER CELL */}
-                          <TableCell>
-                            <div className="flex items-start justify-between gap-2 bg-indigo-50/50 p-3 rounded-xl border border-indigo-200/80">
+                          <TableCell className="py-3 px-3 align-top">
+                            <div className="rounded border border-[var(--gray-200)] bg-[var(--gray-50)] p-2.5 flex items-start justify-between gap-2">
                               <div className="space-y-1">
-                                <div className="font-bold text-slate-900 text-base leading-snug">
+                                <div className="text-sm font-medium text-[var(--gray-900)] leading-snug">
                                   {daySchedule?.dinner?.menu || "Not set"}
                                 </div>
-                                <div className="text-xs font-bold text-indigo-800 flex items-center gap-1.5 bg-indigo-100/70 w-fit px-2 py-0.5 rounded-md">
-                                  <Clock className="h-3.5 w-3.5" />
-                                  {to12HourDisplay(daySchedule?.dinner?.startTime)} - {to12HourDisplay(daySchedule?.dinner?.endTime)}
+                                <div className="text-[11px] text-[var(--gray-600)] tabular-nums flex items-center gap-1">
+                                  <Clock className="h-3 w-3 text-[var(--gray-400)]" />
+                                  {to12HourDisplay(daySchedule?.dinner?.startTime)} – {to12HourDisplay(daySchedule?.dinner?.endTime)}
                                 </div>
                               </div>
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                className="h-7 w-7 text-indigo-700 hover:bg-indigo-200/60 rounded-full shrink-0"
+                                className="h-6 w-6 text-[var(--gray-400)] hover:text-[var(--gray-800)] shrink-0"
                                 onClick={() => handleOpenSlotEdit(day.dayOfWeek, "dinner")}
-                                title={`Edit Dinner for ${day.label}`}
+                                aria-label={`Edit Dinner for ${day.label}`}
                               >
-                                <Edit2 className="h-3.5 w-3.5" />
+                                <Edit2 className="h-3 w-3" />
                               </Button>
                             </div>
                           </TableCell>
@@ -358,148 +375,175 @@ export default function FoodDiningPage() {
                 </Table>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        )}
 
-        {/* SINGLE MEAL SLOT FOCUSED EDIT MODAL */}
-        <Dialog open={slotEditModal.open} onOpenChange={(open) => setSlotEditModal({ ...slotEditModal, open })}>
-          <DialogContent className="sm:max-w-md">
+        {/* DIALOG 1: SINGLE SLOT EDIT MODAL */}
+        <Dialog
+          open={slotEditModal.open}
+          onOpenChange={(open) => setSlotEditModal((p) => ({ ...p, open }))}
+        >
+          <DialogContent className="sm:max-w-md p-6 space-y-4">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-teal-700 font-bold capitalize">
-                <UtensilsCrossed className="h-5 w-5" /> Edit {slotEditModal.mealType} - {DAYS_MAP.find((d) => d.dayOfWeek === slotEditModal.dayOfWeek)?.label}
+              <DialogTitle className="text-base font-semibold text-[var(--gray-900)] capitalize">
+                Edit {slotEditModal.mealType} ({DAYS_MAP.find((d) => d.dayOfWeek === slotEditModal.dayOfWeek)?.label})
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 py-2 text-sm">
+            <div className="space-y-3 py-2">
               <div className="space-y-1.5">
-                <Label className="font-bold text-slate-900">{slotEditModal.mealType.toUpperCase()} Menu Items</Label>
+                <Label className="text-xs font-medium text-[var(--gray-700)]">Menu Items</Label>
                 <Input
                   value={slotMenu}
                   onChange={(e) => setSlotMenu(e.target.value)}
-                  placeholder="e.g. Jeera Rice, Dal Tadka, Roti"
-                  className="font-medium text-slate-900"
+                  placeholder="e.g. Aloo Paratha, Curd, Pickle"
+                  className="h-9 text-sm"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="font-bold text-slate-900">Start Time (Clock)</Label>
+                  <Label className="text-xs font-medium text-[var(--gray-700)]">Start Time</Label>
                   <Input
                     type="time"
                     value={slotStart}
                     onChange={(e) => setSlotStart(e.target.value)}
-                    className="font-semibold text-slate-900 cursor-pointer"
+                    className="h-9 text-sm"
                   />
-                  <span className="text-[11px] text-teal-700 font-bold">{to12HourDisplay(slotStart)}</span>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="font-bold text-slate-900">End Time (Clock)</Label>
+                  <Label className="text-xs font-medium text-[var(--gray-700)]">End Time</Label>
                   <Input
                     type="time"
                     value={slotEnd}
                     onChange={(e) => setSlotEnd(e.target.value)}
-                    className="font-semibold text-slate-900 cursor-pointer"
+                    className="h-9 text-sm"
                   />
-                  <span className="text-[11px] text-teal-700 font-bold">{to12HourDisplay(slotEnd)}</span>
                 </div>
               </div>
             </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setSlotEditModal({ ...slotEditModal, open: false })}>Cancel</Button>
-              <Button className="bg-teal-600 hover:bg-teal-700 text-white font-bold" onClick={handleSaveSlotEdit} disabled={updateMutation.isPending}>
-                Save {slotEditModal.mealType.toUpperCase()} Slot
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSlotEditModal((p) => ({ ...p, open: false }))}
+                className="border-[var(--gray-300)]"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white font-medium"
+                onClick={handleSaveSlotEdit}
+                disabled={updateMutation.isPending}
+              >
+                Save slot
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
-        {/* BULK / MULTI-DAY TIMINGS MODAL */}
+        {/* DIALOG 2: BULK TIMINGS MODAL */}
         <Dialog open={bulkTimingsModalOpen} onOpenChange={setBulkTimingsModalOpen}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-md p-6 space-y-4">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-teal-700 font-bold">
-                <Clock className="h-5 w-5" /> Bulk Meal Timings Manager
+              <DialogTitle className="text-base font-semibold text-[var(--gray-900)]">
+                Set Meal Timings Across Days
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 py-2 text-sm">
+            <div className="space-y-3 py-2">
               <div className="space-y-1.5">
-                <Label className="font-bold text-slate-900">Select Meal Slot to Apply Timing</Label>
-                <div className="flex gap-2">
-                  {(["breakfast", "lunch", "dinner"] as MealType[]).map((mt) => (
-                    <Button
-                      key={mt}
-                      variant={bulkMealType === mt ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setBulkMealType(mt)}
-                      className={`capitalize flex-1 font-bold text-xs ${
-                        bulkMealType === mt ? "bg-teal-600 text-white" : ""
+                <Label className="text-xs font-medium text-[var(--gray-700)]">Meal Type</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(["breakfast", "lunch", "dinner"] as MealType[]).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setBulkMealType(type)}
+                      className={`h-9 text-xs font-medium rounded-md border capitalize transition-colors ${
+                        bulkMealType === type
+                          ? "border-[var(--brand-600)] bg-[var(--brand-50)] text-[var(--brand-700)]"
+                          : "border-[var(--gray-200)] text-[var(--gray-700)] hover:bg-[var(--gray-50)]"
                       }`}
                     >
-                      {mt}
-                    </Button>
+                      {type}
+                    </button>
                   ))}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="font-bold text-slate-900">Start Time (Clock)</Label>
+                  <Label className="text-xs font-medium text-[var(--gray-700)]">Start Time</Label>
                   <Input
                     type="time"
                     value={bulkStart}
                     onChange={(e) => setBulkStart(e.target.value)}
-                    className="font-semibold text-slate-900 cursor-pointer"
+                    className="h-9 text-sm"
                   />
-                  <span className="text-[11px] text-teal-700 font-bold">{to12HourDisplay(bulkStart)}</span>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="font-bold text-slate-900">End Time (Clock)</Label>
+                  <Label className="text-xs font-medium text-[var(--gray-700)]">End Time</Label>
                   <Input
                     type="time"
                     value={bulkEnd}
                     onChange={(e) => setBulkEnd(e.target.value)}
-                    className="font-semibold text-slate-900 cursor-pointer"
+                    className="h-9 text-sm"
                   />
-                  <span className="text-[11px] text-teal-700 font-bold">{to12HourDisplay(bulkEnd)}</span>
                 </div>
               </div>
 
-              <div className="space-y-2 border-t pt-3">
+              <div className="space-y-2 pt-1">
                 <div className="flex items-center justify-between">
-                  <Label className="font-bold text-xs text-slate-900">Apply Timing to Selected Days</Label>
-                  <Button variant="ghost" size="sm" onClick={toggleSelectAllDays} className="text-xs h-6 text-teal-700 font-semibold px-1">
-                    {selectedDays.length === 7 ? "Deselect All" : "Select All Days"}
-                  </Button>
+                  <Label className="text-xs font-medium text-[var(--gray-700)]">Apply to Days</Label>
+                  <button
+                    type="button"
+                    onClick={toggleSelectAllDays}
+                    className="text-xs text-[var(--brand-600)] hover:underline"
+                  >
+                    {selectedDays.length === 7 ? "Deselect All" : "Select All"}
+                  </button>
                 </div>
-
-                <div className="grid grid-cols-2 gap-2 pt-1">
+                <div className="grid grid-cols-4 gap-2">
                   {DAYS_MAP.map((d) => {
-                    const isChecked = selectedDays.includes(d.dayOfWeek);
+                    const checked = selectedDays.includes(d.dayOfWeek);
                     return (
-                      <div
+                      <label
                         key={d.dayOfWeek}
-                        onClick={() => toggleDaySelection(d.dayOfWeek)}
-                        className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all text-xs font-semibold ${
-                          isChecked
-                            ? "bg-teal-50 border-teal-300 text-teal-900"
-                            : "bg-slate-50 border-slate-200 text-slate-600"
+                        className={`flex items-center gap-1.5 p-2 rounded border cursor-pointer text-xs ${
+                          checked ? "border-[var(--brand-600)] bg-[var(--brand-50)]" : "border-[var(--gray-200)]"
                         }`}
                       >
-                        <Checkbox checked={isChecked} onCheckedChange={() => toggleDaySelection(d.dayOfWeek)} />
-                        <span>{d.label}</span>
-                      </div>
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={() => toggleDaySelection(d.dayOfWeek)}
+                        />
+                        <span>{d.short}</span>
+                      </label>
                     );
                   })}
                 </div>
               </div>
             </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setBulkTimingsModalOpen(false)}>Cancel</Button>
-              <Button className="bg-teal-600 hover:bg-teal-700 text-white font-bold" onClick={handleApplyBulkTimings} disabled={updateMutation.isPending}>
-                Apply Timings to {selectedDays.length} Day(s)
+            <DialogFooter className="gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBulkTimingsModalOpen(false)}
+                className="border-[var(--gray-300)]"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white font-medium"
+                onClick={handleApplyBulkTimings}
+                disabled={updateMutation.isPending}
+              >
+                Apply timings
               </Button>
             </DialogFooter>
           </DialogContent>

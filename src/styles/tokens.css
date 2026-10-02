@@ -1,0 +1,142 @@
+/* PG Ease Design System Tokens
+   Calm, dense, operational register aesthetics.
+   Brand: Teal #008080. 
+   Radius: Max 6px. Shadows: minimal/none on cards.
+*/
+
+:root {
+  /* Brand (Teal) */
+  --brand-600: #008080; /* Primary action / selection */
+  --brand-700: #006B6B; /* Hover */
+  --brand-800: #005757; /* Pressed */
+  --brand-500: #0E9494; /* Icons on dark */
+  --brand-100: #CCE6E6; /* Selected border/ring */
+  --brand-50:  #E8F4F4; /* Selected row / nav bg */
+  --brand-focus: rgba(0, 128, 128, 0.35);
+
+  /* Neutrals */
+  --gray-900: #18212B; /* Primary text */
+  --gray-700: #3D4A57; /* Strong secondary */
+  --gray-600: #556270; /* Secondary text */
+  --gray-500: #6B7785; /* Tertiary (>= 4.5:1 on white) */
+  --gray-400: #98A2AE; /* Placeholder, disabled text */
+  --gray-300: #C8CFD6; /* Strong border */
+  --gray-200: #E2E6EA; /* Default border */
+  --gray-100: #EEF1F3; /* Subtle bg, table header */
+  --gray-50:  #F6F7F8; /* App surface bg */
+  --white:    #FFFFFF; /* Pure surface */
+
+  /* Semantic - Success (Paid, Occupied, Verified) */
+  --success-text:   #157F3D;
+  --success-bg:     #ECFAF1;
+  --success-border: #B4E5C5;
+  --success-dot:    #22A350;
+
+  /* Semantic - Warning (Partially paid, Due today, Notice) */
+  --warning-text:   #A15C07;
+  --warning-bg:     #FFF7E6;
+  --warning-border: #F5D9A8;
+  --warning-dot:    #E08A00;
+
+  /* Semantic - Error (Overdue, Rejected, Destructive) */
+  --error-text:   #B42318;
+  --error-bg:     #FEF1F0;
+  --error-border: #F6C7C2;
+  --error-dot:    #D92D20;
+
+  /* Semantic - Info (Verification pending, Reserved, In-progress) */
+  --info-text:   #1D5FC2;
+  --info-bg:     #EEF5FF;
+  --info-border: #BFD6F6;
+  --info-dot:    #2E77E5;
+
+  /* Semantic - Neutral (Inactive, Vacant, Closed) */
+  --neutral-text:   #475462;
+  --neutral-bg:     #F1F3F5;
+  --neutral-border: #D5DBE1;
+  --neutral-dot:    #8A96A3;
+
+  /* Radii */
+  --radius-sm: 4px; /* Badges, checkboxes, chips, bed tiles */
+  --radius-md: 6px; /* Buttons, inputs, cards, menus, modals, drawers */
+
+  /* Shadows */
+  --shadow-card: none;
+  --shadow-pop: 0 4px 12px rgba(16, 24, 40, 0.08);
+  --shadow-overlay: 0 12px 32px rgba(16, 24, 40, 0.14);
+  --scrim: rgba(16, 24, 40, 0.40);
+
+  /* Mapping to Tailwind/shadcn tokens */
+  --background: 210 17% 98%;    /* #F6F7F8 */
+  --foreground: 212 28% 13%;    /* #18212B */
+
+  --card: 0 0% 100%;            /* #FFFFFF */
+  --card-foreground: 212 28% 13%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 212 28% 13%;
+
+  --primary: 180 100% 25%;      /* #008080 */
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 210 14% 95%;     /* #EEF1F3 */
+  --secondary-foreground: 212 28% 13%;
+
+  --muted: 210 14% 95%;
+  --muted-foreground: 214 11% 47%; /* #6B7785 */
+
+  --accent: 180 30% 93%;        /* #E8F4F4 */
+  --accent-foreground: 180 100% 25%;
+
+  --destructive: 4 77% 41%;     /* #B42318 */
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 210 14% 90%;        /* #E2E6EA */
+  --input: 210 14% 81%;         /* #C8CFD6 */
+  --ring: 180 100% 25%;
+
+  --radius: 6px;
+
+  /* Sidebar */
+  --sidebar-background: 0 0% 100%;
+  --sidebar-foreground: 212 28% 13%;
+  --sidebar-primary: 180 100% 25%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 180 30% 93%;
+  --sidebar-accent-foreground: 180 100% 25%;
+  --sidebar-border: 210 14% 90%;
+  --sidebar-ring: 180 100% 25%;
+  --sidebar-muted: 214 11% 47%;
+}
+
+.dark {
+  --background: 215 28% 9%;
+  --foreground: 210 20% 96%;
+  --card: 215 25% 12%;
+  --card-foreground: 210 20% 96%;
+  --popover: 215 25% 12%;
+  --popover-foreground: 210 20% 96%;
+  --primary: 180 100% 32%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 215 20% 18%;
+  --secondary-foreground: 210 20% 90%;
+  --muted: 215 20% 18%;
+  --muted-foreground: 215 15% 65%;
+  --accent: 180 30% 20%;
+  --accent-foreground: 180 50% 80%;
+  --destructive: 4 77% 45%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 215 20% 22%;
+  --input: 215 20% 28%;
+  --ring: 180 100% 32%;
+
+  --sidebar-background: 215 25% 11%;
+  --sidebar-foreground: 210 20% 90%;
+  --sidebar-primary: 180 100% 32%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 215 20% 18%;
+  --sidebar-accent-foreground: 210 20% 96%;
+  --sidebar-border: 215 20% 22%;
+  --sidebar-ring: 180 100% 32%;
+  --sidebar-muted: 215 15% 65%;
+}

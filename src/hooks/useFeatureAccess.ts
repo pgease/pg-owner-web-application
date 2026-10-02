@@ -32,6 +32,7 @@ export function useFeatureAccess() {
     hasExplicitFeatureList: Object.keys(entitlements.featuresMap).length > 0,
     hasFeature,
     isNavChildLocked,
+    isFeatureNavLocked: isNavChildLocked,
     isLoading: entitlements.isLoading,
     isError,
     refetch: entitlements.refetch,
