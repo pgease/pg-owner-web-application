@@ -133,7 +133,7 @@ export const SupportLearningHubModal: React.FC<SupportLearningHubModalProps> = (
                 title="Email"
                 detail={SUPPORT_EMAIL}
                 hint="Billing & account queries"
-                href={supportMailtoUrl("PG Ease Owner Support Request")}
+                href={supportMailtoUrl("PG Ease Support Request")}
               />
             </div>
 

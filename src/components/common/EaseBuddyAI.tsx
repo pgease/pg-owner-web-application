@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
+import mascotRent from "@/assets/mascot/mascot-rent.png";
 
 interface Message {
   id: string;
@@ -149,12 +150,16 @@ export const EaseBuddyAI: React.FC<{
           <button
             type="button"
             onClick={() => setIsOpen(true)}
-            className="group relative flex h-12 w-12 items-center justify-center rounded-full bg-[var(--brand-600)] text-white shadow-pop hover:bg-[var(--brand-700)] active:bg-[var(--brand-800)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-600)] focus-visible:ring-offset-2 border border-white/20"
+            className="group relative flex h-12 w-12 items-center justify-center rounded-full bg-[var(--brand-600)] text-white shadow-pop hover:scale-105 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-600)] focus-visible:ring-offset-2 border-2 border-white overflow-hidden p-0.5"
             title="Ease Buddy AI Assistant"
             aria-label="Open Ease Buddy AI"
           >
-            <Bot className="h-5 w-5 text-white" />
-            <span className="absolute top-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+            <img
+              src={mascotRent}
+              alt="Ease Buddy"
+              className="h-full w-full object-cover object-top rounded-full"
+            />
+            <span className="absolute top-0 right-0 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white" />
           </button>
         </div>
       )}
@@ -165,8 +170,12 @@ export const EaseBuddyAI: React.FC<{
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-[var(--gray-50)] border-b border-[var(--gray-200)] shrink-0">
             <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-full bg-[var(--brand-50)] border border-[var(--brand-100)] flex items-center justify-center text-[var(--brand-600)]">
-                <Bot className="h-4 w-4" />
+              <div className="h-9 w-9 rounded-full bg-[var(--brand-50)] border border-[var(--brand-100)] overflow-hidden shrink-0">
+                <img
+                  src={mascotRent}
+                  alt="Ease Buddy"
+                  className="h-full w-full object-cover object-top"
+                />
               </div>
               <div>
                 <div className="flex items-center gap-2">
