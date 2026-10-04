@@ -1,4 +1,5 @@
-import {useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { authStorage } from "@/api/http";
 import {
   assignStaffRole,
   approveKycApplication,
@@ -858,7 +859,10 @@ export function useUpdateMeMutation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (payload: UpdatePropertyOwnerPayload) => updateMe(payload),
-    onSuccess: () => {
+    onSuccess: (updated) => {
+      if (updated) {
+        authStorage.setPropertyOwner(updated);
+      }
       qc.invalidateQueries({ queryKey: ["property-owner", "me"] });
     },
   });

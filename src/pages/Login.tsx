@@ -23,6 +23,7 @@ import {
   Building2,
   TrendingUp,
   CheckCircle2,
+  User,
 } from "lucide-react";
 
 type Step = "phone" | "otp";
@@ -162,6 +163,11 @@ const TEXTS = {
     title: "Executive PG Management",
     subtitle: "Complete control over occupancy, rent reconciliation, tenant KYC, and team operations.",
     owner: "PG Ease Owner Portal",
+    nameLabel: "PG Owner Name",
+    nameOptional: "Optional",
+    namePlaceholder: "e.g. Rahul Sharma (optional)",
+    nameHint: "Used on tenant rent receipts and your owner profile.",
+    loggingInAs: "Signing in as",
     phoneLabel: "Mobile Number",
     phoneHintWhatsapp: "We'll send an OTP to your WhatsApp account.",
     phoneHintSms: "We'll send an OTP via SMS to verify your mobile.",
@@ -200,6 +206,11 @@ const TEXTS = {
     title: "स्मार्ट पीजी प्रबंधन",
     subtitle: "कमरों की उपलब्धता, किराया संग्रह और कर्मचारियों का संचालन एक ही सुरक्षित डैशबोर्ड में।",
     owner: "पीजी ईज़ ओनर पोर्टल",
+    nameLabel: "पीजी मालिक का नाम",
+    nameOptional: "वैकल्पिक",
+    namePlaceholder: "उदा. राहुल शर्मा (वैकल्पिक)",
+    nameHint: "किरायेदार रसीदों और आपके ओनर प्रोफ़ाइल पर उपयोग किया जाता है।",
+    loggingInAs: "लॉगिन कर रहे हैं",
     phoneLabel: "मोबाइल नंबर",
     phoneHintWhatsapp: "हम आपके व्हाट्सएप पर एक ओटीपी भेजेंगे।",
     phoneHintSms: "हम आपके नंबर पर एसएमएस के माध्यम से ओटीपी भेजेंगे।",
@@ -250,6 +261,7 @@ export default function Login() {
       return "";
     }
   });
+  const [pgOwnerName, setPgOwnerName] = useState("");
   const [otp, setOtp] = useState("");
   const [shaking, setShaking] = useState(false);
 
@@ -353,7 +365,7 @@ export default function Login() {
       if (otpValue.length !== 4) return;
       try {
         setIsVerifyingOtp(true);
-        const data = await verifyOtp(phone, otpValue);
+        const data = await verifyOtp(phone, otpValue, pgOwnerName.trim() || undefined);
 
         setShowSuccess(true);
         toast({
@@ -380,7 +392,7 @@ export default function Login() {
         setIsVerifyingOtp(false);
       }
     },
-    [phone, navigate, triggerShake]
+    [phone, pgOwnerName, navigate, triggerShake]
   );
 
   const handleOtpChange = useCallback(
@@ -553,6 +565,30 @@ export default function Login() {
                         </div>
                       </div>
 
+                      {/* PG Owner Name (Optional) */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                            <User className="h-3.5 w-3.5 text-primary" />
+                            <span>{T.nameLabel}</span>
+                          </Label>
+                          <span className="text-[10px] text-muted-foreground font-medium bg-muted/70 px-2 py-0.5 rounded-full border border-border/50">
+                            {T.nameOptional}
+                          </span>
+                        </div>
+                        <Input
+                          value={pgOwnerName}
+                          onChange={(e) => setPgOwnerName(e.target.value)}
+                          onKeyDown={handlePhoneKeyDown}
+                          placeholder={T.namePlaceholder}
+                          autoComplete="name"
+                          className="h-11 rounded-xl text-sm font-medium border-input shadow-2xs focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary"
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                          {T.nameHint}
+                        </p>
+                      </div>
+
                       <div className="space-y-2">
                         <Label className="text-xs font-semibold text-foreground">{T.phoneLabel}</Label>
                         <div className="flex rounded-xl overflow-hidden border border-input shadow-2xs focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary">
@@ -663,6 +699,14 @@ export default function Login() {
                             <Pencil className="h-3 w-3" /> {T.editNumber}
                           </button>
                         </div>
+                        {pgOwnerName.trim() ? (
+                          <div className="pt-0.5">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[11px] font-medium text-primary">
+                              <User className="h-3 w-3" />
+                              <span>{T.loggingInAs}: <strong>{pgOwnerName.trim()}</strong></span>
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
 
                       <div className="space-y-2.5">

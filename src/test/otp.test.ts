@@ -125,4 +125,54 @@ describe("Request OTP Channel Support", () => {
       expect(body.channel).toBeUndefined();
     });
   });
+
+  describe("Property Owner Verify OTP with Optional Name", () => {
+    it("should pass optional name, pgOwnerName, and ownerName when name is provided", async () => {
+      const { verifyOtp } = await import("../api/propertyOwner");
+      await verifyOtp("9123456789", "1234", "Vikas Kuntal");
+
+      const [url, options] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("/property-owners/otp/verify");
+      expect(options.method).toBe("POST");
+
+      const body = JSON.parse(options.body);
+      expect(body).toEqual({
+        mobileNumber: "9123456789",
+        otp: "1234",
+        name: "Vikas Kuntal",
+        pgOwnerName: "Vikas Kuntal",
+        ownerName: "Vikas Kuntal",
+      });
+    });
+
+    it("should omit name fields when name is empty or not provided", async () => {
+      const { verifyOtp } = await import("../api/propertyOwner");
+      await verifyOtp("9123456789", "1234");
+
+      const [url, options] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("/property-owners/otp/verify");
+
+      const body = JSON.parse(options.body);
+      expect(body).toEqual({
+        mobileNumber: "9123456789",
+        otp: "1234",
+      });
+      expect(body.name).toBeUndefined();
+    });
+  });
+
+  describe("Property Owner Profile Name and Email Update", () => {
+    it("should send PUT /property-owners/me with updated name and email", async () => {
+      const { updateMe } = await import("../api/propertyOwner");
+      await updateMe({ name: "Vikas Kuntal", email: "vikas@pgease.com" });
+
+      const [url, options] = (globalThis.fetch as any).mock.calls[0];
+      expect(url).toContain("/property-owners/me");
+      expect(options.method).toBe("PUT");
+
+      const body = JSON.parse(options.body);
+      expect(body.name).toBe("Vikas Kuntal");
+      expect(body.email).toBe("vikas@pgease.com");
+    });
+  });
 });

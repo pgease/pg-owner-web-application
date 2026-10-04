@@ -13,6 +13,7 @@ import {
   Sun,
   Moon,
   Bot,
+  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +34,7 @@ import pgeaseLogo from "@/assets/pgease-logo.jpg";
 import { cn } from "@/lib/utils";
 import { SupportLearningHubModal } from "@/components/common/SupportLearningHubModal";
 import { TrialExpiredGateModal } from "@/components/common/TrialExpiredGateModal";
+import { EditProfileModal } from "@/components/settings/EditProfileModal";
 
 interface AppHeaderProps {
   onMenuToggle: () => void;
@@ -70,7 +72,25 @@ const AppHeader = ({ onMenuToggle }: AppHeaderProps) => {
     [list, selectedPgId],
   );
 
-  const owner = authStorage.getPropertyOwner();
+  const [owner, setOwner] = useState(() => authStorage.getPropertyOwner());
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOwnerUpdate = () => {
+      setOwner(authStorage.getPropertyOwner());
+    };
+    const handleOpenEditProfile = () => {
+      setEditProfileOpen(true);
+    };
+    window.addEventListener("pgease-owner-updated", handleOwnerUpdate);
+    window.addEventListener("pgease-auth-token-updated", handleOwnerUpdate);
+    window.addEventListener("open-edit-profile", handleOpenEditProfile);
+    return () => {
+      window.removeEventListener("pgease-owner-updated", handleOwnerUpdate);
+      window.removeEventListener("pgease-auth-token-updated", handleOwnerUpdate);
+      window.removeEventListener("open-edit-profile", handleOpenEditProfile);
+    };
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -278,12 +298,16 @@ const AppHeader = ({ onMenuToggle }: AppHeaderProps) => {
                   <ChevronDown className="hidden h-3.5 w-3.5 opacity-60 lg:block" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 shadow-pop border-[#E2E6EA] bg-white">
-                <DropdownMenuLabel className="font-normal">
-                  <p className="truncate text-sm font-medium text-[#18212B]">{owner?.name ?? "Owner"}</p>
-                  <p className="text-xs text-[#6B7785]">{entitlements.planDisplayName}</p>
+              <DropdownMenuContent align="end" className="w-60 shadow-pop border-[#E2E6EA] bg-white">
+                <DropdownMenuLabel className="font-normal pb-2">
+                  <p className="truncate text-sm font-semibold text-[#18212B]">{owner?.name ?? "Owner"}</p>
+                  {owner?.email && <p className="truncate text-xs text-[#6B7785]">{owner.email}</p>}
+                  <p className="text-[11px] font-medium text-[#008080] mt-0.5">{entitlements.planDisplayName}</p>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-[#E2E6EA]" />
+                <DropdownMenuItem onClick={() => setEditProfileOpen(true)} className="gap-2 cursor-pointer text-[13px] font-medium text-[#18212B]">
+                  <User className="h-4 w-4 text-[#008080]" /> Edit Profile (Name & Email)
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate("/settings")} className="gap-2 cursor-pointer text-[13px]">
                   Settings
                 </DropdownMenuItem>
@@ -313,6 +337,7 @@ const AppHeader = ({ onMenuToggle }: AppHeaderProps) => {
 
       <SupportLearningHubModal open={supportHubOpen} onOpenChange={setSupportHubOpen} />
       <TrialExpiredGateModal open={trialExpiredOpen} onOpenChange={setTrialExpiredOpen} featureName="Add New Property" />
+      <EditProfileModal open={editProfileOpen} onOpenChange={setEditProfileOpen} />
     </>
   );
 };

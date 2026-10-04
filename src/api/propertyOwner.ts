@@ -16,6 +16,8 @@ export type OtpChannel = "whatsapp" | "sms";
 export interface RequestOtpPayload {
   mobileNumber: string;
   channel?: OtpChannel;
+  name?: string;
+  pgOwnerName?: string;
 }
 
 export interface RequestOtpResponse {
@@ -102,10 +104,16 @@ export async function requestTenantOtp(
   });
 }
 
-export async function verifyOtp(mobileNumber: string, otp: string) {
+export async function verifyOtp(mobileNumber: string, otp: string, name?: string) {
+  const body: Record<string, unknown> = { mobileNumber, otp };
+  if (name?.trim()) {
+    body.name = name.trim();
+    body.pgOwnerName = name.trim();
+    body.ownerName = name.trim();
+  }
   const data = await httpRequest<VerifyOtpResponse>(`${PROPERTY_OWNER_BASE}/otp/verify`, {
     method: "POST",
-    body: { mobileNumber, otp },
+    body,
   });
 
   authStorage.set({

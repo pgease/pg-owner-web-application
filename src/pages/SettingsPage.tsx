@@ -57,6 +57,8 @@ export default function SettingsPage() {
   useEffect(() => {
     if (searchParams.get("tab") === "activity") {
       navigate("/activity-logs", { replace: true });
+    } else if (searchParams.get("editProfile") === "true" || searchParams.get("edit") === "profile") {
+      setIsEditingProfile(true);
     }
   }, [searchParams, navigate]);
 
@@ -124,7 +126,7 @@ export default function SettingsPage() {
     }
 
     try {
-      await updateMeMut.mutateAsync({
+      const updated = await updateMeMut.mutateAsync({
         name: ownerName.trim(),
         email: ownerEmail.trim() || undefined,
         mobileContactNumber: ownerPhone.trim() || undefined,
@@ -132,8 +134,13 @@ export default function SettingsPage() {
         language: ownerLanguage,
       });
 
+      if (updated) {
+        authStorage.setPropertyOwner(updated);
+      }
+
       toast({
         title: "Profile updated successfully",
+        description: "Your name and contact email have been updated.",
       });
       setIsEditingProfile(false);
       void meQuery.refetch();
@@ -202,7 +209,7 @@ export default function SettingsPage() {
               onClick={() => setIsEditingProfile(true)}
               className="h-8 text-xs border-[var(--gray-300)] gap-1.5"
             >
-              <Edit2 className="h-3.5 w-3.5" /> Edit Profile
+              <Edit2 className="h-3.5 w-3.5 text-[var(--brand-600)]" /> Edit Name & Email
             </Button>
           ) : (
             <div className="flex items-center gap-2">

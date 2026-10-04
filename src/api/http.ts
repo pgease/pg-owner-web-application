@@ -51,12 +51,21 @@ export const authStorage = {
     if (typeof window === "undefined") return null;
     return window.localStorage.getItem(REFRESH_TOKEN_KEY);
   },
-  getPropertyOwner(): { name: string } | null {
+  setPropertyOwner(owner: unknown) {
+    if (typeof window === "undefined") return;
+    if (owner) {
+      window.localStorage.setItem(PROPERTY_OWNER_KEY, JSON.stringify(owner));
+    } else {
+      window.localStorage.removeItem(PROPERTY_OWNER_KEY);
+    }
+    window.dispatchEvent(new Event("pgease-owner-updated"));
+  },
+  getPropertyOwner(): { id?: string; name?: string; email?: string; mobileContactNumber?: string; [key: string]: unknown } | null {
     if (typeof window === "undefined") return null;
     const raw = window.localStorage.getItem(PROPERTY_OWNER_KEY);
     if (!raw) return null;
     try {
-      return JSON.parse(raw) as { name: string };
+      return JSON.parse(raw);
     } catch {
       return null;
     }
