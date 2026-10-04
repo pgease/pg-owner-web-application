@@ -76,6 +76,7 @@ const App = () => (
           {/* Auth routes (no layout) */}
           <Route path="/" element={<Login />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Login initialMode="signup" />} />
           <Route
             path="/onboarding"
             element={

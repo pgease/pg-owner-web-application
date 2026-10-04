@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { toast } from "@/components/ui/use-toast";
@@ -23,6 +23,7 @@ import {
 
 type Step = "phone" | "otp";
 type Lang = "en" | "hi";
+type AuthMode = "signin" | "signup";
 
 const LAST_PHONE_KEY = "pgEase_lastPhone";
 const LANG_STORAGE_KEY = "pgEase_lang";
@@ -132,13 +133,21 @@ const TEXTS = {
     bullet1: "Instant UPI Collections & WhatsApp Receipts",
     bullet2: "Real-Time Bed Occupancy & Multi-Branch View",
     bullet3: "Paperless Aadhaar KYC & Police Verification",
-    title: "Sign in to PG Ease",
-    subtitle: "Enter your registered mobile number. Zero password hassle.",
+    tabSignIn: "Sign In",
+    tabSignUp: "New Owner Sign Up",
+    titleSignIn: "Sign in to PG Ease",
+    subtitleSignIn: "Enter your registered mobile number. Zero password hassle.",
+    titleSignUp: "Create Owner Account",
+    subtitleSignUp: "Register your PG and start with 45-day free Pro access.",
+    promptToSignUp: "New to PG Ease?",
+    actionSignUp: "Sign Up for Free",
+    promptToSignIn: "Already have an account?",
+    actionSignIn: "Sign in here",
     nameLabel: "PG Owner Name",
     nameOptional: "Optional",
     namePlaceholder: "e.g. Rahul Sharma (optional)",
     nameHint: "Used on tenant rent receipts and your owner profile.",
-    loggingInAs: "Signing in as",
+    signingUpAs: "Registering as",
     phoneLabel: "MOBILE NUMBER",
     otpNote: "We will send a 6-digit one-time password (OTP)",
     sendVia: "Send verification code via:",
@@ -164,13 +173,21 @@ const TEXTS = {
     bullet1: "तत्काल यूपीआई संग्रह और व्हाट्सएप रसीदें",
     bullet2: "रियल-टाइम बेड उपलब्धता और मल्टी-ब्रांच व्यू",
     bullet3: "पेपरलेस आधार केवाईसी और डिजिटल अनुबंध",
-    title: "पीजी ईज़ में लॉगिन करें",
-    subtitle: "अपना पंजीकृत मोबाइल नंबर दर्ज करें। पासवर्ड का कोई झंझट नहीं।",
+    tabSignIn: "साइन इन",
+    tabSignUp: "नया खाता बनाएं",
+    titleSignIn: "पीजी ईज़ में लॉगिन करें",
+    subtitleSignIn: "अपना पंजीकृत मोबाइल नंबर दर्ज करें। पासवर्ड का कोई झंझट नहीं।",
+    titleSignUp: "नया ओनर खाता बनाएं",
+    subtitleSignUp: "अपना पीजी रजिस्टर करें और 45 दिनों का मुफ़्त Pro एक्सेस पाएं।",
+    promptToSignUp: "नया खाता बनाना चाहते हैं?",
+    actionSignUp: "मुफ़्त साइन अप करें",
+    promptToSignIn: "पहले से खाता है?",
+    actionSignIn: "यहाँ साइन इन करें",
     nameLabel: "पीजी मालिक का नाम",
     nameOptional: "वैकल्पिक",
     namePlaceholder: "उदा. राहुल शर्मा (वैकल्पिक)",
     nameHint: "किरायेदार रसीदों और आपके ओनर प्रोफ़ाइल पर उपयोग किया जाता है।",
-    loggingInAs: "लॉगिन कर रहे हैं",
+    signingUpAs: "रजिस्टर कर रहे हैं",
     phoneLabel: "मोबाइल नंबर",
     otpNote: "हम आपके नंबर पर 6-अंकीय ओटीपी कोड भेजेंगे",
     sendVia: "सत्यापन कोड माध्यम चुनें:",
@@ -192,8 +209,18 @@ const TEXTS = {
 };
 
 /* ==================== Main Component ==================== */
-export default function Login() {
+export default function Login({ initialMode }: { initialMode?: AuthMode } = {}) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [mode, setMode] = useState<AuthMode>(() => {
+    if (initialMode) return initialMode;
+    if (location.pathname === "/signup") return "signup";
+    const q = searchParams.get("mode");
+    if (q === "signup") return "signup";
+    return "signin";
+  });
 
   const [lang, setLang] = useState<Lang>(() => {
     try {
@@ -560,40 +587,74 @@ export default function Login() {
                   </span>
                 </div>
 
+                {/* Sign In vs Sign Up Segmented Control */}
+                <div className="grid grid-cols-2 p-1 bg-gray-100 rounded-xl text-xs font-semibold select-none border border-gray-200/70">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("signin");
+                      setPgOwnerName("");
+                    }}
+                    className={`py-2 rounded-lg transition-all text-center ${
+                      mode === "signin"
+                        ? "bg-white text-gray-900 shadow-2xs font-bold"
+                        : "text-gray-500 hover:text-gray-900"
+                    }`}
+                  >
+                    {T.tabSignIn}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode("signup")}
+                    className={`py-2 rounded-lg transition-all text-center flex items-center justify-center gap-1.5 ${
+                      mode === "signup"
+                        ? "bg-white text-[#008080] shadow-2xs font-bold"
+                        : "text-gray-500 hover:text-gray-900"
+                    }`}
+                  >
+                    <span>{T.tabSignUp}</span>
+                    <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold uppercase">
+                      Trial
+                    </span>
+                  </button>
+                </div>
+
                 <div className="space-y-1">
                   <h2 className="text-2xl sm:text-[25px] font-extrabold text-[#18212B] tracking-tight">
-                    {T.title}
+                    {mode === "signup" ? T.titleSignUp : T.titleSignIn}
                   </h2>
                   <p className="text-xs text-gray-500">
-                    {T.subtitle}
+                    {mode === "signup" ? T.subtitleSignUp : T.subtitleSignIn}
                   </p>
                 </div>
 
-                {/* PG Owner Name (Optional) */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
-                      <User className="h-3.5 w-3.5 text-[#008080]" />
-                      <span>{T.nameLabel}</span>
-                    </label>
-                    <span className="text-[10px] text-gray-500 font-medium bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
-                      {T.nameOptional}
-                    </span>
+                {/* PG Owner Name (Optional) - SHOWN ONLY ON SIGNUP! */}
+                {mode === "signup" && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
+                        <User className="h-3.5 w-3.5 text-[#008080]" />
+                        <span>{T.nameLabel}</span>
+                      </label>
+                      <span className="text-[10px] text-gray-500 font-medium bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
+                        {T.nameOptional}
+                      </span>
+                    </div>
+                    <div className="flex rounded-lg border border-gray-300 bg-white overflow-hidden focus-within:border-[#008080] focus-within:ring-2 focus-within:ring-[#CCE6E6] h-11 sm:h-12 transition-all">
+                      <input
+                        value={pgOwnerName}
+                        onChange={(e) => setPgOwnerName(e.target.value)}
+                        onKeyDown={handlePhoneKeyDown}
+                        placeholder={T.namePlaceholder}
+                        autoComplete="name"
+                        className="flex-1 h-full px-3 text-sm font-semibold text-gray-900 placeholder:text-gray-400 outline-none"
+                      />
+                    </div>
+                    <p className="text-[10.5px] sm:text-[11px] text-gray-400">
+                      {T.nameHint}
+                    </p>
                   </div>
-                  <div className="flex rounded-lg border border-gray-300 bg-white overflow-hidden focus-within:border-[#008080] focus-within:ring-2 focus-within:ring-[#CCE6E6] h-11 sm:h-12 transition-all">
-                    <input
-                      value={pgOwnerName}
-                      onChange={(e) => setPgOwnerName(e.target.value)}
-                      onKeyDown={handlePhoneKeyDown}
-                      placeholder={T.namePlaceholder}
-                      autoComplete="name"
-                      className="flex-1 h-full px-3 text-sm font-semibold text-gray-900 placeholder:text-gray-400 outline-none"
-                    />
-                  </div>
-                  <p className="text-[10.5px] sm:text-[11px] text-gray-400">
-                    {T.nameHint}
-                  </p>
-                </div>
+                )}
 
                 {/* Mobile Input Section */}
                 <div className="space-y-1">
@@ -718,6 +779,36 @@ export default function Login() {
                   </div>
                 </div>
 
+                {/* Switch Mode Prompt Link */}
+                <div className="text-center pt-0.5 text-xs text-gray-500">
+                  {mode === "signin" ? (
+                    <p>
+                      {T.promptToSignUp}{" "}
+                      <button
+                        type="button"
+                        onClick={() => setMode("signup")}
+                        className="font-bold text-[#008080] hover:underline cursor-pointer"
+                      >
+                        {T.actionSignUp}
+                      </button>
+                    </p>
+                  ) : (
+                    <p>
+                      {T.promptToSignIn}{" "}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMode("signin");
+                          setPgOwnerName("");
+                        }}
+                        className="font-bold text-[#008080] hover:underline cursor-pointer"
+                      >
+                        {T.actionSignIn}
+                      </button>
+                    </p>
+                  )}
+                </div>
+
                 {/* Security Note */}
                 <div className="flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-gray-400 pt-0.5">
                   <Lock className="h-3 w-3 text-gray-400 shrink-0" />
@@ -749,11 +840,11 @@ export default function Login() {
                       <Pencil className="h-3 w-3" /> {T.editNumber}
                     </button>
                   </div>
-                  {pgOwnerName.trim() ? (
+                  {mode === "signup" && pgOwnerName.trim() ? (
                     <div className="pt-0.5">
                       <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#E6F8F0] border border-[#B4E5C5] text-[11px] font-medium text-[#0E7A4A]">
                         <User className="h-3 w-3" />
-                        <span>{T.loggingInAs}: <strong>{pgOwnerName.trim()}</strong></span>
+                        <span>{T.signingUpAs}: <strong>{pgOwnerName.trim()}</strong></span>
                       </div>
                     </div>
                   ) : null}

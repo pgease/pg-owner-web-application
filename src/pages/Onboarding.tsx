@@ -14,10 +14,12 @@ import { toast } from "@/components/ui/use-toast";
 import {
   createProperty,
   updateLanguage,
+  updateMe,
   getPropertyTypesAndAmenities,
   type PropertyType,
   DEFAULT_PROPERTY_TYPE_ID,
 } from "@/api/propertyOwner";
+import { authStorage } from "@/api/http";
 import { useSubscriptionAccess } from "@/hooks/useSubscriptionAccess";
 import { TrialExpiredGateModal } from "@/components/common/TrialExpiredGateModal";
 
@@ -213,7 +215,9 @@ const Onboarding = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [locating, setLocating] = useState(false);
   const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>([]);
-
+  const currentOwner = authStorage.getPropertyOwner();
+  const initialOwnerName = currentOwner?.name && !currentOwner.name.startsWith("user_") ? currentOwner.name : "";
+  const [ownerName, setOwnerName] = useState(initialOwnerName);
   const [pgName, setPgName] = useState("");
   const [address, setAddress] = useState("");
   const [propertyTypeId, setPropertyTypeId] = useState(DEFAULT_PROPERTY_TYPE_ID);
@@ -327,6 +331,14 @@ const Onboarding = () => {
         bedRange,
         propertyTypeId,
       });
+
+      if (ownerName.trim()) {
+        try {
+          const updatedOwner = await updateMe({ name: ownerName.trim() });
+          authStorage.setPropertyOwner(updatedOwner);
+        } catch {}
+      }
+
       await refreshProperties();
       setSelectedPgId(newPg.id);
       toast({ title: lang === "en" ? "Onboarding complete" : "सेटअप पूरा", description: T.successSub });
@@ -459,6 +471,27 @@ const Onboarding = () => {
                         </p>
                       </div>
                     </div>
+
+                  {/* PG Owner Name (Optional) */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-white/60">
+                        {lang === "en" ? "Your Full Name" : "आपका पूरा नाम"}
+                      </Label>
+                      <span className="text-[10px] text-white/40 font-medium bg-white/5 px-2 py-0.5 rounded-full border border-white/10">
+                        {lang === "en" ? "Optional" : "वैकल्पिक"}
+                      </span>
+                    </div>
+                    <Input
+                      value={ownerName}
+                      onChange={(e) => setOwnerName(e.target.value)}
+                      placeholder={lang === "en" ? "e.g. Rahul Sharma (optional)" : "उदा. राहुल शर्मा (वैकल्पिक)"}
+                      className="h-11 rounded-2xl border-white/[0.08] bg-white/[0.04] text-white placeholder:text-white/25 focus-visible:ring-1 focus-visible:ring-primary/50"
+                    />
+                    <p className="text-[10.5px] text-white/40">
+                      {lang === "en" ? "Appears on tenant rent receipts and your owner profile." : "किरायेदार रसीदों और आपके ओनर प्रोफ़ाइल पर दिखाया जाएगा।"}
+                    </p>
+                  </div>
 
                   <div className="space-y-1.5">
                     <Label className="text-xs text-white/60">{T.pgName}</Label>
