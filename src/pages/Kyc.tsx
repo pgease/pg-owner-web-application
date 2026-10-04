@@ -153,10 +153,14 @@ export default function Kyc() {
         handler: async (response: any) => {
           try {
             await verifyPaymentMut.mutateAsync({
+              packId,
+              creditPackId: packId,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
               razorpayOrderId: response.razorpay_order_id,
               razorpayPaymentId: response.razorpay_payment_id,
               razorpaySignature: response.razorpay_signature,
-              creditPackId: packId,
             });
             toast({
               title: "Credits Recharged",

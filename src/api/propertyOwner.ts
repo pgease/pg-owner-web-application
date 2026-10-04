@@ -1904,14 +1904,25 @@ export async function createCreditTopupOrder(creditPackId: string) {
 }
 
 export async function verifyCreditPayment(body: {
-  razorpayOrderId: string;
-  razorpayPaymentId: string;
-  razorpaySignature: string;
-  creditPackId: string;
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  razorpaySignature?: string;
+  razorpay_order_id?: string;
+  razorpay_payment_id?: string;
+  razorpay_signature?: string;
+  creditPackId?: string;
+  packId?: string;
 }) {
+  const payload = {
+    packId: body.packId || body.creditPackId,
+    razorpay_order_id: body.razorpay_order_id || body.razorpayOrderId,
+    razorpay_payment_id: body.razorpay_payment_id || body.razorpayPaymentId,
+    razorpay_signature: body.razorpay_signature || body.razorpaySignature,
+  };
+
   return httpRequest<{ success: boolean; message: string; newBalance: number }>(`${PROPERTY_OWNER_BASE}/credits/verify-payment`, {
     method: 'POST',
-    body,
+    body: payload,
     auth: true,
   });
 }
