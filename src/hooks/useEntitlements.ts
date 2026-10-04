@@ -33,6 +33,12 @@ export interface EntitlementsInfo {
   featuresMap: Record<string, boolean>;
   /** Check if a feature key is enabled for this owner */
   hasFeature: (featureKey: string) => boolean;
+  /** Bed quota usage if plan has bed constraints */
+  bedsUsage?: { used: number; max: number };
+  /** True if bed quota has reached or exceeded max limit */
+  isBedQuotaFull: boolean;
+  /** Available bed slots before reaching quota (Infinity if unlimited) */
+  availableBedsQuota: number;
   /** Whether feature or plan queries are actively loading */
   isLoading: boolean;
   /** Refetch all entitlement queries from the server */
@@ -396,6 +402,12 @@ export function useEntitlements(): EntitlementsInfo {
       ]);
     };
 
+    const bedsUsage = currentPlanData?.bedsUsage;
+    const isBedQuotaFull = Boolean(bedsUsage && bedsUsage.max > 0 && bedsUsage.used >= bedsUsage.max);
+    const availableBedsQuota = bedsUsage && bedsUsage.max > 0
+      ? Math.max(0, bedsUsage.max - bedsUsage.used)
+      : Infinity;
+
     return {
       status: rawStatus,
       planName,
@@ -410,6 +422,9 @@ export function useEntitlements(): EntitlementsInfo {
       pricePerBed,
       featuresMap,
       hasFeature,
+      bedsUsage,
+      isBedQuotaFull,
+      availableBedsQuota,
       isLoading: isFeaturesLoading || isPlanLoading,
       refetch,
       setDemoPlan,

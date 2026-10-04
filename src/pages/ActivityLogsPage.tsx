@@ -57,6 +57,7 @@ import {
 import { PageHeader } from "@/components/common/PageHeader";
 import { useApp } from "@/context/AppContext";
 import { getActivityLogs, type ActivityLogItem } from "@/api/propertyOwner";
+import { FeatureGuard } from "@/components/common/FeatureGuard";
 import { cn } from "@/lib/utils";
 
 // Translate technical routes or endpoints into natural, friendly language
@@ -257,8 +258,13 @@ const getActorDisplay = (type: string, snapshot: any) => {
         description="Clear, real-time record of rent entries, tenant check-ins, complaints, and changes made across your properties."
       />
 
-      {/* FILTER & SEARCH TOOLBAR */}
-      <Card className="rounded-2xl border-border/80 shadow-xs">
+      <FeatureGuard
+        feature="audit_logs"
+        fallbackTitle="Audit Logs (Pro Feature)"
+        fallbackDescription="Audit logs & operational activity tracking is exclusive to the Pro plan. Upgrade to inspect staff actions, timestamped changes, and tenant updates across all your properties."
+      >
+        {/* FILTER & SEARCH TOOLBAR */}
+        <Card className="rounded-2xl border-border/80 shadow-xs">
         <CardContent className="p-4 space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {/* Property Filter */}
@@ -499,6 +505,7 @@ const getActorDisplay = (type: string, snapshot: any) => {
           </div>
         </DialogContent>
       </Dialog>
+      </FeatureGuard>
     </div>
   );
 }

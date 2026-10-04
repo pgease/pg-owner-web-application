@@ -45,6 +45,7 @@ import {
 import { EmptyState } from "@/components/common/EmptyState";
 import { parseRentTenantRow } from "@/lib/rentDashboard";
 import { CanAccessPage } from "@/components/PermissionGuard";
+import { FeatureGuard } from "@/components/common/FeatureGuard";
 import { toast } from "@/components/ui/use-toast";
 import { formatINR, formatDate } from "@/lib/formatters";
 import {
@@ -385,7 +386,12 @@ export default function Reports() {
           }
         />
 
-        {!selectedPgId ? (
+        <FeatureGuard
+          feature="advanced_reports"
+          fallbackTitle="Advanced Reports & 95-Column Exports (Pro Feature)"
+          fallbackDescription="Generate and export comprehensive 95-column master spreadsheets, compliance records, and collections ledgers exclusively on the Pro plan."
+        >
+          {!selectedPgId ? (
           <div className="bg-white rounded-md border border-[var(--gray-200)] p-8">
             <EmptyState
               icon={<Building2 className="h-10 w-10 text-[var(--gray-400)]" />}
@@ -700,6 +706,7 @@ export default function Reports() {
             </div>
           </DialogContent>
         </Dialog>
+        </FeatureGuard>
       </div>
     </CanAccessPage>
   );

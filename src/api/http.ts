@@ -16,6 +16,8 @@ const PROPERTY_OWNER_KEY = "pgEase_propertyOwner";
 const SELECTED_PG_ID_KEY = "pgEase_selectedPgId";
 const LANGUAGE_KEY = "pgEase_language";
 
+import { decodeJwtPayload } from "../lib/jwt";
+
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 export interface HttpError extends Error {
@@ -58,6 +60,16 @@ export const authStorage = {
     } catch {
       return null;
     }
+  },
+  isStaff(): boolean {
+    const token = this.getAccessToken();
+    if (!token) return false;
+    const payload = decodeJwtPayload(token);
+    if (!payload) return false;
+    return Boolean(payload.staffId) || payload.role === "staff" || payload.userType === "staff";
+  },
+  isOwner(): boolean {
+    return !this.isStaff();
   },
 };
 
@@ -184,6 +196,18 @@ export async function httpRequest<TResponse>(path: string, options: RequestOptio
   }
 
   if (!response.ok) {
+    if (response.status === 403 && typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("pgease-403-error", {
+          detail: {
+            status: 403,
+            data,
+            errorCode: (data as any)?.errorCode,
+            message: formatApiErrorMessage(data),
+          },
+        })
+      );
+    }
     const error: HttpError = new Error(formatApiErrorMessage(data));
     error.status = response.status;
     error.data = data;

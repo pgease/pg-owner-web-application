@@ -9,12 +9,14 @@ import { CanAccessPage } from "@/components/PermissionGuard";
 import { queryKeys } from "@/hooks/usePropertyOwnerQueries";
 import { useApp } from "@/context/AppContext";
 import { useSubscriptionAccess } from "@/hooks/useSubscriptionAccess";
+import { useEntitlements } from "@/hooks/useEntitlements";
 
 export default function AddTenantPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { selectedPgId } = useApp();
   const subAccess = useSubscriptionAccess();
+  const entitlements = useEntitlements();
 
   const handleSuccess = () => {
     if (selectedPgId) {
@@ -50,11 +52,29 @@ export default function AddTenantPage() {
             </div>
             <CardTitle className="text-xl font-bold text-foreground">Trial Expired: Tenant Addition Restricted</CardTitle>
             <CardDescription className="text-sm mt-2 max-w-md mx-auto">
-              Your 45-day free trial has expired. To add new tenants, manage allocations, and keep your property organized, please subscribe to Lite (₹29/bed) or Pro (₹49/bed).
+              Your subscription has expired. To add new tenants, manage allocations, and keep your property organized, please subscribe to Lite (₹29/bed) or Pro (₹49/bed).
             </CardDescription>
             <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
               <Button onClick={() => navigate("/plans")} className="bg-brand-600 hover:bg-brand-700 text-white rounded-xl">
                 View Subscription Plans
+              </Button>
+              <Button variant="outline" onClick={() => navigate("/tenants")} className="rounded-xl">
+                Back to Tenants
+              </Button>
+            </div>
+          </Card>
+        ) : entitlements.isBedQuotaFull ? (
+          <Card className="border-amber-300 bg-amber-50/30 shadow-sm max-w-xl mx-auto text-center p-8 rounded-2xl">
+            <div className="h-12 w-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-4">
+              <Lock className="h-6 w-6" />
+            </div>
+            <CardTitle className="text-xl font-bold text-foreground">Bed Quota Exceeded</CardTitle>
+            <CardDescription className="text-sm mt-2 max-w-md mx-auto">
+              You have reached your plan limit of {entitlements.bedsUsage?.max || 0} beds. To onboard additional tenants, please upgrade your subscription plan.
+            </CardDescription>
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Button onClick={() => navigate("/plans")} className="bg-brand-600 hover:bg-brand-700 text-white rounded-xl">
+                Upgrade Plan
               </Button>
               <Button variant="outline" onClick={() => navigate("/tenants")} className="rounded-xl">
                 Back to Tenants

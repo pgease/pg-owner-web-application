@@ -29,6 +29,7 @@ interface NavChild {
   url: string;
   permissionKey?: string;
   featureKey?: string;
+  ownerOnly?: boolean;
 }
 
 interface NavItem {
@@ -38,6 +39,7 @@ interface NavItem {
   children?: NavChild[];
   permissionKey?: string;
   featureKey?: string;
+  ownerOnly?: boolean;
 }
 
 /**
@@ -63,7 +65,7 @@ const NAV_ITEMS: NavItem[] = [
       { title: "House Rules", url: "/my-pgs/restrictions", permissionKey: "room_view" },
       { title: "WiFi", url: "/my-pgs/wifi", permissionKey: "room_view", featureKey: "wifi_management" },
       { title: "Notice Board", url: "/my-pgs/notices", permissionKey: "room_view", featureKey: "digital_notice_board" },
-      { title: "Bank Account", url: "/my-pgs/bank", permissionKey: "room_view" },
+      { title: "Bank Account", url: "/my-pgs/bank", ownerOnly: true },
       { title: "Public Listing", url: "/post-pg", permissionKey: "room_view" },
     ],
   },
@@ -107,11 +109,12 @@ const NAV_ITEMS: NavItem[] = [
     title: "Staff",
     url: "/team",
     icon: UserCog,
+    ownerOnly: true,
     permissionKey: "team_view_members",
     featureKey: "staff_roles_permissions",
     children: [
-      { title: "Team Members", url: "/team", permissionKey: "team_view_members", featureKey: "staff_roles_permissions" },
-      { title: "Permissions", url: "/team/permissions-matrix", permissionKey: "team_view_members", featureKey: "staff_roles_permissions" },
+      { title: "Team Members", url: "/team", ownerOnly: true, permissionKey: "team_view_members", featureKey: "staff_roles_permissions" },
+      { title: "Permissions", url: "/team/permissions-matrix", ownerOnly: true, permissionKey: "team_view_members", featureKey: "staff_roles_permissions" },
     ],
   },
   {
@@ -127,8 +130,8 @@ const NAV_ITEMS: NavItem[] = [
     icon: Settings,
     children: [
       { title: "Settings", url: "/settings" },
-      { title: "Plans & Billing", url: "/plans" },
-      { title: "Refer & Earn", url: "/referrals" },
+      { title: "Plans & Billing", url: "/plans", ownerOnly: true },
+      { title: "Refer & Earn", url: "/referrals", ownerOnly: true },
       { title: "Activity Logs", url: "/activity-logs", featureKey: "audit_logs" },
     ],
   },
@@ -210,7 +213,7 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
   };
 
   const isLockedByFeature = (featureKey?: string) => {
-    if (!featureKey || !isOwner) return false;
+    if (!featureKey) return false;
     return isFeatureNavLocked(featureKey);
   };
 
@@ -220,10 +223,26 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
   };
 
   const renderChild = (child: NavChild) => {
+    if (child.ownerOnly && !isOwner) {
+      return null;
+    }
+
     const permLocked = isLockedByPermission(child.permissionKey);
     const featLocked = isLockedByFeature(child.featureKey);
 
     if (featLocked) {
+      if (!isOwner) {
+        return (
+          <div
+            className="flex h-[32px] w-full cursor-not-allowed items-center justify-between gap-2 rounded-[4px] px-2.5 text-[13px] text-[#98A2AE]"
+            title="This feature is not included in the PG's plan."
+            aria-disabled
+          >
+            <span className="truncate">{child.title}</span>
+            <Lock className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
+          </div>
+        );
+      }
       return (
         <button
           type="button"
@@ -266,15 +285,20 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
   };
 
   const renderTopLevel = (item: NavItem) => {
+    if (item.ownerOnly && !isOwner) {
+      return null;
+    }
+
+    const visibleChildren = item.children?.filter((c) => !(c.ownerOnly && !isOwner));
+    const hasChildren = Boolean(visibleChildren?.length);
     const active = isGroupActive(item);
-    const hasChildren = Boolean(item.children?.length);
     const topLocked = isLockedByPermission(item.permissionKey) || isLockedByFeature(item.featureKey);
     const featLocked = isLockedByFeature(item.featureKey);
     const Icon = item.icon;
 
     // Collapsed rail: icon only, tooltip with the label.
     if (collapsed) {
-      const target = featLocked ? "/plans" : item.url;
+      const target = featLocked ? (isOwner ? "/plans" : item.url) : item.url;
       return (
         <Tooltip delayDuration={0}>
           <TooltipTrigger asChild>
@@ -293,7 +317,7 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
           </TooltipTrigger>
           <TooltipContent side="right" className="text-xs">
             {item.title}
-            {featLocked ? " · Pro" : ""}
+            {featLocked && isOwner ? " · Pro" : ""}
           </TooltipContent>
         </Tooltip>
       );
@@ -318,7 +342,7 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
           </button>
           {open ? (
             <ul className="ml-[18px] mt-0.5 space-y-0.5 border-l border-[#E2E6EA] pl-2">
-              {item.children!.map((child) => (
+              {visibleChildren!.map((child) => (
                 <li key={child.url}>{renderChild(child)}</li>
               ))}
             </ul>
@@ -328,6 +352,19 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
     }
 
     if (featLocked) {
+      if (!isOwner) {
+        return (
+          <div
+            className="flex h-[36px] w-full cursor-not-allowed items-center gap-2.5 rounded-[4px] px-3 text-[14px] leading-[20px] font-medium text-[#98A2AE]"
+            title="This feature is not included in the PG's plan."
+            aria-disabled
+          >
+            <Icon className="h-[18px] w-[18px] shrink-0 opacity-60" aria-hidden />
+            <span className="flex-1 text-left">{item.title}</span>
+            <Lock className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
+          </div>
+        );
+      }
       return (
         <button
           type="button"

@@ -47,6 +47,8 @@ import {
   useMoveOutTenantMutation,
 } from "@/hooks/usePropertyOwnerQueries";
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { TrialExpiredGateModal } from "@/components/common/TrialExpiredGateModal";
 import { toast } from "@/components/ui/use-toast";
 import {
   tenantDisplayName,
@@ -80,6 +82,28 @@ const Tenants = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { properties, selectedPgId } = useApp();
+  const entitlements = useEntitlements();
+  const [trialExpiredOpen, setTrialExpiredOpen] = useState(false);
+  const [trialExpiredFeature, setTrialExpiredFeature] = useState("");
+
+  const handleAddTenantClick = (e: React.MouseEvent) => {
+    if (entitlements.isExpired) {
+      e.preventDefault();
+      setTrialExpiredFeature("Add Tenant");
+      setTrialExpiredOpen(true);
+      return;
+    }
+    if (entitlements.isBedQuotaFull) {
+      e.preventDefault();
+      toast({
+        title: "Bed Quota Exceeded",
+        description: `Your subscription limit of ${entitlements.bedsUsage?.max || 0} beds has been reached. Please upgrade your plan to add more tenants.`,
+        variant: "destructive",
+      });
+      navigate("/plans");
+      return;
+    }
+  };
 
   const [searchQuery, setSearchQuery] = useState("");
   const [kycFilter, setKycFilter] = useState<"all" | "verified" | "pending">("all");
@@ -132,6 +156,11 @@ const Tenants = () => {
   const targetRooms = targetRoomsQuery.data ?? [];
 
   const handleOpenMoveModal = (tenant?: PropertyTenant) => {
+    if (entitlements.isExpired) {
+      setTrialExpiredFeature("Move Tenant");
+      setTrialExpiredOpen(true);
+      return;
+    }
     if (tenant) setSelectedTenantForMove(tenant);
     setTargetPropertyId(selectedPgId || "");
     setTransferDate(new Date().toISOString().split("T")[0]);
@@ -167,6 +196,11 @@ const Tenants = () => {
   };
 
   const handleOpenVacateModal = (tenant: PropertyTenant) => {
+    if (entitlements.isExpired) {
+      setTrialExpiredFeature("Move Out Tenant");
+      setTrialExpiredOpen(true);
+      return;
+    }
     setSelectedTenantForVacate(tenant);
     setVacateDate(new Date().toISOString().split("T")[0]);
     setVacateReason("Tenancy completed smoothly");
@@ -203,6 +237,11 @@ const Tenants = () => {
   };
 
   const handleOpenNoticeModal = (tenant: PropertyTenant) => {
+    if (entitlements.isExpired) {
+      setTrialExpiredFeature("Notice Period");
+      setTrialExpiredOpen(true);
+      return;
+    }
     setSelectedTenantForNotice(tenant);
     setNoticeMoveOutDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]);
     setNoticeReason("Standard 30-day notice");
@@ -410,7 +449,7 @@ const Tenants = () => {
             </Button>
             <CanAccess permission="tenant_add">
               <Button size="sm" asChild className="gap-1.5">
-                <Link to="/tenants/add">
+                <Link to="/tenants/add" onClick={handleAddTenantClick}>
                   <Plus className="h-4 w-4" /> Add tenant
                 </Link>
               </Button>
@@ -785,7 +824,7 @@ const Tenants = () => {
               action={
                 tenantsQuery.data?.length === 0 ? (
                   <Button asChild size="sm">
-                    <Link to="/tenants/add">Add first tenant</Link>
+                    <Link to="/tenants/add" onClick={handleAddTenantClick}>Add first tenant</Link>
                   </Button>
                 ) : (
                   <Button variant="secondary" size="sm" onClick={() => setSearchQuery("")}>
@@ -1080,6 +1119,12 @@ const Tenants = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <TrialExpiredGateModal
+          open={trialExpiredOpen}
+          onOpenChange={setTrialExpiredOpen}
+          featureName={trialExpiredFeature}
+        />
       </div>
     </CanAccessPage>
   );

@@ -55,6 +55,8 @@ import {
 } from "@/hooks/usePropertyOwnerQueries";
 import { createProperty } from "@/api/propertyOwner";
 import { CanAccessPage } from "@/components/PermissionGuard";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { TrialExpiredGateModal } from "@/components/common/TrialExpiredGateModal";
 import { cn } from "@/lib/utils";
 
 export default function Structure() {
@@ -66,6 +68,46 @@ export default function Structure() {
 
   const [locating, setLocating] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+
+  const entitlements = useEntitlements();
+  const [trialExpiredOpen, setTrialExpiredOpen] = useState(false);
+  const [trialExpiredFeature, setTrialExpiredFeature] = useState("");
+
+  const handleOpenAddProperty = () => {
+    if (entitlements.isExpired) {
+      setTrialExpiredFeature("Add Property");
+      setTrialExpiredOpen(true);
+      return;
+    }
+    setAddPropertyOpen(true);
+  };
+
+  const handleOpenAddFloor = () => {
+    if (entitlements.isExpired) {
+      setTrialExpiredFeature("Add Floor");
+      setTrialExpiredOpen(true);
+      return;
+    }
+    setAddFloorOpen(true);
+  };
+
+  const handleOpenAddRoom = () => {
+    if (entitlements.isExpired) {
+      setTrialExpiredFeature("Add Room");
+      setTrialExpiredOpen(true);
+      return;
+    }
+    if (entitlements.isBedQuotaFull) {
+      toast({
+        title: "Bed Quota Exceeded",
+        description: `Your subscription limit of ${entitlements.bedsUsage?.max || 0} beds has been reached. Please upgrade your plan to add more rooms and beds.`,
+        variant: "destructive",
+      });
+      navigate("/plans");
+      return;
+    }
+    setAddRoomOpen(true);
+  };
 
   // State for Navigation Hierarchy
   const [selectedBlockId, setSelectedBlockId] = useState<string>("");
@@ -302,14 +344,14 @@ export default function Structure() {
                 variant="secondary"
                 size="sm"
                 className="gap-1.5"
-                onClick={() => setAddPropertyOpen(true)}
+                onClick={handleOpenAddProperty}
               >
                 <Plus className="h-4 w-4" /> Add property
               </Button>
               <Button
                 size="sm"
                 className="gap-1.5"
-                onClick={() => setAddRoomOpen(true)}
+                onClick={handleOpenAddRoom}
               >
                 <Plus className="h-4 w-4" /> Add room
               </Button>
@@ -457,7 +499,7 @@ export default function Structure() {
                 size="sm"
                 variant="secondary"
                 className="gap-1 text-xs h-7"
-                onClick={() => setAddFloorOpen(true)}
+                onClick={handleOpenAddFloor}
               >
                 <Plus className="h-3.5 w-3.5" /> Add Floor
               </Button>
@@ -552,7 +594,7 @@ export default function Structure() {
                 title="No rooms created yet"
                 description="Add rooms to this floor to track bed occupancy and allocate new tenants."
                 action={
-                  <Button size="sm" onClick={() => setAddRoomOpen(true)}>
+                  <Button size="sm" onClick={handleOpenAddRoom}>
                     Add first room
                   </Button>
                 }
@@ -974,6 +1016,12 @@ export default function Structure() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <TrialExpiredGateModal
+          open={trialExpiredOpen}
+          onOpenChange={setTrialExpiredOpen}
+          featureName={trialExpiredFeature}
+        />
       </div>
     </CanAccessPage>
   );

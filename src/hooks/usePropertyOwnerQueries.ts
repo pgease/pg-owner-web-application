@@ -88,6 +88,8 @@ import {
   getPlans,
   getCurrentPlan,
   createPlanCheckoutOrder,
+  createAccountDeleteRequest,
+  getAccountDeleteRequest,
   verifyPlanPayment,
   getPropertyAgreements,
   createRentalAgreement,
@@ -1305,4 +1307,22 @@ export function useMoveTenantMutation(propertyId?: string | null) {
     },
   });
 }
+
+export function useAccountDeleteRequest() {
+  return useQuery({
+    queryKey: ["accountDeleteRequest"],
+    queryFn: getAccountDeleteRequest,
+  });
+}
+
+export function useCreateAccountDeleteRequestMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (reason?: string) => createAccountDeleteRequest(reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["accountDeleteRequest"] });
+    },
+  });
+}
+
 

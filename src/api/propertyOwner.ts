@@ -348,7 +348,11 @@ export interface MyFeaturesResponse {
 }
 
 export async function getMyFeatures(): Promise<MyFeaturesResponse> {
-  const res = await httpRequest<any>(`${PROPERTY_OWNER_BASE}/my-features`, {
+  const isStaff = authStorage.isStaff?.() ?? false;
+  const path = isStaff
+    ? `${PROPERTY_OWNER_BASE}/my-features?userType=staff`
+    : `${PROPERTY_OWNER_BASE}/my-features`;
+  const res = await httpRequest<any>(path, {
     method: "GET",
     auth: true,
   });
@@ -3233,5 +3237,48 @@ export async function getTutorialCategories(): Promise<string[]> {
   const rawList = Array.isArray(res) ? res : res?.data || [];
   return rawList.map((item) => (typeof item === "string" ? item : item.category)).filter(Boolean);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ACCOUNT DELETION REQUESTS (PROPERTY OWNER)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface AccountDeleteRequestItem {
+  id: string;
+  propertyOwnerId: string;
+  reason: string | null;
+  status: "pending" | "approved" | "rejected";
+  adminNote: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+export interface AccountDeleteRequestResponse {
+  success: boolean;
+  message?: string;
+  request: AccountDeleteRequestItem | null;
+}
+
+/**
+ * Submit an account deletion request for the authenticated property owner.
+ * Idempotent: returns existing request if one is already pending.
+ */
+export async function createAccountDeleteRequest(reason?: string): Promise<AccountDeleteRequestResponse> {
+  return httpRequest<AccountDeleteRequestResponse>(`${PROPERTY_OWNER_BASE}/account/delete-request`, {
+    method: "POST",
+    auth: true,
+    body: reason?.trim() ? { reason: reason.trim() } : {},
+  });
+}
+
+/**
+ * Check latest account deletion request status for the authenticated property owner.
+ */
+export async function getAccountDeleteRequest(): Promise<AccountDeleteRequestResponse> {
+  return httpRequest<AccountDeleteRequestResponse>(`${PROPERTY_OWNER_BASE}/account/delete-request`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
 
 

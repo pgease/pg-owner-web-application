@@ -9,6 +9,7 @@ import { usePermissions } from "@/context/PermissionContext";
 import { CanAccessPage } from "@/components/PermissionGuard";
 import { useApp } from "@/context/AppContext";
 import { useStaffList } from "@/hooks/usePropertyOwnerQueries";
+import { FeatureGuard } from "@/components/common/FeatureGuard";
 import { useMemo } from "react";
 
 const ROLE_BADGE_STYLES: Record<string, string> = {
@@ -61,7 +62,12 @@ function TeamIndexInner() {
         }
       />
 
-      {!pgId ? (
+      <FeatureGuard
+        feature="staff_roles_permissions"
+        fallbackTitle="Staff Roles & Granular Permissions (Pro Feature)"
+        fallbackDescription="Delegate property tasks, manage caretakers and wardens, and configure granular operational permissions exclusively on the Pro plan."
+      >
+        {!pgId ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground text-sm">
             Select a PG from the top header to load and manage team members.
@@ -156,6 +162,7 @@ function TeamIndexInner() {
           })}
         </div>
       )}
+      </FeatureGuard>
     </div>
   );
 }

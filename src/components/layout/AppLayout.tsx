@@ -4,6 +4,9 @@ import { cn } from "@/lib/utils";
 import AppSidebar from "./AppSidebar";
 import AppHeader from "./AppHeader";
 import { SubscriptionBanner } from "./SubscriptionBanner";
+import StaffExpiredLockout from "./StaffExpiredLockout";
+import { authStorage } from "@/api/http";
+import { useEntitlements } from "@/hooks/useEntitlements";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -23,6 +26,13 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   const [collapsed, setCollapsed] = useState<boolean>(readCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const { isExpired, isLoading } = useEntitlements();
+  const isStaff = authStorage.isStaff();
+
+  // If user is staff and the owner's subscription has expired, enforce full operational lockout.
+  if (!isLoading && isExpired && isStaff) {
+    return <StaffExpiredLockout />;
+  }
 
   // Persist the collapse preference and close the mobile drawer on navigation.
   useEffect(() => {

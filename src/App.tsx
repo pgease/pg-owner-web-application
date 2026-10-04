@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import RequireAuth from "@/components/auth/RequireAuth";
+import RequireOwner from "@/components/auth/RequireOwner";
 import Dashboard from "./pages/Dashboard";
 import Tenants from "./pages/Tenants";
 import AddTenantPage from "./pages/tenants/AddTenantPage";
@@ -118,8 +119,8 @@ const App = () => (
                         <Route path="/my-pgs/notices" element={<PropertyNoticesPage />} />
                         <Route path="/notices" element={<Navigate to="/my-pgs/notices" replace />} />
                         <Route path="/my-pgs/rooms" element={<Structure />} />
-                        <Route path="/my-pgs/bank" element={<BankAccountPage />} />
-                        <Route path="/bank" element={<BankAccountPage />} />
+                        <Route path="/my-pgs/bank" element={<RequireOwner><BankAccountPage /></RequireOwner>} />
+                        <Route path="/bank" element={<RequireOwner><BankAccountPage /></RequireOwner>} />
                         <Route path="/rent-payments" element={<RentPayments />} />
                         <Route path="/rent-payments/history" element={<RentPayments />} />
                         <Route path="/rent-payments/dues" element={<RentPayments />} />
@@ -134,12 +135,12 @@ const App = () => (
                         <Route path="/reports" element={<Reports />} />
                         <Route path="/reports/payments" element={<Reports />} />
                         <Route path="/reports/export" element={<Reports />} />
-                        <Route path="/plans" element={<Plans />} />
-                        <Route path="/referrals" element={<ReferralsPage />} />
+                        <Route path="/plans" element={<RequireOwner><Plans /></RequireOwner>} />
+                        <Route path="/referrals" element={<RequireOwner><ReferralsPage /></RequireOwner>} />
                         <Route path="/feature-catalogue" element={<FeatureCataloguePage />} />
                         <Route path="/api-catalog" element={<ApiCatalogPage />} />
                         <Route path="/reference/api-catalog" element={<ApiCatalogPage />} />
-                        <Route path="/refer-and-earn" element={<ReferralsPage />} />
+                        <Route path="/refer-and-earn" element={<RequireOwner><ReferralsPage /></RequireOwner>} />
                         <Route path="/post-pg" element={<PublicListingPage />} />
                         <Route path="/my-pgs/public-listing" element={<PublicListingPage />} />
                         <Route path="/public-listing" element={<PublicListingPage />} />
@@ -152,12 +153,12 @@ const App = () => (
                         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
                         <Route path="/terms-and-conditions" element={<TermsConditionsPage />} />
                         <Route path="/contact-us" element={<ContactUsPage />} />
-                        <Route path="/team" element={<TeamIndex />} />
-                        <Route path="/team/add-staff" element={<AddStaff />} />
-                        <Route path="/team/:staffId/permissions" element={<EditStaffPermissions />} />
-                        <Route path="/team/permissions" element={<PermissionsMatrixPage />} />
-                        <Route path="/team/permissions-matrix" element={<PermissionsMatrixPage />} />
-                        <Route path="/settings/permissions" element={<PermissionsMatrixPage />} />
+                        <Route path="/team" element={<RequireOwner><TeamIndex /></RequireOwner>} />
+                        <Route path="/team/add-staff" element={<RequireOwner><AddStaff /></RequireOwner>} />
+                        <Route path="/team/:staffId/permissions" element={<RequireOwner><EditStaffPermissions /></RequireOwner>} />
+                        <Route path="/team/permissions" element={<RequireOwner><PermissionsMatrixPage /></RequireOwner>} />
+                        <Route path="/team/permissions-matrix" element={<RequireOwner><PermissionsMatrixPage /></RequireOwner>} />
+                        <Route path="/settings/permissions" element={<RequireOwner><PermissionsMatrixPage /></RequireOwner>} />
                         <Route path="/food" element={<FoodDiningPage />} />
                         <Route path="/nightout" element={<NightOutRequestsPage />} />
                         <Route

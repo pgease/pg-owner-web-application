@@ -64,6 +64,9 @@ import {
 import { useApp } from "@/context/AppContext";
 import { toast } from "@/components/ui/use-toast";
 import { CanAccess, CanAccessPage } from "@/components/PermissionGuard";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { FeatureGuard } from "@/components/common/FeatureGuard";
+import { TrialExpiredGateModal } from "@/components/common/TrialExpiredGateModal";
 import { formatINR, formatDate } from "@/lib/formatters";
 
 declare global {
@@ -74,6 +77,9 @@ declare global {
 
 export default function Kyc() {
   const { selectedPgId: currentPropertyId } = useApp();
+  const entitlements = useEntitlements();
+  const [trialExpiredOpen, setTrialExpiredOpen] = useState(false);
+  const [trialExpiredFeature, setTrialExpiredFeature] = useState("");
   const [activeTab, setActiveTab] = useState<"kyc" | "agreements">("kyc");
 
   // KYC Queries & Mutations
@@ -181,6 +187,11 @@ export default function Kyc() {
 
   // Request KYC Action
   const handleInitiateTenantKyc = async () => {
+    if (entitlements.isExpired) {
+      setTrialExpiredFeature("Tenant KYC");
+      setTrialExpiredOpen(true);
+      return;
+    }
     if (!selectedTenantForKyc) {
       toast({ title: "Please select a tenant", variant: "destructive" });
       return;
@@ -205,6 +216,11 @@ export default function Kyc() {
 
   // Create Agreement Action
   const handleCreateAgreement = async () => {
+    if (entitlements.isExpired) {
+      setTrialExpiredFeature("Rental Agreements");
+      setTrialExpiredOpen(true);
+      return;
+    }
     if (!agreementForm.roomTenantId) {
       toast({ title: "Select a tenant", variant: "destructive" });
       return;
@@ -261,7 +277,14 @@ export default function Kyc() {
                 <Button
                   size="sm"
                   className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white gap-2 font-medium"
-                  onClick={() => setRequestKycOpen(true)}
+                  onClick={() => {
+                    if (entitlements.isExpired) {
+                      setTrialExpiredFeature("Tenant KYC");
+                      setTrialExpiredOpen(true);
+                      return;
+                    }
+                    setRequestKycOpen(true);
+                  }}
                 >
                   <Plus className="h-4 w-4" /> Request tenant KYC
                 </Button>
@@ -269,7 +292,14 @@ export default function Kyc() {
                 <Button
                   size="sm"
                   className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white gap-2 font-medium"
-                  onClick={() => setCreateAgreementOpen(true)}
+                  onClick={() => {
+                    if (entitlements.isExpired) {
+                      setTrialExpiredFeature("Rental Agreements");
+                      setTrialExpiredOpen(true);
+                      return;
+                    }
+                    setCreateAgreementOpen(true);
+                  }}
                 >
                   <Plus className="h-4 w-4" /> Create agreement
                 </Button>
@@ -453,7 +483,12 @@ export default function Kyc() {
 
         {/* TAB 2: DIGITAL RENTAL AGREEMENTS */}
         {activeTab === "agreements" && (
-          <div className="bg-white rounded-md border border-[var(--gray-200)] p-4 space-y-4">
+          <FeatureGuard
+            feature="digital_rental_agreements"
+            fallbackTitle="Digital Rental Agreements & Aadhaar e-Sign (Pro Feature)"
+            fallbackDescription="Draft legally valid rental agreements, send online Aadhaar e-Sign links, and automate tenant stamp papers exclusively on the Pro plan."
+          >
+            <div className="bg-white rounded-md border border-[var(--gray-200)] p-4 space-y-4">
             {isAgreementsLoading ? (
               <div className="flex justify-center py-16 text-sm text-[var(--gray-500)]">
                 <Loader2 className="h-6 w-6 animate-spin text-[var(--brand-600)] mr-2" />
@@ -567,6 +602,7 @@ export default function Kyc() {
               </div>
             )}
           </div>
+          </FeatureGuard>
         )}
 
         {/* DIALOG 1: CREDIT TOP-UP MODAL */}
@@ -866,6 +902,12 @@ export default function Kyc() {
             )}
           </DialogContent>
         </Dialog>
+
+        <TrialExpiredGateModal
+          open={trialExpiredOpen}
+          onOpenChange={setTrialExpiredOpen}
+          featureName={trialExpiredFeature}
+        />
       </div>
     </CanAccessPage>
   );

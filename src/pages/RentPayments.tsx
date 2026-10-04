@@ -53,6 +53,8 @@ import {
   useRentCollectionHistory,
 } from "@/hooks/usePropertyOwnerQueries";
 import { CanAccessPage } from "@/components/PermissionGuard";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { TrialExpiredGateModal } from "@/components/common/TrialExpiredGateModal";
 import { sendWhatsAppRentReminder, type RentDashboardTenantRow } from "@/api/propertyOwner";
 import { amountFromRow, formatInr, parseRentTenantRow } from "@/lib/rentDashboard";
 import { SharePaymentLinkDialog } from "@/components/tenants/SharePaymentLinkDialog";
@@ -108,6 +110,10 @@ export const RentPayments = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { selectedPgId, properties } = useApp();
+  const entitlements = useEntitlements();
+  const [trialExpiredOpen, setTrialExpiredOpen] = useState(false);
+  const [trialExpiredFeature, setTrialExpiredFeature] = useState("");
+
   const selectedPg = useMemo(() => {
     return Array.isArray(properties) ? properties.find((p) => p.id === selectedPgId) : null;
   }, [properties, selectedPgId]);
@@ -125,6 +131,80 @@ export const RentPayments = () => {
   const [amountPaid, setAmountPaid] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
   const [paymentMode, setPaymentMode] = useState("UPI");
+
+  const handleOpenRecordPayment = (row?: RentDashboardTenantRow) => {
+    if (entitlements.isExpired) {
+      setTrialExpiredFeature("Record Payment");
+      setTrialExpiredOpen(true);
+      return;
+    }
+    if (row) {
+      setRoomTenantId(row.roomTenantId);
+      setTenantId(row.tenantId);
+      setAmountPaid(String(row.amountDue || ""));
+    } else {
+      setRoomTenantId("");
+      setTenantId("");
+      setAmountPaid("");
+    }
+    setManualPaymentOpen(true);
+  };
+
+  const handleSendWhatsAppReminder = async (row: RentDashboardTenantRow) => {
+    if (entitlements.isExpired) {
+      setTrialExpiredFeature("WhatsApp Reminders");
+      setTrialExpiredOpen(true);
+      return;
+    }
+    if (!entitlements.hasFeature("whatsapp_notifications")) {
+      toast({
+        title: "Pro Feature: WhatsApp Reminders",
+        description: "Automated WhatsApp rent reminders are available exclusively on the Pro plan. Please upgrade to Pro to enable this feature.",
+        variant: "destructive",
+      });
+      navigate("/plans");
+      return;
+    }
+    if (selectedPgId && row.roomTenantId) {
+      try {
+        const res = await sendWhatsAppRentReminder(selectedPgId, row.roomTenantId, { customAmount: row.amountDue });
+        toast({ title: "WhatsApp reminder sent", description: res?.message });
+        return;
+      } catch {}
+    }
+    const text = encodeURIComponent(
+      `Hi ${row.tenantName}, gentle reminder that your PG rent of ${formatINR(row.amountDue)} is pending for ${MONTH_NAMES[month - 1]} ${year}. Please pay via UPI.`
+    );
+    window.open(`https://wa.me/91${row.phone.replace(/\D/g, "")}?text=${text}`, "_blank");
+  };
+
+  const handleSharePaymentLink = (row: RentDashboardTenantRow) => {
+    if (entitlements.isExpired) {
+      setTrialExpiredFeature("Payment Links");
+      setTrialExpiredOpen(true);
+      return;
+    }
+    if (!entitlements.hasFeature("payment_gateway_collection")) {
+      toast({
+        title: "Pro Feature: Payment Links",
+        description: "Payment link collection is available exclusively on the Pro plan. Please upgrade to Pro to enable instant payment links.",
+        variant: "destructive",
+      });
+      navigate("/plans");
+      return;
+    }
+    if (selectedPgId) {
+      setPaymentLinkTenant({
+        propertyId: selectedPgId,
+        roomTenantId: row.roomTenantId,
+        tenantName: row.tenantName,
+        roomNumber: row.roomNumber,
+        phone: row.phone,
+        amount: row.amountDue,
+        monthYear: `${MONTH_NAMES[month - 1]} ${year}`,
+      });
+    }
+  };
 
   // Passbook Drawer
   const [passbookDrawerOpen, setPassbookDrawerOpen] = useState(false);
@@ -466,12 +546,7 @@ export const RentPayments = () => {
             <Button
               size="sm"
               className="gap-1.5"
-              onClick={() => {
-                setRoomTenantId("");
-                setTenantId("");
-                setAmountPaid("");
-                setManualPaymentOpen(true);
-              }}
+              onClick={() => handleOpenRecordPayment()}
               disabled={!selectedPgId}
             >
               <IndianRupee className="h-4 w-4" /> Record payment
@@ -770,12 +845,7 @@ export const RentPayments = () => {
                         size="sm"
                         variant="secondary"
                         className="h-7 px-2.5 text-xs"
-                        onClick={() => {
-                          setTenantId(row.tenantId);
-                          setRoomTenantId(row.roomTenantId);
-                          setAmountPaid(String(row.amountDue));
-                          setManualPaymentOpen(true);
-                        }}
+                        onClick={() => handleOpenRecordPayment(row)}
                       >
                         Record
                       </Button>
@@ -793,44 +863,17 @@ export const RentPayments = () => {
                               {
                                 label: "Record payment",
                                 icon: <IndianRupee className="h-3.5 w-3.5" />,
-                                onClick: () => {
-                                  setTenantId(row.tenantId);
-                                  setRoomTenantId(row.roomTenantId);
-                                  setAmountPaid(String(row.amountDue));
-                                  setManualPaymentOpen(true);
-                                },
+                                onClick: () => handleOpenRecordPayment(row),
                               },
                               {
                                 label: "Send WhatsApp reminder",
                                 icon: <MessageSquare className="h-3.5 w-3.5 text-emerald-600" />,
-                                onClick: async () => {
-                                  if (selectedPgId && row.roomTenantId) {
-                                    try {
-                                      const res = await sendWhatsAppRentReminder(selectedPgId, row.roomTenantId, { customAmount: row.amountDue });
-                                      toast({ title: "WhatsApp reminder sent", description: res?.message });
-                                      return;
-                                    } catch {}
-                                  }
-                                  const text = encodeURIComponent(
-                                    `Hi ${row.tenantName}, gentle reminder that your PG rent of ${formatINR(row.amountDue)} is pending for ${MONTH_NAMES[month - 1]} ${year}. Please pay via UPI.`
-                                  );
-                                  window.open(`https://wa.me/91${row.phone.replace(/\D/g, "")}?text=${text}`, "_blank");
-                                },
+                                onClick: () => handleSendWhatsAppReminder(row),
                               },
                               {
                                 label: "Share payment link",
                                 icon: <LinkIcon className="h-3.5 w-3.5 text-[var(--brand-600)]" />,
-                                onClick: () => {
-                                  if (selectedPgId) {
-                                    setPaymentLinkTenant({
-                                      propertyId: selectedPgId,
-                                      roomTenantId: row.roomTenantId,
-                                      tenantName: row.tenantName,
-                                      roomNumber: row.roomNumber,
-                                      phone: row.phone,
-                                    });
-                                  }
-                                },
+                                onClick: () => handleSharePaymentLink(row),
                               },
                             ]
                           : []),
@@ -973,10 +1016,11 @@ export const RentPayments = () => {
                   size="sm"
                   onClick={() => {
                     setPassbookDrawerOpen(false);
-                    setTenantId(selectedPassbookTenant.tenantId);
-                    setRoomTenantId(selectedPassbookTenant.roomTenantId);
-                    setAmountPaid(String(selectedPassbookTenant.amountDue));
-                    setManualPaymentOpen(true);
+                    handleOpenRecordPayment({
+                      roomTenantId: selectedPassbookTenant.roomTenantId,
+                      tenantId: selectedPassbookTenant.tenantId,
+                      amountDue: selectedPassbookTenant.amountDue,
+                    } as any);
                   }}
                 >
                   <IndianRupee className="h-3.5 w-3.5 mr-1" /> Record payment
@@ -1219,6 +1263,12 @@ export const RentPayments = () => {
             phone={paymentLinkTenant.phone}
           />
         )}
+
+        <TrialExpiredGateModal
+          open={trialExpiredOpen}
+          onOpenChange={setTrialExpiredOpen}
+          featureName={trialExpiredFeature}
+        />
       </div>
     </CanAccessPage>
   );
