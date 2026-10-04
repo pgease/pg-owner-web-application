@@ -42,6 +42,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/use-toast";
+import { PostPgSearchModal } from "@/components/property/PostPgSearchModal";
 
 const COMMON_AMENITIES = [
   "High-speed WiFi",
@@ -97,6 +98,7 @@ export default function PublicListingPage() {
 
   // Meal Plan Preview Toggle: "withFood" vs "withoutFood"
   const [previewMealPlan, setPreviewMealPlan] = useState<"withFood" | "withoutFood">("withFood");
+  const [postSearchOpen, setPostSearchOpen] = useState(false);
 
   // 1. Publication status & Property Details
   const [isPublished, setIsPublished] = useState(true);
@@ -522,6 +524,15 @@ export default function PublicListingPage() {
               Search Page Preview
             </button>
           </div>
+
+          <Button
+            type="button"
+            onClick={() => setPostSearchOpen(true)}
+            className="rounded-xl text-xs font-bold gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-xs px-4"
+          >
+            <Sparkles className="h-4 w-4" />
+            Post to PG Search
+          </Button>
 
           <Button
             type="button"
@@ -1721,6 +1732,24 @@ export default function PublicListingPage() {
           </div>
         </div>
       )}
+
+      <PostPgSearchModal
+        open={postSearchOpen}
+        onOpenChange={setPostSearchOpen}
+        property={currentProperty}
+        listingData={{
+          propertyName,
+          address,
+          description,
+          contactNumber,
+          latitude,
+          longitude,
+        }}
+        onSuccess={() => {
+          void queryClient.invalidateQueries({ queryKey: ["public-listing", selectedPgId] });
+          void refreshProperties();
+        }}
+      />
     </div>
   );
 }

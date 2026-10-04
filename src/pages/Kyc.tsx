@@ -13,7 +13,16 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  Coins,
+  Wallet,
+  History,
+  Sparkles,
+  Gift,
+  ArrowUpRight,
+  ArrowDownRight,
+  BadgeAlert,
 } from "lucide-react";
+import { CreditTransaction } from "@/api/propertyOwner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -75,12 +84,59 @@ declare global {
   }
 }
 
+function formatDateTime(dateInput?: string | Date | null) {
+  if (!dateInput) return "—";
+  try {
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return "—";
+    return d.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    return "—";
+  }
+}
+
+function getTransactionTypeBadge(type: string) {
+  switch (type) {
+    case "admin_adjustment":
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <Sparkles className="h-3 w-3 text-emerald-600" /> Admin Quota Grant
+        </span>
+      );
+    case "usage":
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+          <ShieldCheck className="h-3 w-3 text-slate-500" /> Tenant KYC Verified
+        </span>
+      );
+    case "purchase":
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+          <CreditCard className="h-3 w-3 text-blue-600" /> Credit Recharge
+        </span>
+      );
+    default:
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200">
+          {type}
+        </span>
+      );
+  }
+}
+
 export default function Kyc() {
   const { selectedPgId: currentPropertyId } = useApp();
   const entitlements = useEntitlements();
   const [trialExpiredOpen, setTrialExpiredOpen] = useState(false);
   const [trialExpiredFeature, setTrialExpiredFeature] = useState("");
-  const [activeTab, setActiveTab] = useState<"kyc" | "agreements">("kyc");
+  const [activeTab, setActiveTab] = useState<"kyc" | "agreements" | "credits">("kyc");
 
   // KYC Queries & Mutations
   const { data: kycRows = [], isLoading: isKycLoading, refetch: refetchKyc } = useKycApplications();
@@ -131,6 +187,21 @@ export default function Kyc() {
   }).length;
 
   const pendingKycCount = kycList.length - verifiedKycCount;
+
+  // Credit quota breakdown & transactions from real backend API:
+  const freeCreditsGiven = Number(balanceData?.freeCreditsGiven ?? balanceData?.freeCreditsAllocated ?? 5);
+  const freeCreditsUsed = Number(balanceData?.freeCreditsUsed ?? 0);
+  const freeCreditsRemaining = Number(balanceData?.freeCreditsRemaining ?? 0);
+  const paidCreditsBalance = Number(balanceData?.paidCreditsBalance ?? balanceData?.topupCreditsRemaining ?? 0);
+  const totalCreditsAvailable = Number(
+    balanceData?.totalCreditsAvailable ??
+    balanceData?.remainingCredits ??
+    (freeCreditsRemaining + paidCreditsBalance)
+  );
+  const totalCreditsUsed = Number(balanceData?.totalCreditsUsed ?? freeCreditsUsed);
+  const recentTransactions = (Array.isArray(balanceData?.recentTransactions)
+    ? balanceData.recentTransactions
+    : []) as CreditTransaction[];
 
   // Top-up Razorpay Checkout
   const handleTopupCheckout = async (packId: string) => {
@@ -292,7 +363,7 @@ export default function Kyc() {
                 >
                   <Plus className="h-4 w-4" /> Request tenant KYC
                 </Button>
-              ) : (
+              ) : activeTab === "agreements" ? (
                 <Button
                   size="sm"
                   className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white gap-2 font-medium"
@@ -307,45 +378,86 @@ export default function Kyc() {
                 >
                   <Plus className="h-4 w-4" /> Create agreement
                 </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  className="bg-[var(--brand-600)] hover:bg-[var(--brand-700)] text-white gap-2 font-medium"
+                  onClick={() => setTopupOpen(true)}
+                >
+                  <Sparkles className="h-4 w-4" /> Top up credits
+                </Button>
               )}
             </div>
           }
         />
 
-        {/* Operational Metrics Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <MetricDisplay
-            label="Verification Credits"
-            value={balanceData?.remainingCredits ?? "—"}
-            hint={
-              balanceData?.freeCreditsRemaining !== undefined
-                ? `${balanceData.freeCreditsRemaining} free credits included`
-                : "Available for DigiLocker KYC"
-            }
-            tone={Number(balanceData?.remainingCredits || 0) > 0 ? "success" : "warning"}
-          />
-          <MetricDisplay
-            label="Verified Tenants"
-            value={verifiedKycCount}
-            hint="Aadhaar authenticated records"
-            tone="success"
-          />
-          <MetricDisplay
-            label="Pending KYC"
-            value={pendingKycCount}
-            hint="Awaiting tenant OTP submission"
-            tone={pendingKycCount > 0 ? "warning" : "neutral"}
-          />
-          <MetricDisplay
-            label="Digital Agreements"
-            value={agreementsList.length}
-            hint="Drafted and signed contracts"
-            tone="neutral"
-          />
-        </div>
+                    {/* Top Quota Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white rounded-lg border border-[var(--gray-200)] p-4 shadow-xs">
+                <div className="flex items-center justify-between text-xs text-[var(--gray-500)] mb-1">
+                  <span className="font-medium">Total Available Balance</span>
+                  <Coins className="h-4 w-4 text-[var(--brand-600)]" />
+                </div>
+                <div className="text-2xl font-bold text-[var(--gray-900)] tabular-nums">
+                  {isBalanceLoading ? "—" : totalCreditsAvailable}
+                </div>
+                <p className="text-xs text-[var(--gray-500)] mt-1">
+                  Active for instant DigiLocker Aadhaar KYC
+                </p>
+              </div>
+
+              <div className="bg-white rounded-lg border border-[var(--gray-200)] p-4 shadow-xs">
+                <div className="flex items-center justify-between text-xs text-[var(--gray-500)] mb-1">
+                  <span className="font-medium">Free Onboarding Quota</span>
+                  <Gift className="h-4 w-4 text-amber-500" />
+                </div>
+                <div className="text-2xl font-bold text-amber-600 tabular-nums">
+                  {freeCreditsRemaining} <span className="text-xs font-normal text-[var(--gray-500)]">left of {freeCreditsGiven}</span>
+                </div>
+                <div className="mt-2 w-full bg-[var(--gray-100)] h-1.5 rounded-full overflow-hidden">
+                  <div
+                    className="bg-amber-500 h-full rounded-full transition-all"
+                    style={{
+                      width: `${freeCreditsGiven > 0 ? Math.min(100, (freeCreditsUsed / freeCreditsGiven) * 100) : 0}%`,
+                    }}
+                  />
+                </div>
+                <p className="text-[11px] text-[var(--gray-500)] mt-1.5 tabular-nums">
+                  {freeCreditsUsed} used · {freeCreditsRemaining} remaining
+                </p>
+              </div>
+
+              <div className="bg-white rounded-lg border border-[var(--gray-200)] p-4 shadow-xs">
+                <div className="flex items-center justify-between text-xs text-[var(--gray-500)] mb-1">
+                  <span className="font-medium">Paid / Purchased Balance</span>
+                  <Wallet className="h-4 w-4 text-teal-600" />
+                </div>
+                <div className="text-2xl font-bold text-teal-700 tabular-nums">
+                  {paidCreditsBalance} <span className="text-xs font-normal text-[var(--gray-500)]">credits</span>
+                </div>
+                <p className="text-xs text-[var(--gray-500)] mt-1">
+                  Non-expiring · Used after free quota
+                </p>
+              </div>
+
+              <div className="bg-white rounded-lg border border-[var(--gray-200)] p-4 shadow-xs">
+                <div className="flex items-center justify-between text-xs text-[var(--gray-500)] mb-1">
+                  <span className="font-medium">Total Consumed</span>
+                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                </div>
+                <div className="text-2xl font-bold text-[var(--gray-900)] tabular-nums">
+                  {totalCreditsUsed} <span className="text-xs font-normal text-[var(--gray-500)]">verifications</span>
+                </div>
+                <p className="text-xs text-[var(--gray-500)] mt-1">
+                  Tenants verified across properties
+                </p>
+              </div>
+            </div>
+
+
 
         {/* Tabs Bar */}
-        <div className="flex items-center gap-1 border-b border-[var(--gray-200)] pb-2">
+        <div className="flex items-center gap-1 border-b border-[var(--gray-200)] pb-2 overflow-x-auto">
           <button
             type="button"
             onClick={() => setActiveTab("kyc")}
@@ -367,6 +479,26 @@ export default function Kyc() {
             }`}
           >
             Rental Agreements ({agreementsList.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("credits")}
+            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5 ${
+              activeTab === "credits"
+                ? "bg-[var(--brand-50)] text-[var(--brand-700)] font-semibold"
+                : "text-[var(--gray-600)] hover:text-[var(--gray-900)] hover:bg-[var(--gray-100)]"
+            }`}
+          >
+            <span>Credits & Passbook</span>
+            <span
+              className={`px-1.5 py-0.5 rounded-full text-[11px] font-bold tabular-nums ${
+                activeTab === "credits"
+                ? "bg-[var(--brand-50)] text-[var(--brand-700)] font-semibold"
+                : "text-[var(--gray-600)] hover:text-[var(--gray-900)] hover:bg-[var(--gray-100)]"
+              }`}
+            >
+              ({totalCreditsAvailable})
+            </span>
           </button>
         </div>
 
@@ -607,6 +739,88 @@ export default function Kyc() {
             )}
           </div>
           </FeatureGuard>
+        )}
+
+        {/* TAB 3: VERIFICATION CREDITS & PASSBOOK */}
+        {activeTab === "credits" && (
+          <div className="space-y-6">
+
+            {/* Recent Transactions / Passbook Table */}
+            <div className="bg-white rounded-md border border-[var(--gray-200)] p-5 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[var(--gray-200)] pb-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-[var(--gray-900)] flex items-center gap-2">
+                    <History className="h-4 w-4 text-[var(--brand-600)]" />
+                    Credit Passbook & Usage Statement
+                  </h3>
+                  <p className="text-xs text-[var(--gray-500)] mt-0.5">
+                    Complete transaction ledger of credit grants, top-ups, and tenant KYC verifications.
+                  </p>
+                </div>
+                <div className="text-xs text-[var(--gray-500)] font-medium">
+                  {recentTransactions.length} recorded transaction{recentTransactions.length === 1 ? "" : "s"}
+                </div>
+              </div>
+
+              {recentTransactions.length === 0 ? (
+                <EmptyState
+                  icon={<History className="h-10 w-10 text-[var(--gray-400)]" />}
+                  title="No credit transactions yet"
+                  description="Transactions will appear here when verification credits are granted, purchased, or consumed."
+                />
+              ) : (
+                <div className="overflow-x-auto rounded border border-[var(--gray-200)]">
+                  <Table>
+                    <TableHeader className="bg-[var(--gray-100)] text-xs text-[var(--gray-600)]">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="py-2.5 px-3">Date & Time</TableHead>
+                        <TableHead className="py-2.5 px-3">Type</TableHead>
+                        <TableHead className="py-2.5 px-3">Description / Notes</TableHead>
+                        <TableHead className="py-2.5 px-3">Reference</TableHead>
+                        <TableHead className="py-2.5 px-3 text-right">Credits</TableHead>
+                        <TableHead className="py-2.5 px-3 text-right">Balance After</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recentTransactions.map((tx) => {
+                        const isCredit = Number(tx.credits) > 0;
+                        return (
+                          <TableRow key={tx.id} className="text-xs hover:bg-[var(--gray-50)]">
+                            <TableCell className="py-2.5 px-3 whitespace-nowrap text-[var(--gray-600)] tabular-nums">
+                              {formatDateTime(tx.createdAt)}
+                            </TableCell>
+                            <TableCell className="py-2.5 px-3 whitespace-nowrap">
+                              {getTransactionTypeBadge(tx.type)}
+                            </TableCell>
+                            <TableCell className="py-2.5 px-3 font-medium text-[var(--gray-900)]">
+                              {tx.notes || (isCredit ? "Credits Added" : "Tenant Verification")}
+                            </TableCell>
+                            <TableCell className="py-2.5 px-3 whitespace-nowrap text-xs text-[var(--gray-500)] font-mono">
+                              {tx.referenceType || tx.referenceId || "—"}
+                            </TableCell>
+                            <TableCell className="py-2.5 px-3 text-right whitespace-nowrap tabular-nums">
+                              {isCredit ? (
+                                <span className="inline-flex items-center text-emerald-600 font-bold">
+                                  <ArrowUpRight className="h-3.5 w-3.5 mr-0.5" /> +{tx.credits}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center text-slate-700 font-bold">
+                                  <ArrowDownRight className="h-3.5 w-3.5 mr-0.5 text-slate-400" /> {tx.credits}
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="py-2.5 px-3 text-right whitespace-nowrap tabular-nums font-semibold text-[var(--gray-900)]">
+                              {tx.balanceAfter}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {/* DIALOG 1: CREDIT TOP-UP MODAL */}

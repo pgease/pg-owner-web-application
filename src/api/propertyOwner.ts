@@ -176,6 +176,16 @@ export interface PropertyResponse {
   active: boolean;
   createdAt: string;
   updatedAt: string;
+  photos?: Array<{ url: string; key?: string; order?: number } | string>;
+  facilities?: string[];
+  nearbyPlaces?: string[];
+  cityId?: string;
+  cityName?: string;
+  city?: { id: string; name: string } | string;
+  yearOfConstruction?: number | null;
+  contactNumber?: string;
+  mobileContactNumber?: string;
+  description?: string;
 }
 
 // NOTE: propertyTypeId is currently fixed based on backend configuration.
@@ -229,6 +239,44 @@ export interface UpdatePropertyPayload {
 export async function updateProperty(propertyId: string, payload: UpdatePropertyPayload) {
   return httpRequest<PropertyResponse>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}`, {
     method: "PUT",
+    auth: true,
+    body: payload,
+  });
+}
+
+/** Payload for POST /properties (Public PG Search Registry) */
+export interface PostPropertyToSearchPayload {
+  propertyTypeId: string;
+  propertyOwnerId: string;
+  name: string;
+  displayNameI18n: {
+    en: string;
+    hi?: string;
+  };
+  address: {
+    street: string;
+    area: string;
+    city: string;
+    pincode: string;
+  };
+  geoLocation: string;
+  mobileContactNumber: string;
+  countryCode: string;
+  cityId: string;
+  email: string;
+  descriptionI18n: {
+    en: string;
+    hi?: string;
+  };
+  languagesSpoken: string[];
+  status: "active" | "inactive" | string;
+  active: boolean;
+  yearOfConstruction: number;
+}
+
+export async function postPropertyToSearch(payload: PostPropertyToSearchPayload) {
+  return httpRequest<any>("/properties", {
+    method: "POST",
     auth: true,
     body: payload,
   });
@@ -1857,14 +1905,35 @@ export async function createStaffPermissionDefinition(payload: CreateStaffPermis
 // VERIFICATION CREDITS & TOP-UPS (RAZORPAY)
 // ==========================================================
 
+export interface CreditTransaction {
+  id: string;
+  propertyOwnerId?: string;
+  type: 'admin_adjustment' | 'usage' | 'purchase' | 'refund' | string;
+  credits: number;
+  balanceAfter: number;
+  referenceType?: string;
+  referenceId?: string;
+  amountPaid?: string;
+  paymentInfo?: any;
+  notes?: string;
+  createdAt: string;
+}
+
 export interface CreditBalanceResponse {
-  totalCredits: number;
-  freeCreditsAllocated: number;
-  freeCreditsUsed: number;
-  freeCreditsRemaining: number;
-  topupCreditsRemaining: number;
-  remainingCredits: number;
-  isBlocked: boolean;
+  freeCreditsGiven?: number;
+  freeCreditsUsed?: number;
+  freeCreditsRemaining?: number;
+  paidCreditsBalance?: number;
+  totalCreditsAvailable?: number;
+  totalCreditsUsed?: number;
+  recentTransactions?: CreditTransaction[];
+
+  // Legacy & normalized aliases
+  totalCredits?: number;
+  freeCreditsAllocated?: number;
+  topupCreditsRemaining?: number;
+  remainingCredits?: number;
+  isBlocked?: boolean;
 }
 
 export interface CreditPack {
@@ -1885,9 +1954,26 @@ export interface RazorpayOrderResponse {
 }
 
 export async function getCreditBalance() {
-  return httpRequest<CreditBalanceResponse>(`${PROPERTY_OWNER_BASE}/credits/balance`, {
+  const data = await httpRequest<CreditBalanceResponse>(`${PROPERTY_OWNER_BASE}/credits/balance`, {
     auth: true,
   });
+  if (data) {
+    const freeRem = Number(data.freeCreditsRemaining ?? data.freeCreditsAllocated ?? 0);
+    const paidBal = Number(data.paidCreditsBalance ?? data.topupCreditsRemaining ?? 0);
+    const totalAvail = Number(data.totalCreditsAvailable ?? data.remainingCredits ?? (freeRem + paidBal));
+    return {
+      ...data,
+      totalCreditsAvailable: totalAvail,
+      remainingCredits: totalAvail,
+      freeCreditsGiven: Number(data.freeCreditsGiven ?? data.freeCreditsAllocated ?? 0),
+      freeCreditsUsed: Number(data.freeCreditsUsed ?? 0),
+      freeCreditsRemaining: freeRem,
+      paidCreditsBalance: paidBal,
+      totalCreditsUsed: Number(data.totalCreditsUsed ?? 0),
+      recentTransactions: Array.isArray(data.recentTransactions) ? data.recentTransactions : [],
+    };
+  }
+  return data;
 }
 
 export async function getCreditPacks() {
