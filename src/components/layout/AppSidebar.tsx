@@ -305,7 +305,7 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
     if (permLocked) {
       return (
         <div
-          className="flex h-[36px] w-full cursor-not-allowed items-center justify-between gap-2 rounded-lg px-2.5 text-[14.5px] text-teal-200/40"
+          className="flex h-[36px] w-full cursor-not-allowed items-center justify-between gap-2 rounded-lg px-2.5 text-[14px] text-teal-200/40"
           title="You don't have access to this section. Ask the PG owner."
           aria-disabled
         >
@@ -319,7 +319,7 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
       <NavLink
         to={child.url}
         end
-        className="flex h-[36px] items-center justify-between gap-2 rounded-lg px-2.5 text-[14.5px] font-medium text-teal-100/80 transition-all duration-150 hover:bg-white/10 hover:text-white"
+        className="flex h-[36px] items-center justify-between gap-2 rounded-lg px-2.5 text-[14px] font-medium text-teal-100/80 transition-all duration-150 hover:bg-white/10 hover:text-white"
         activeClassName="bg-white/20 font-bold text-white shadow-xs border-l-2 border-white pl-2 hover:bg-white/25 hover:text-white"
         onClick={onMobileClose}
       >
@@ -530,7 +530,7 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
                         <ChevronDown className="h-3.5 w-3.5" />
                       </div>
                     </div>
-                    <p className="text-[12.5px] text-teal-200/80 truncate font-medium leading-tight mt-0.5">
+                    <p className="text-[12px] text-teal-200/80 truncate font-medium leading-tight mt-0.5">
                       {selectedPg?.address || "PG Ease Portal"}
                     </p>
                   </div>
@@ -723,7 +723,7 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
               {showSection ? (
                 <div
                   className={cn(
-                    "px-3 pb-1.5 text-[12px] font-black uppercase tracking-wider text-teal-200/65 select-none",
+                    "px-3 pb-1.5 text-[11.5px] font-black uppercase tracking-wider text-teal-200/65 select-none",
                     index > 0 ? "pt-4" : "pt-2",
                   )}
                 >
@@ -748,7 +748,7 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
                 <p className="text-[14px] font-bold text-white truncate leading-tight">
                   {ownerName || "PG Owner"}
                 </p>
-                <p className="text-[12.5px] text-teal-200/80 truncate leading-tight mt-0.5">
+                <p className="text-[12px] text-teal-200/80 truncate leading-tight mt-0.5">
                   {ownerPhone || (isOwner ? "Owner Admin" : "Staff Member")}
                 </p>
               </div>
