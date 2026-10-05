@@ -33,18 +33,23 @@ This document provides complete implementation specifications for two critical f
 
 ---
 
-## 2. Feature 1: Optional PG Owner Name in Login & Signup
+## 2. Feature 1: Optional PG Owner Name on Sign Up (NOT on Sign In)
 
-### UI/UX Screen Flow
+### UI/UX Screen Flow & Mode Toggle
+
+Landlords who already have an account should only enter their mobile number to **Sign In**. The **PG Owner Name (Optional)** field must only appear when the user is in **Sign Up** mode (or onboarding):
 
 ```
 ┌───────────────────────────────────────────┐
 │              PG Ease Owner                │
-│             Owner Sign In                 │
+│                                           │
+│       [ Sign In ]   [ Sign Up (Trial) ]   │
+│                                           │
+│  ────── In SIGN UP Mode: ───────────────  │
 │                                           │
 │  PG Owner Name (Optional)                 │
 │  ┌─────────────────────────────────────┐  │
-│  │ 👤 e.g. Rahul Sharma                │  │
+│  │ 👤 e.g. Rahul Sharma (optional)     │  │
 │  └─────────────────────────────────────┘  │
 │  Used on tenant receipts & manager profile│
 │                                           │
@@ -53,13 +58,12 @@ This document provides complete implementation specifications for two critical f
 │  │  +91   │  98765 43210               │  │
 │  └────────┴────────────────────────────┘  │
 │                                           │
-│  Receive Verification Code via            │
-│  ┌───────────────┐  ┌──────────────────┐  │
-│  │ 🟢 WhatsApp   │  │ 💬 SMS           │  │
-│  └───────────────┘  └──────────────────┘  │
+│  ────── In SIGN IN Mode: ───────────────  │
+│  Only Mobile Number is displayed.         │
+│  (Owner Name is hidden!)                  │
 │                                           │
 │  ┌─────────────────────────────────────┐  │
-│  │            Send OTP                 │  │
+│  │     Get OTP via WhatsApp / SMS      │  │
 │  └─────────────────────────────────────┘  │
 └───────────────────────────────────────────┘
                      │
@@ -68,7 +72,7 @@ This document provides complete implementation specifications for two critical f
 │             Verify Mobile                 │
 │                                           │
 │  Enter 4-digit code sent to +91 9876543210│
-│  Signing in as: Rahul Sharma              │
+│  Registering as: Rahul Sharma (on signup) │
 │                                           │
 │         [ 1 ] [ 2 ] [ 3 ] [ 4 ]           │
 │                                           │
@@ -80,9 +84,11 @@ This document provides complete implementation specifications for two critical f
 └───────────────────────────────────────────┘
 ```
 
-1. **Step 1: Phone Screen**
-   - **Owner Name Input**:
-     - Placed above the phone number.
+1. **Step 1: Phone Screen & Mode Toggle**
+   - **Segmented Control / Tab Switcher**:
+     - `Sign In` (default for returning landlords): Only requests 10-digit mobile number.
+     - `Sign Up`: Requests **PG Owner Name (Optional)** + 10-digit mobile number.
+   - **Owner Name Input (Sign Up Only)**:
      - Label: `PG Owner Name` with `(Optional)` badge.
      - Hint / Helper Text: *"Used on tenant rent receipts and your owner profile."*
      - English placeholder: `e.g. Rahul Sharma (optional)`
@@ -95,9 +101,9 @@ This document provides complete implementation specifications for two critical f
 
 2. **Step 2: OTP Verification Screen**
    - The user inputs the 4-digit security code.
-   - If the user entered their name in Step 1, display a badge:
-     `👤 Signing in as: Rahul Sharma`
-   - If the user taps "Edit Number" to go back, the entered name is **preserved** in the text controller.
+   - If in Sign Up mode and the user entered their name in Step 1, display a badge:
+     `👤 Registering as: Rahul Sharma`
+   - If in Sign In mode, no name badge is shown.
    - When the user enters the 4th digit (or presses "Verify"), the name is sent to `POST /property-owners/otp/verify`.
 
 ---

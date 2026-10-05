@@ -14,6 +14,7 @@ import { toast } from "@/components/ui/use-toast";
 import {
   createProperty,
   updateLanguage,
+  updateMe,
   getPropertyTypesAndAmenities,
   type PropertyType,
   DEFAULT_PROPERTY_TYPE_ID,
@@ -221,11 +222,9 @@ const Onboarding = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [locating, setLocating] = useState(false);
   const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>([]);
-
-  const [ownerName, setOwnerName] = useState(() => {
-    const existing = authStorage.getPropertyOwner();
-    return existing?.name || "";
-  });
+  const currentOwner = authStorage.getPropertyOwner();
+  const initialOwnerName = currentOwner?.name && !currentOwner.name.startsWith("user_") ? currentOwner.name : "";
+  const [ownerName, setOwnerName] = useState(initialOwnerName);
   const [pgName, setPgName] = useState("");
   const [address, setAddress] = useState("");
   const [propertyTypeId, setPropertyTypeId] = useState(DEFAULT_PROPERTY_TYPE_ID);
@@ -482,17 +481,24 @@ const Onboarding = () => {
                       </div>
                     </div>
 
-                  {/* Owner Full Name (First-Time PG Registration) */}
+                  {/* PG Owner Name (Optional) */}
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-white/60">{T.ownerName}</Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-white/60">
+                        {lang === "en" ? "Your Full Name" : "आपका पूरा नाम"}
+                      </Label>
+                      <span className="text-[10px] text-white/40 font-medium bg-white/5 px-2 py-0.5 rounded-full border border-white/10">
+                        {lang === "en" ? "Optional" : "वैकल्पिक"}
+                      </span>
+                    </div>
                     <Input
                       value={ownerName}
                       onChange={(e) => setOwnerName(e.target.value)}
-                      placeholder={T.ownerNamePlaceholder}
+                      placeholder={lang === "en" ? "e.g. Rahul Sharma (optional)" : "उदा. राहुल शर्मा (वैकल्पिक)"}
                       className="h-11 rounded-2xl border-white/[0.08] bg-white/[0.04] text-white placeholder:text-white/25 focus-visible:ring-1 focus-visible:ring-primary/50"
                     />
                     <p className="text-[10.5px] text-white/40">
-                      {T.ownerNameHint}
+                      {lang === "en" ? "Appears on tenant rent receipts and your owner profile." : "किरायेदार रसीदों और आपके ओनर प्रोफ़ाइल पर दिखाया जाएगा।"}
                     </p>
                   </div>
 
