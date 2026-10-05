@@ -237,15 +237,29 @@ export function formatActivityLogToTimelineItem(
   if (
     cat === "payment" ||
     cat === "tenant_payment" ||
+    cat === "rent_manual" ||
     route.includes("payment") ||
+    route.includes("rent-collections") ||
     rawSummary.toLowerCase().includes("payment") ||
+    rawSummary.toLowerCase().includes("rent") ||
     rawSummary.toLowerCase().includes("received")
   ) {
-    const amount = reqBody.amount || reqBody.paidAmount || after.amount || 60000;
+    const amount =
+      reqBody.amount ||
+      reqBody.amountPaid ||
+      reqBody.paidAmount ||
+      after.amountPaidThisPayment ||
+      after.totalAmountPaid ||
+      after.amount ||
+      after.collection?.amountPaid ||
+      after.transaction?.amountPaid ||
+      60000;
     const mode =
       reqBody.paymentMethod ||
       reqBody.paymentMode ||
       reqBody.method ||
+      after.collection?.paymentMethod ||
+      after.transaction?.paymentMethod ||
       after.paymentMode ||
       "Cash";
     return {

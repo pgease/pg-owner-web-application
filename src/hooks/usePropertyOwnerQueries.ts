@@ -730,6 +730,8 @@ export function usePostManualRentMutation(propertyId?: string | null) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["rent-collection-dashboard"] });
       qc.invalidateQueries({ queryKey: ["rent-collection-history"] });
+      qc.invalidateQueries({ queryKey: ["tenant-activity-logs"] });
+      qc.invalidateQueries({ queryKey: ["activityLogs"] });
     },
   });
 }

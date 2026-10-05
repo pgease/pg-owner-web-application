@@ -2491,26 +2491,74 @@ export async function updatePropertyWifiHierarchy(
 // GUEST ARRIVAL REQUESTS
 // ==========================================================
 
-export async function createGuestRequest(propertyId: string, payload: {
+export interface CreateGuestRequestPayload {
   tenantId?: string;
+  roomTenantId?: string;
   guestName: string;
   guestPhone?: string;
+  guestGender?: "Male" | "Female" | "Other" | string;
   relationship?: string;
-  expectedArrival?: string;
+  expectedArrival: string;
+  expectedDeparture?: string;
+  numberOfGuests?: number;
   purpose?: string;
-}) {
-  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/guest-requests`, {
-    method: "POST",
-    body: payload,
-    auth: true,
-  });
+  idProofUrl?: string;
+}
+
+export interface GuestRequestItem {
+  id: string;
+  propertyId: string;
+  tenantId: string;
+  roomTenantId?: string;
+  guestName: string;
+  guestPhone?: string;
+  guestGender?: string;
+  relationship?: string;
+  expectedArrival: string;
+  expectedDeparture?: string;
+  numberOfGuests?: number;
+  purpose?: string;
+  idProofUrl?: string;
+  status: "pending" | "approved" | "rejected" | string;
+  ownerRemarks?: string;
+  actionTakenAt?: string;
+  actionTakenBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  tenant?: {
+    id: string;
+    numericId?: string;
+    name: string;
+    phone: string;
+  };
+  room?: {
+    id: string;
+    roomNumber: string;
+    name?: string;
+    floor?: string;
+    block?: string;
+  };
+}
+
+export async function createGuestRequest(propertyId: string, payload: CreateGuestRequestPayload) {
+  return httpRequest<{ success: boolean; data: GuestRequestItem; message: string }>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/guest-requests`,
+    {
+      method: "POST",
+      body: payload,
+      auth: true,
+    }
+  );
 }
 
 export async function getGuestRequests(propertyId: string, status?: string) {
   const qs = status && status !== "all" ? `?status=${encodeURIComponent(status)}` : "";
-  return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/guest-requests${qs}`, {
-    auth: true,
-  });
+  return httpRequest<{ success: boolean; total: number; data: GuestRequestItem[] }>(
+    `${PROPERTY_OWNER_BASE}/properties/${propertyId}/guest-requests${qs}`,
+    {
+      auth: true,
+    }
+  );
 }
 
 export async function updateGuestRequestStatus(
