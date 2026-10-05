@@ -1,18 +1,15 @@
 import { useState, useMemo, useEffect } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Menu,
   Building2,
   ChevronDown,
   Check,
   Plus,
-  PlayCircle,
-  LifeBuoy,
   LogOut,
   Globe,
   Sun,
   Moon,
-  Bot,
   User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,8 +28,8 @@ import { useTutorials } from "@/context/TutorialContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { useSubscriptionAccess } from "@/hooks/useSubscriptionAccess";
 import pgeaseLogo from "@/assets/pgease-logo.jpg";
+import mascotRent from "@/assets/mascot/mascot-rent.png";
 import { cn } from "@/lib/utils";
-import { SupportLearningHubModal } from "@/components/common/SupportLearningHubModal";
 import { TrialExpiredGateModal } from "@/components/common/TrialExpiredGateModal";
 import { EditProfileModal } from "@/components/settings/EditProfileModal";
 
@@ -40,26 +37,12 @@ interface AppHeaderProps {
   onMenuToggle: () => void;
 }
 
-const ROUTE_TUTORIAL_MAP: Record<string, string> = {
-  "/dashboard": "onboarding_guide",
-  "/tenants": "add_tenant",
-  "/tenants/add": "add_tenant",
-  "/rent-payments": "rent_collection",
-  "/rent-payments/dues": "rent_collection",
-  "/my-pgs/structure": "room_management",
-  "/team": "staff_management",
-  "/team/permissions-matrix": "staff_management",
-  "/reports": "financial_reports",
-};
-
 const AppHeader = ({ onMenuToggle }: AppHeaderProps) => {
   const { properties, selectedPgId, setSelectedPgId, language, setLanguage } = useApp();
   const navigate = useNavigate();
-  const location = useLocation();
-  const { openTutorial } = useTutorials();
+  const { openYouTubeTutorial, currentRouteTutorialKey } = useTutorials();
   const entitlements = useEntitlements();
   const subAccess = useSubscriptionAccess();
-  const [supportHubOpen, setSupportHubOpen] = useState(false);
   const [trialExpiredOpen, setTrialExpiredOpen] = useState(false);
   const [isDark, setIsDark] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -98,15 +81,6 @@ const AppHeader = ({ onMenuToggle }: AppHeaderProps) => {
     else root.classList.remove("dark");
   }, [isDark]);
 
-  const currentRouteTutorialKey = useMemo(() => {
-    const p = location.pathname;
-    if (ROUTE_TUTORIAL_MAP[p]) return ROUTE_TUTORIAL_MAP[p];
-    for (const [route, key] of Object.entries(ROUTE_TUTORIAL_MAP)) {
-      if (p.startsWith(route)) return key;
-    }
-    return "onboarding_guide";
-  }, [location.pathname]);
-
   const handleLogout = () => {
     authStorage.clear();
     navigate("/login");
@@ -131,16 +105,30 @@ const AppHeader = ({ onMenuToggle }: AppHeaderProps) => {
         tone: "text-[#B42318] bg-[#FEF1F0] border border-[#F6C7C2]",
       };
     }
+    const days = Math.max(0, entitlements.daysRemaining);
+    const daysLabel = `${days} ${days === 1 ? "day" : "days"} left`;
     if (entitlements.isTrial) {
       return {
-        label: `Pro Trial · ${entitlements.daysRemaining}d left`,
+        label: `Pro Trial · ${daysLabel}`,
         tone: "text-[#A15C07] bg-[#FFF7E6] border border-[#F5D9A8]",
       };
     }
     if (entitlements.isPro) {
       return {
-        label: "Pro",
+        label: days > 0 ? `Pro · ${daysLabel}` : "Pro",
         tone: "text-[#006B6B] bg-[#E8F4F4] border border-[#CCE6E6]",
+      };
+    }
+    if (entitlements.isLite) {
+      return {
+        label: "Lite",
+        tone: "text-[#556270] bg-[#EEF1F3] border border-[#E2E6EA]",
+      };
+    }
+    if (days > 0) {
+      return {
+        label: `Pro Trial · ${daysLabel}`,
+        tone: "text-[#A15C07] bg-[#FFF7E6] border border-[#F5D9A8]",
       };
     }
     return {
@@ -233,32 +221,26 @@ const AppHeader = ({ onMenuToggle }: AppHeaderProps) => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => void openTutorial(currentRouteTutorialKey)}
-                  className="h-[36px] gap-1.5 px-2.5 text-[#556270] hover:text-[#18212B]"
-                  aria-label="Watch tutorial for this page"
+                  onClick={() => void openYouTubeTutorial(currentRouteTutorialKey)}
+                  className="h-[36px] gap-1.5 px-2.5 text-[#556270] hover:text-[#008080]"
+                  aria-label="Watch this page’s tutorial on YouTube"
                 >
-                  <PlayCircle className="h-4 w-4" />
-                  <span className="hidden text-[13px] sm:inline">Tutorial</span>
+                  <svg
+                    className="h-4 w-4 shrink-0 transition-transform group-hover:scale-105"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814z"
+                      fill="#FF0000"
+                    />
+                    <path d="M9.545 15.568V8.432L15.818 12l-6.273 3.568z" fill="#FFFFFF" />
+                  </svg>
+                  <span className="hidden text-[13px] font-medium sm:inline">Tutorial</span>
                 </Button>
               </TooltipTrigger>
-              <TooltipContent className="text-xs">Watch a short video about this page</TooltipContent>
-            </Tooltip>
-
-            {/* Help & support */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSupportHubOpen(true)}
-                  className="h-[36px] gap-1.5 px-2.5 text-[#556270] hover:text-[#18212B]"
-                  aria-label="Help and support"
-                >
-                  <LifeBuoy className="h-4 w-4" />
-                  <span className="hidden text-[13px] sm:inline">Help</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent className="text-xs">Contact support or browse tutorials</TooltipContent>
+              <TooltipContent className="text-xs">Opens this page’s tutorial on YouTube</TooltipContent>
             </Tooltip>
 
             {/* Ease Buddy Trigger in Header */}
@@ -271,7 +253,11 @@ const AppHeader = ({ onMenuToggle }: AppHeaderProps) => {
                   className="h-[36px] gap-1.5 px-2 text-[#008080] hover:bg-[#E8F4F4]"
                   aria-label="Open Ease Buddy AI"
                 >
-                  <Bot className="h-4 w-4 text-[#008080]" />
+                  <img
+                    src={mascotRent}
+                    alt="Ease Buddy Mascot"
+                    className="h-5 w-5 rounded-full object-cover object-top border border-[#008080]/30 shadow-2xs shrink-0"
+                  />
                   <span className="hidden text-[13px] font-medium lg:inline">Ease Buddy</span>
                 </Button>
               </TooltipTrigger>
@@ -335,7 +321,6 @@ const AppHeader = ({ onMenuToggle }: AppHeaderProps) => {
         </div>
       </header>
 
-      <SupportLearningHubModal open={supportHubOpen} onOpenChange={setSupportHubOpen} />
       <TrialExpiredGateModal open={trialExpiredOpen} onOpenChange={setTrialExpiredOpen} featureName="Add New Property" />
       <EditProfileModal open={editProfileOpen} onOpenChange={setEditProfileOpen} />
     </>

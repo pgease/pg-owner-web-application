@@ -311,10 +311,9 @@ export default function Kyc() {
         monthlyRent: Number(agreementForm.monthlyRent),
         securityDeposit: Number(agreementForm.securityDeposit),
         noticePeriodDays: Number(agreementForm.noticePeriodDays),
-        lockInPeriodMonths: Number(agreementForm.lockInPeriodMonths),
-        agreementStartDate: agreementForm.agreementStartDate,
-        agreementEndDate: agreementForm.agreementEndDate || undefined,
-        houseRules: rules,
+        lockInPeriodMonths: Number(agreementForm.lockInPeriodMonths) || undefined,
+        moveInDate: agreementForm.agreementStartDate,
+        customRules: rules,
       });
 
       toast({

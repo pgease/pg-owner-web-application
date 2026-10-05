@@ -42,7 +42,7 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
         className,
       )}
     >
-      <span className="text-[12px] leading-[16px] font-medium text-[#6B7785] truncate-none">
+      <span className="whitespace-normal text-[12px] leading-[16px] font-medium text-[#6B7785]">
         {label}
       </span>
 

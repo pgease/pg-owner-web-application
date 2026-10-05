@@ -461,7 +461,7 @@ export default function SettingsPage() {
           </div>
 
           <div
-            onClick={() => navigate("/food-menu")}
+            onClick={() => navigate("/food")}
             className="bg-white rounded-md border border-[var(--gray-200)] hover:border-[var(--gray-300)] p-4 flex items-center justify-between cursor-pointer transition-colors"
           >
             <div className="space-y-0.5">
@@ -470,21 +470,6 @@ export default function SettingsPage() {
               </h4>
               <p className="text-xs text-[var(--gray-500)]">
                 Meal timings (Breakfast, Lunch, Dinner) and weekly menu schedule
-              </p>
-            </div>
-            <ChevronRight className="h-4 w-4 text-[var(--gray-400)] shrink-0 ml-3" />
-          </div>
-
-          <div
-            onClick={() => navigate("/attendance")}
-            className="bg-white rounded-md border border-[var(--gray-200)] hover:border-[var(--gray-300)] p-4 flex items-center justify-between cursor-pointer transition-colors"
-          >
-            <div className="space-y-0.5">
-              <h4 className="text-sm font-semibold text-[var(--gray-900)]">
-                Biometric & Night-out Approvals
-              </h4>
-              <p className="text-xs text-[var(--gray-500)]">
-                Gate check-in timings, curfew alert threshold, and parent approval workflows
               </p>
             </div>
             <ChevronRight className="h-4 w-4 text-[var(--gray-400)] shrink-0 ml-3" />

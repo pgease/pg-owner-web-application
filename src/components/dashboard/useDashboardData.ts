@@ -155,7 +155,7 @@ export function useDashboardData(propertyId: string | null) {
     const c = creditsQuery.data;
     if (!c) return { remaining: undefined as number | undefined, isLow: false, isBlocked: false };
     const remaining = Number(c.remainingCredits ?? 0);
-    return { remaining, isLow: remaining <= 2, isBlocked: Boolean(c.isBlocked) };
+    return { remaining, isLow: remaining > 0 && remaining <= 2, isBlocked: Boolean(c.isBlocked) || remaining <= 0 };
   }, [creditsQuery.data]);
 
   const isLoading = roomsQuery.isLoading || tenantsQuery.isLoading;

@@ -249,6 +249,15 @@ export const RentPayments = () => {
     }
   }, [location.state, tenantsQuery.data]);
 
+  // Synchronize status filter when arriving via sub-routes like /rent-payments/dues or /rent-payments/history
+  useEffect(() => {
+    if (location.pathname.endsWith("/dues")) {
+      setStatusFilter("pending");
+    } else if (location.pathname.endsWith("/history")) {
+      setStatusFilter("paid");
+    }
+  }, [location.pathname]);
+
   // Unified Register Rows
   const registerRows = useMemo(() => {
     if (!dashboard) return [];

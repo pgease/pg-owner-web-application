@@ -734,6 +734,7 @@ export default function TenantDetailPage() {
   const initials = tenantInitials(tenant);
   const stayStatus = tenantStayStatus(tenant);
   const photo = (tenant as any)?.photoUrl || (tenant as any)?.imageUrl || (tenant as any)?.profilePhotoUrl;
+  const statusInfo = tenantStatusDisplay(tenant);
   const rawRoomNo = tenantRoomNo(tenant);
   const rawBedNo = tenantBedNo(tenant);
   const rawFloor = tenantFloor(tenant);
@@ -787,7 +788,7 @@ export default function TenantDetailPage() {
         (tenant as any)?.room?.block ||
         (tenant as any)?.roomTenant?.block ||
         (tenant as any)?.currentStay?.block ||
-        "Block A";
+        "—";
 
   const roomNo = effectiveRoomNo;
   const bedNo = effectiveBedNo;
@@ -1171,9 +1172,9 @@ export default function TenantDetailPage() {
         monthlyRent: Number(agreementForm.monthlyRent),
         securityDeposit: Number(agreementForm.securityDeposit),
         noticePeriodDays: Number(agreementForm.noticePeriodDays),
-        lockInPeriodMonths: Number(agreementForm.lockInPeriodMonths),
-        agreementStartDate: agreementForm.agreementStartDate,
-        houseRules: rules,
+        lockInPeriodMonths: Number(agreementForm.lockInPeriodMonths) || undefined,
+        moveInDate: agreementForm.agreementStartDate,
+        customRules: rules,
       });
       toast({
         title: "Agreement Created & Dispatched! 📝",
@@ -1461,13 +1462,49 @@ export default function TenantDetailPage() {
           </div>
         )}
 
+        <section className="rounded-md border border-[var(--gray-200)] bg-white p-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <Avatar className="h-14 w-14 rounded-md">
+              {photo ? <AvatarImage src={photo} alt="" className="object-cover" /> : null}
+              <AvatarFallback className="rounded-md bg-[var(--brand-50)] text-base font-semibold text-[var(--brand-700)]">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-lg font-semibold text-[var(--gray-900)]">{name}</h1>
+                {tenantCode(tenant) ? (
+                  <span className="rounded-sm border border-[var(--gray-200)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--gray-600)]">
+                    {tenantCode(tenant)}
+                  </span>
+                ) : null}
+                <span className={cn("inline-flex items-center gap-1.5 rounded-sm border px-2 py-0.5 text-[11px] font-medium", statusInfo.badgeClass)}>
+                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                  {statusInfo.label}
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-[var(--gray-600)]">
+                {effectiveRoomNo !== "—" ? `Room ${effectiveRoomNo}` : "Room not set"}
+                {effectiveBedNo !== "—" ? ` · Bed ${effectiveBedNo}` : ""}
+                {phone ? ` · ${phone}` : ""}
+              </p>
+              <p className="mt-0.5 text-sm font-medium text-[var(--gray-900)]">
+                {form.monthlyRent || tenant.monthlyRent
+                  ? `₹${Number(form.monthlyRent || tenant.monthlyRent).toLocaleString("en-IN")} / month`
+                  : rent}
+                {duesLabel ? ` · ${duesLabel}` : ""}
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* Tabbed Sections */}
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 sm:w-[500px]">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="electricity">Electricity</TabsTrigger>
-            <TabsTrigger value="notice">Notice</TabsTrigger>
-            <TabsTrigger value="agreement">Agreement</TabsTrigger>
+          <TabsList className="flex h-auto w-full justify-start gap-1 rounded-md border border-[var(--gray-200)] bg-[var(--gray-50)] p-1">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-white data-[state=active]:text-[var(--brand-700)]">Overview</TabsTrigger>
+            <TabsTrigger value="electricity" className="data-[state=active]:bg-white data-[state=active]:text-[var(--brand-700)]">Electricity</TabsTrigger>
+            <TabsTrigger value="notice" className="data-[state=active]:bg-white data-[state=active]:text-[var(--brand-700)]">Notice</TabsTrigger>
+            <TabsTrigger value="agreement" className="data-[state=active]:bg-white data-[state=active]:text-[var(--brand-700)]">Agreement</TabsTrigger>
           </TabsList>
 
           {/* TAB 1: OVERVIEW */}
@@ -1478,108 +1515,8 @@ export default function TenantDetailPage() {
               <div className="lg:col-span-4 space-y-4">
                 
                 {/* Profile Card */}
-                <Card className="border border-border/80 shadow-xs rounded-2xl overflow-hidden bg-card">
-                  <CardContent className="p-5 flex flex-col items-center text-center space-y-3">
-                    <div className="relative">
-                      <Avatar className="h-20 w-20 border-2 border-teal-500/30 text-xl font-bold shadow-xs">
-                        {photo ? <AvatarImage src={photo} alt={name} className="object-cover" /> : null}
-                        <AvatarFallback className="bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300">
-                          {initials}
-                        </AvatarFallback>
-                      </Avatar>
-                    </div>
-
-                    <div className="space-y-1.5 flex flex-col items-center">
-                      <div className="flex flex-wrap items-center justify-center gap-2">
-                        <h2 className="text-lg font-bold text-foreground">{name}</h2>
-                        {tenantCode(tenant) && (
-                          <Badge variant="outline" className="font-mono text-[10px] bg-muted/60 text-muted-foreground font-semibold px-2 py-0.5">
-                            {tenantCode(tenant)}
-                          </Badge>
-                        )}
-                      </div>
-
-                      {(() => {
-                        const statusInfo = tenantStatusDisplay(tenant);
-                        return (
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              "text-[11px] py-0.5 px-2.5 font-medium flex items-center gap-1.5",
-                              statusInfo.badgeClass
-                            )}
-                          >
-                            <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                            {statusInfo.label}
-                          </Badge>
-                        );
-                      })()}
-                      <p className="text-xs text-muted-foreground font-medium">{phone || "No mobile number"}</p>
-                    </div>
-
-                    {/* Quick Action Buttons: Call, WhatsApp, Move Room */}
-                    <div className="grid grid-cols-3 gap-2 w-full pt-1">
-                      {phone ? (
-                        <a
-                          href={`tel:${phone}`}
-                          className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors text-xs font-semibold text-foreground"
-                        >
-                          <Phone className="h-4 w-4 text-teal-600" />
-                          <span>Call</span>
-                        </a>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl border border-border/60 bg-muted/10 opacity-50 text-xs font-semibold">
-                          <Phone className="h-4 w-4 text-muted-foreground" />
-                          <span>Call</span>
-                        </div>
-                      )}
-
-                      {phone ? (
-                        <a
-                          href={`https://wa.me/${phoneDigits(phone)}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors text-xs font-semibold text-foreground"
-                        >
-                          <MessageCircle className="h-4 w-4 text-emerald-600" />
-                          <span>WhatsApp</span>
-                        </a>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl border border-border/60 bg-muted/10 opacity-50 text-xs font-semibold">
-                          <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                          <span>WhatsApp</span>
-                        </div>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!subAccess.canPerformOperations) {
-                            setGateFeature("Tenant Relocation");
-                            setGateModalOpen(true);
-                          } else {
-                            setMoveModalOpen(true);
-                          }
-                        }}
-                        className="flex flex-col items-center justify-center gap-1 p-2 rounded-xl border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors text-xs font-semibold text-foreground"
-                      >
-                        <ArrowRightLeft className="h-4 w-4 text-blue-600" />
-                        <span>Move</span>
-                      </button>
-                    </div>
-
-                    {/* Room allocation pill */}
-                    <div className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-muted/30 border text-xs font-semibold text-muted-foreground">
-                      <span>Room : <strong className="text-foreground">{effectiveRoomNo !== "—" ? `Room ${effectiveRoomNo}` : "—"} {effectiveBedNo !== "—" ? `- Bed ${effectiveBedNo}` : ""}</strong></span>
-                      <button
-                        type="button"
-                        onClick={() => setEditing(true)}
-                        className="text-blue-600 hover:text-blue-700"
-                        title="Edit Details"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                <Card className="overflow-hidden rounded-md border border-[var(--gray-200)] bg-white shadow-none">
+                  <CardContent className="space-y-3 p-4 text-left">
 
                     {/* Aadhaar KYC Card with FIXED Non-Cramped UI */}
                     <div className="w-full p-3.5 rounded-xl border bg-muted/15 text-left space-y-2.5">
@@ -1923,7 +1860,7 @@ export default function TenantDetailPage() {
                         </select>
                       </EditField>
                     ) : (
-                      <DetailRow label="Rental Frequency" value={form.rentalFrequency || "Monthly"} />
+                      <DetailRow label="Rental Frequency" value={formatHumanEnum(form.rentalFrequency || "monthly")} />
                     )}
 
                     {editing ? (
@@ -1940,7 +1877,7 @@ export default function TenantDetailPage() {
                         </select>
                       </EditField>
                     ) : (
-                      <DetailRow label="Stay Type" value={form.stayType || "Long Stay"} />
+                      <DetailRow label="Stay Type" value={formatHumanEnum(form.stayType || "long_stay")} />
                     )}
 
                     {editing ? (
@@ -1954,7 +1891,7 @@ export default function TenantDetailPage() {
                         />
                       </EditField>
                     ) : (
-                      <DetailRow label="Lockin Period (Months)" value={form.lockinPeriodMonths || "0"} />
+                      <DetailRow label="Lock-in period (months)" value={form.lockinPeriodMonths || "0"} />
                     )}
 
                     {editing ? (
@@ -1984,7 +1921,7 @@ export default function TenantDetailPage() {
                         />
                       </EditField>
                     ) : (
-                      <DetailRow label="Renting Type" value={form.rentingType || "—"} />
+                      <DetailRow label="Renting Type" value={form.rentingType ? formatHumanEnum(form.rentingType) : "—"} />
                     )}
 
                     {editing ? (
@@ -2929,7 +2866,7 @@ export default function TenantDetailPage() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="text-xs font-semibold text-foreground truncate">
-                                  {noteText || pay.dueType || `Rent via ${String(method).toUpperCase()}`}
+                                  {noteText || (pay.dueType ? formatHumanEnum(String(pay.dueType)) : `Rent via ${formatHumanEnum(String(method))}`)}
                                 </p>
                                 <p className="text-[10px] text-muted-foreground">
                                   {payDate ? formatDateText(payDate) : "Recently"}
@@ -2970,53 +2907,6 @@ export default function TenantDetailPage() {
                   </CardContent>
                 </Card>
 
-                {/* Actions Panel (Desktop view) */}
-                <Card className="border-border/60 shadow-sm hidden md:block">
-                  <CardHeader className="pb-3 border-b bg-muted/15">
-                    <CardTitle className="text-sm font-bold">Quick Actions</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-4 flex flex-col gap-2">
-                    <Button variant="outline" className="w-full border-teal-600 text-teal-600 hover:bg-teal-50 gap-2" asChild>
-                      <a href={`tel:${phoneDigits(phone || "")}`}>
-                        <Phone className="h-4 w-4" /> Call Tenant
-                      </a>
-                    </Button>
-                    <Button
-                      className="w-full bg-teal-600 hover:bg-teal-700 text-white gap-2 shadow-xs"
-                      onClick={() => {
-                        setPaymentForm((p) => ({
-                          ...p,
-                          amountPaid: Number(tenant.monthlyRent || rent || 0),
-                        }));
-                        setRecordPaymentOpen(true);
-                      }}
-                    >
-                      <IndianRupee className="h-4 w-4" /> Collect Rent / Mark Paid
-                    </Button>
-                    {phone && (
-                      <Button variant="outline" className="w-full border-emerald-600 text-emerald-700 hover:bg-emerald-50 gap-2" asChild>
-                        <a href={waLink(phone) || "#"} target="_blank" rel="noreferrer">
-                          <MessageCircle className="h-4 w-4" /> Remind via WhatsApp
-                        </a>
-                      </Button>
-                    )}
-                    {!isKycDone && (
-                      <Button
-                        variant="outline"
-                        className="w-full border-blue-600 text-blue-600 hover:bg-blue-50 gap-2"
-                        onClick={handleRequestKyc}
-                        disabled={requestKycMut.isPending}
-                      >
-                        {requestKycMut.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <ShieldCheck className="h-4 w-4" />
-                        )}
-                        {isKycRequested ? "Resend KYC Link" : "Request KYC Verification"}
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
 
               </div>
             </div>

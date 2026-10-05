@@ -17,7 +17,9 @@ import {
   getPropertyTypesAndAmenities,
   type PropertyType,
   DEFAULT_PROPERTY_TYPE_ID,
+  updateMe,
 } from "@/api/propertyOwner";
+import { authStorage } from "@/api/http";
 import { useSubscriptionAccess } from "@/hooks/useSubscriptionAccess";
 import { TrialExpiredGateModal } from "@/components/common/TrialExpiredGateModal";
 
@@ -51,6 +53,9 @@ const TEXTS = {
     continueWith: "Continue with",
     step2Title: "Tell us about your PG",
     step2Sub: "Step 2 — We only need these details to create your property.",
+    ownerName: "Your Full Name (Owner Name)",
+    ownerNamePlaceholder: "e.g. Rahul Sharma",
+    ownerNameHint: "Used on official rent receipts, tenant agreements, and owner profile.",
     pgName: "PG name",
     pgAddress: "PG address",
     pgType: "PG type",
@@ -83,6 +88,9 @@ const TEXTS = {
     continueWith: "जारी रखें",
     step2Title: "अपने PG के बारे में बताएं",
     step2Sub: "चरण 2 — प्रॉपर्टी बनाने के लिए इतनी जानकारी ही चाहिए।",
+    ownerName: "आपका पूरा नाम (मालिक का नाम)",
+    ownerNamePlaceholder: "उदा. राहुल शर्मा",
+    ownerNameHint: "किराया रसीदों, किरायेदार केवाईसी और ओनर प्रोफ़ाइल पर दिखाई देगा।",
     pgName: "PG का नाम",
     pgAddress: "PG का पता",
     pgType: "PG प्रकार",
@@ -214,6 +222,10 @@ const Onboarding = () => {
   const [locating, setLocating] = useState(false);
   const [propertyTypes, setPropertyTypes] = useState<PropertyType[]>([]);
 
+  const [ownerName, setOwnerName] = useState(() => {
+    const existing = authStorage.getPropertyOwner();
+    return existing?.name || "";
+  });
   const [pgName, setPgName] = useState("");
   const [address, setAddress] = useState("");
   const [propertyTypeId, setPropertyTypeId] = useState(DEFAULT_PROPERTY_TYPE_ID);
@@ -279,8 +291,8 @@ const Onboarding = () => {
   }, [T.locationDenied, T.locationFailed, address, lang]);
 
   const canSubmitStep2 = useMemo(() => {
-    return Boolean(pgName.trim() && address.trim() && propertyTypeId && bedRange);
-  }, [pgName, address, propertyTypeId, bedRange]);
+    return Boolean(ownerName.trim() && pgName.trim() && address.trim() && propertyTypeId && bedRange);
+  }, [ownerName, pgName, address, propertyTypeId, bedRange]);
 
 
 
@@ -327,6 +339,16 @@ const Onboarding = () => {
         bedRange,
         propertyTypeId,
       });
+
+      if (ownerName.trim()) {
+        try {
+          const updatedOwner = await updateMe({ name: ownerName.trim() });
+          authStorage.setPropertyOwner(updatedOwner);
+        } catch (nameErr) {
+          console.warn("[Onboarding] Could not update owner profile name:", nameErr);
+        }
+      }
+
       await refreshProperties();
       setSelectedPgId(newPg.id);
       toast({ title: lang === "en" ? "Onboarding complete" : "सेटअप पूरा", description: T.successSub });
@@ -459,6 +481,20 @@ const Onboarding = () => {
                         </p>
                       </div>
                     </div>
+
+                  {/* Owner Full Name (First-Time PG Registration) */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-white/60">{T.ownerName}</Label>
+                    <Input
+                      value={ownerName}
+                      onChange={(e) => setOwnerName(e.target.value)}
+                      placeholder={T.ownerNamePlaceholder}
+                      className="h-11 rounded-2xl border-white/[0.08] bg-white/[0.04] text-white placeholder:text-white/25 focus-visible:ring-1 focus-visible:ring-primary/50"
+                    />
+                    <p className="text-[10.5px] text-white/40">
+                      {T.ownerNameHint}
+                    </p>
+                  </div>
 
                   <div className="space-y-1.5">
                     <Label className="text-xs text-white/60">{T.pgName}</Label>

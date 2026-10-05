@@ -53,6 +53,7 @@ import { toast } from "@/components/ui/use-toast";
 import {
   tenantDisplayName,
   tenantInitials,
+  tenantPhotoUrl,
   tenantPhone,
   tenantRentAmount,
   tenantRentDueLabel,
@@ -629,10 +630,16 @@ const Tenants = () => {
               id: "tenant",
               header: "Tenant",
               sortable: true,
-              render: (t: PropertyTenant) => (
+              render: (t: PropertyTenant) => {
+                const photo = tenantPhotoUrl(t);
+                return (
                 <div className="flex items-center gap-2.5">
-                  <div className="h-8 w-8 rounded-full bg-[var(--brand-50)] border border-[var(--brand-100)] text-[var(--brand-700)] flex items-center justify-center font-medium text-xs shrink-0">
-                    {tenantInitials(t)}
+                  <div className="h-8 w-8 overflow-hidden rounded-full bg-[var(--brand-50)] border border-[var(--brand-100)] text-[var(--brand-700)] flex items-center justify-center font-medium text-xs shrink-0">
+                    {photo ? (
+                      <img src={photo} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      tenantInitials(t)
+                    )}
                   </div>
                   <div className="min-w-0">
                     <span className="block font-medium text-[var(--gray-900)] truncate">
@@ -643,7 +650,8 @@ const Tenants = () => {
                     </span>
                   </div>
                 </div>
-              ),
+                );
+              },
             },
             {
               id: "roomBed",

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Clock, Edit2, Save, Building2 } from "lucide-react";
+import { Clock, Coffee, Edit2, Moon, Save, Building2, UtensilsCrossed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,14 +12,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { useApp } from "@/context/AppContext";
 import { toast } from "@/components/ui/use-toast";
 import {
@@ -30,6 +22,8 @@ import {
 import { CanAccessPage } from "@/components/PermissionGuard";
 import { PageHeader } from "@/components/common/PageHeader";
 import { EmptyState } from "@/components/common/EmptyState";
+import { ErrorState } from "@/components/common/ErrorState";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Order starts from MONDAY (1) to SUNDAY (0)
 const DAYS_MAP = [
@@ -42,26 +36,41 @@ const DAYS_MAP = [
   { dayOfWeek: 0, label: "Sunday", short: "Sun" },
 ];
 
-const DEFAULT_SCHEDULE: DiningDaySchedule[] = DAYS_MAP.map((d) => ({
+const EMPTY_SLOT = { menu: "", startTime: "", endTime: "" };
+
+const EMPTY_SCHEDULE: DiningDaySchedule[] = DAYS_MAP.map((d) => ({
   dayOfWeek: d.dayOfWeek,
-  breakfast: { menu: "Poha, Tea, Boiled Eggs", startTime: "08:30", endTime: "09:30" },
-  lunch: { menu: "Jeera Rice, Dal Tadka, Roti, Salad", startTime: "13:00", endTime: "14:30" },
-  dinner: { menu: "Paneer Butter Masala, Roti, Rice", startTime: "20:30", endTime: "22:00" },
+  breakfast: { ...EMPTY_SLOT },
+  lunch: { ...EMPTY_SLOT },
+  dinner: { ...EMPTY_SLOT },
 }));
 
 type MealType = "breakfast" | "lunch" | "dinner";
 
+const MEALS: { type: MealType; label: string; icon: typeof Coffee }[] = [
+  { type: "breakfast", label: "Breakfast", icon: Coffee },
+  { type: "lunch", label: "Lunch", icon: UtensilsCrossed },
+  { type: "dinner", label: "Dinner", icon: Moon },
+];
+
 function to12HourDisplay(time24?: string): string {
-  if (!time24) return "08:30 AM";
+  if (!time24) return "";
   const parts = time24.trim().split(":");
   if (parts.length < 2) return time24;
   let hh = parseInt(parts[0], 10);
   const mm = parts[1].slice(0, 2).padStart(2, "0");
-  if (isNaN(hh)) return "08:30 AM";
+  if (isNaN(hh)) return "";
   const period = hh >= 12 ? "PM" : "AM";
   hh = hh % 12;
   if (hh === 0) hh = 12;
   return `${String(hh).padStart(2, "0")}:${mm} ${period}`;
+}
+
+function mealWindow(start?: string, end?: string): string {
+  const from = to12HourDisplay(start);
+  const to = to12HourDisplay(end);
+  if (from && to) return `${from} – ${to}`;
+  return "Time not set";
 }
 
 function formatHHmm(timeStr?: string, defaultVal = "08:30"): string {
@@ -80,13 +89,14 @@ export default function FoodDiningPage() {
   const queryClient = useQueryClient();
   const selectedPg = properties.find((p) => p.id === selectedPgId);
 
-  const { data: diningData, isLoading } = useQuery({
+  const { data: diningData, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["diningSchedule", selectedPgId],
     queryFn: () => (selectedPgId ? getDiningSchedule(selectedPgId) : null),
     enabled: Boolean(selectedPgId),
   });
 
-  const [schedule, setSchedule] = useState<DiningDaySchedule[]>(DEFAULT_SCHEDULE);
+  const [schedule, setSchedule] = useState<DiningDaySchedule[]>(EMPTY_SCHEDULE);
+  const today = new Date().getDay();
 
   // Single Meal Slot Edit Modal
   const [slotEditModal, setSlotEditModal] = useState<{
@@ -118,31 +128,31 @@ export default function FoodDiningPage() {
         if (found) {
           return {
             dayOfWeek: d.dayOfWeek,
-            breakfast: found.breakfast || { menu: "Not set", startTime: "08:30", endTime: "09:30" },
-            lunch: found.lunch || { menu: "Not set", startTime: "13:00", endTime: "14:30" },
-            dinner: found.dinner || { menu: "Not set", startTime: "20:30", endTime: "22:00" },
+            breakfast: found.breakfast || { ...EMPTY_SLOT },
+            lunch: found.lunch || { ...EMPTY_SLOT },
+            dinner: found.dinner || { ...EMPTY_SLOT },
           };
         }
-        return (
-          DEFAULT_SCHEDULE.find((def) => def.dayOfWeek === d.dayOfWeek) || {
-            dayOfWeek: d.dayOfWeek,
-            breakfast: { menu: "Not set", startTime: "08:30", endTime: "09:30" },
-            lunch: { menu: "Not set", startTime: "13:00", endTime: "14:30" },
-            dinner: { menu: "Not set", startTime: "20:30", endTime: "22:00" },
-          }
-        );
+        return {
+          dayOfWeek: d.dayOfWeek,
+          breakfast: { ...EMPTY_SLOT },
+          lunch: { ...EMPTY_SLOT },
+          dinner: { ...EMPTY_SLOT },
+        };
       });
       setSchedule(merged);
+    } else {
+      setSchedule(EMPTY_SCHEDULE.map((day) => ({ ...day, breakfast: { ...EMPTY_SLOT }, lunch: { ...EMPTY_SLOT }, dinner: { ...EMPTY_SLOT } })));
     }
   }, [diningData]);
 
   const updateMutation = useMutation({
     mutationFn: async (newSchedule: DiningDaySchedule[]) => {
       if (!selectedPgId) return;
-      return updateDiningSchedule(selectedPgId, newSchedule);
+      return updateDiningSchedule(selectedPgId, { schedule: newSchedule });
     },
     onSuccess: () => {
-      toast({ title: "Dining Schedule Saved", description: "Food menu and meal timings updated." });
+      toast({ title: "Meals saved", description: "Menus and timings are updated for this property." });
       queryClient.invalidateQueries({ queryKey: ["diningSchedule", selectedPgId] });
       setSlotEditModal({ open: false, dayOfWeek: 1, mealType: "breakfast" });
       setBulkTimingsModalOpen(false);
@@ -225,8 +235,8 @@ export default function FoodDiningPage() {
     <CanAccessPage permission="food_view_edit">
       <div className="space-y-6">
         <PageHeader
-          title="Food & Dining Schedule"
-          description={`Weekly meal menus and dining times for residents at ${selectedPg?.name || "your PG"}.`}
+          title="Food & Meals"
+          description={selectedPg ? `Weekly menus and meal times for ${selectedPg.name}.` : "Weekly menus and meal times for this property."}
           action={
             <div className="flex items-center gap-2">
               <Button
@@ -260,120 +270,89 @@ export default function FoodDiningPage() {
             />
           </div>
         ) : (
-          <div className="bg-white rounded-md border border-[var(--gray-200)] p-4 space-y-4">
-            <div className="flex items-center justify-between border-b border-[var(--gray-200)] pb-3">
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--gray-900)]">
-                  Weekly Menu & Timing Matrix
-                </h3>
-                <p className="text-xs text-[var(--gray-500)]">
-                  Weekly schedule from Monday to Sunday. Click on any meal slot to update menu or timings.
-                </p>
-              </div>
-            </div>
-
+          <div className="space-y-4">
             {isLoading ? (
-              <div className="py-12 text-center text-sm text-[var(--gray-500)]">
-                Loading food schedule...
+              <div className="space-y-3">
+                <div className="grid gap-3 md:grid-cols-3">
+                  {MEALS.map((meal) => <Skeleton key={meal.type} className="h-28" />)}
+                </div>
+                {DAYS_MAP.map((day) => <Skeleton key={day.dayOfWeek} className="h-24" />)}
               </div>
+            ) : isError ? (
+              <ErrorState
+                title="Couldn't load meals"
+                description="The weekly menu didn't load. Try again."
+                onRetry={() => void refetch()}
+                retrying={isFetching}
+              />
             ) : (
-              <div className="overflow-x-auto rounded border border-[var(--gray-200)]">
-                <Table className="min-w-[800px]">
-                  <TableHeader className="bg-[var(--gray-100)] text-xs text-[var(--gray-600)]">
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="py-2.5 px-3 w-[120px]">Day of Week</TableHead>
-                      <TableHead className="py-2.5 px-3">Breakfast</TableHead>
-                      <TableHead className="py-2.5 px-3">Lunch</TableHead>
-                      <TableHead className="py-2.5 px-3">Dinner</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {DAYS_MAP.map((day) => {
-                      const daySchedule = schedule.find((s) => s.dayOfWeek === day.dayOfWeek);
-
+              <>
+                <section className="rounded-md border border-[var(--brand-100)] bg-[var(--brand-50)] p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--brand-700)]">Today · {DAYS_MAP.find((d) => d.dayOfWeek === today)?.label}</p>
+                  <div className="mt-3 grid gap-3 md:grid-cols-3">
+                    {MEALS.map((meal) => {
+                      const slot = schedule.find((s) => s.dayOfWeek === today)?.[meal.type];
+                      const Icon = meal.icon;
                       return (
-                        <TableRow key={day.dayOfWeek} className="hover:bg-[var(--gray-50)] transition-colors">
-                          <TableCell className="py-3 px-3 font-semibold text-sm text-[var(--gray-900)] align-top">
-                            {day.label}
-                          </TableCell>
-
-                          {/* BREAKFAST CELL */}
-                          <TableCell className="py-3 px-3 align-top">
-                            <div className="rounded border border-[var(--gray-200)] bg-[var(--gray-50)] p-2.5 flex items-start justify-between gap-2">
-                              <div className="space-y-1">
-                                <div className="text-sm font-medium text-[var(--gray-900)] leading-snug">
-                                  {daySchedule?.breakfast?.menu || "Not set"}
-                                </div>
-                                <div className="text-[11px] text-[var(--gray-600)] tabular-nums flex items-center gap-1">
-                                  <Clock className="h-3 w-3 text-[var(--gray-400)]" />
-                                  {to12HourDisplay(daySchedule?.breakfast?.startTime)} – {to12HourDisplay(daySchedule?.breakfast?.endTime)}
-                                </div>
-                              </div>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6 text-[var(--gray-400)] hover:text-[var(--gray-800)] shrink-0"
-                                onClick={() => handleOpenSlotEdit(day.dayOfWeek, "breakfast")}
-                                aria-label={`Edit Breakfast for ${day.label}`}
-                              >
-                                <Edit2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
-
-                          {/* LUNCH CELL */}
-                          <TableCell className="py-3 px-3 align-top">
-                            <div className="rounded border border-[var(--gray-200)] bg-[var(--gray-50)] p-2.5 flex items-start justify-between gap-2">
-                              <div className="space-y-1">
-                                <div className="text-sm font-medium text-[var(--gray-900)] leading-snug">
-                                  {daySchedule?.lunch?.menu || "Not set"}
-                                </div>
-                                <div className="text-[11px] text-[var(--gray-600)] tabular-nums flex items-center gap-1">
-                                  <Clock className="h-3 w-3 text-[var(--gray-400)]" />
-                                  {to12HourDisplay(daySchedule?.lunch?.startTime)} – {to12HourDisplay(daySchedule?.lunch?.endTime)}
-                                </div>
-                              </div>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6 text-[var(--gray-400)] hover:text-[var(--gray-800)] shrink-0"
-                                onClick={() => handleOpenSlotEdit(day.dayOfWeek, "lunch")}
-                                aria-label={`Edit Lunch for ${day.label}`}
-                              >
-                                <Edit2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
-
-                          {/* DINNER CELL */}
-                          <TableCell className="py-3 px-3 align-top">
-                            <div className="rounded border border-[var(--gray-200)] bg-[var(--gray-50)] p-2.5 flex items-start justify-between gap-2">
-                              <div className="space-y-1">
-                                <div className="text-sm font-medium text-[var(--gray-900)] leading-snug">
-                                  {daySchedule?.dinner?.menu || "Not set"}
-                                </div>
-                                <div className="text-[11px] text-[var(--gray-600)] tabular-nums flex items-center gap-1">
-                                  <Clock className="h-3 w-3 text-[var(--gray-400)]" />
-                                  {to12HourDisplay(daySchedule?.dinner?.startTime)} – {to12HourDisplay(daySchedule?.dinner?.endTime)}
-                                </div>
-                              </div>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-6 w-6 text-[var(--gray-400)] hover:text-[var(--gray-800)] shrink-0"
-                                onClick={() => handleOpenSlotEdit(day.dayOfWeek, "dinner")}
-                                aria-label={`Edit Dinner for ${day.label}`}
-                              >
-                                <Edit2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
+                        <button
+                          key={meal.type}
+                          type="button"
+                          onClick={() => handleOpenSlotEdit(today, meal.type)}
+                          className="flex min-h-[7rem] flex-col rounded-md border border-[var(--gray-200)] bg-white p-3 text-left transition-colors hover:border-[var(--brand-600)]"
+                        >
+                          <span className="flex items-center justify-between gap-2">
+                            <span className="flex items-center gap-2 text-xs font-medium text-[var(--gray-600)]">
+                              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[var(--brand-50)] text-[var(--brand-700)]">
+                                <Icon className="h-3.5 w-3.5" aria-hidden />
+                              </span>
+                              {meal.label}
+                            </span>
+                            <Edit2 className="h-3.5 w-3.5 text-[var(--gray-400)]" aria-hidden />
+                          </span>
+                          <span className="mt-3 text-sm font-medium leading-snug text-[var(--gray-900)]">{slot?.menu?.trim() || "Not set"}</span>
+                          <span className="mt-auto pt-2 text-xs tabular-nums text-[var(--gray-500)]">{mealWindow(slot?.startTime, slot?.endTime)}</span>
+                        </button>
                       );
                     })}
-                  </TableBody>
-                </Table>
-              </div>
+                  </div>
+                </section>
+
+                <section className="overflow-hidden rounded-md border border-[var(--gray-200)] bg-white">
+                  <div className="border-b border-[var(--gray-200)] px-4 py-3">
+                    <h2 className="text-sm font-semibold text-[var(--gray-900)]">This week</h2>
+                    <p className="text-xs text-[var(--gray-500)]">Tap a meal to change the menu or the time.</p>
+                  </div>
+                  <div className="divide-y divide-[var(--gray-200)]">
+                    {DAYS_MAP.map((day) => {
+                      const daySchedule = schedule.find((s) => s.dayOfWeek === day.dayOfWeek);
+                      const isToday = day.dayOfWeek === today;
+                      return (
+                        <div key={day.dayOfWeek} className={`grid gap-3 px-4 py-3 md:grid-cols-[7rem_1fr_1fr_1fr] ${isToday ? "bg-[var(--brand-50)]" : ""}`}>
+                          <div className="flex items-center md:items-start md:pt-2">
+                            <p className="text-sm font-semibold text-[var(--gray-900)]">{day.short}</p>
+                            {isToday ? <span className="ml-2 rounded-sm bg-[var(--brand-600)] px-1.5 py-0.5 text-[10px] font-medium text-white">Today</span> : null}
+                          </div>
+                          {MEALS.map((meal) => {
+                            const slot = daySchedule?.[meal.type];
+                            return (
+                              <button
+                                key={meal.type}
+                                type="button"
+                                onClick={() => handleOpenSlotEdit(day.dayOfWeek, meal.type)}
+                                className="rounded-md border border-[var(--gray-200)] bg-white px-3 py-2 text-left transition-colors hover:border-[var(--brand-600)]"
+                              >
+                                <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--gray-500)]">{meal.label}</span>
+                                <span className="mt-0.5 block text-sm leading-snug text-[var(--gray-900)]">{slot?.menu?.trim() || "Not set"}</span>
+                                <span className="mt-1 block text-[11px] tabular-nums text-[var(--gray-500)]">{mealWindow(slot?.startTime, slot?.endTime)}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              </>
             )}
           </div>
         )}

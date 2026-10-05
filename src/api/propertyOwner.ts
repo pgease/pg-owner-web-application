@@ -334,12 +334,27 @@ export async function updateMe(payload: UpdatePropertyOwnerPayload) {
   });
 }
 
+export interface UploadPhotoResponse {
+  success?: boolean;
+  photo?: {
+    key?: string;
+    url?: string;
+    suffix?: string;
+    size?: number;
+    mimetype?: string;
+  };
+  url?: string;
+  data?: {
+    url?: string;
+  };
+}
+
 // Upload Photo
 export async function uploadPhoto(file: File) {
   const formData = new FormData();
   formData.append("photo", file);
 
-  return httpRequest<{ url: string }>(`${PROPERTY_OWNER_BASE}/upload-photo`, {
+  return httpRequest<UploadPhotoResponse>(`${PROPERTY_OWNER_BASE}/upload-photo`, {
     method: "POST",
     auth: true,
     body: formData,
@@ -2138,9 +2153,9 @@ export async function createRentalAgreement(
     securityDeposit: number;
     noticePeriodDays: number;
     lockInPeriodMonths?: number;
-    agreementStartDate: string;
-    agreementEndDate?: string;
-    houseRules?: string[];
+    /** YYYY-MM-DD. Backend field name is moveInDate. */
+    moveInDate?: string;
+    customRules?: string[];
   }
 ) {
   return httpRequest<{

@@ -6,6 +6,19 @@ export function tenantDisplayName(t?: PropertyTenant | null): string {
   return n != null && String(n).trim() !== "" ? String(n).trim() : "—";
 }
 
+export function tenantPhotoUrl(t?: PropertyTenant | null): string {
+  if (!t) return "";
+  const record = t as PropertyTenant & {
+    photoUrl?: string;
+    imageUrl?: string;
+    profilePhotoUrl?: string;
+    profileImage?: string;
+    avatarUrl?: string;
+  };
+  const raw = record.photoUrl || record.imageUrl || record.profilePhotoUrl || record.profileImage || record.avatarUrl;
+  return typeof raw === "string" && raw.trim() ? raw.trim() : "";
+}
+
 export function tenantInitials(t?: PropertyTenant | null): string {
   const n = tenantDisplayName(t);
   if (n === "—") return "?";

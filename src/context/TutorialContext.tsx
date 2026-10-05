@@ -8,6 +8,8 @@ import { helpCenterTutorialUrl } from "@/config/links";
 
 interface TutorialContextValue {
   openTutorial: (tutorialKey: string) => Promise<void>;
+  /** Opens the page tutorial on YouTube. Falls back to a YouTube search for this topic. */
+  openYouTubeTutorial: (tutorialKey: string) => Promise<void>;
   currentRouteTutorialKey: string;
   isTutorialOpen: boolean;
   activeTutorial: TutorialItem | null;
@@ -52,6 +54,14 @@ function resolveRouteTutorialKey(pathname: string): string {
   return best?.key ?? DEFAULT_TUTORIAL_KEY;
 }
 
+function toWatchUrl(url?: string | null): string {
+  if (!url) return "";
+  const match = url.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/);
+  if (match && match[2].length === 11) return `https://www.youtube.com/watch?v=${match[2]}`;
+  if (url.includes("youtube.com") || url.includes("youtu.be")) return url;
+  return "";
+}
+
 function toEmbedUrl(url?: string | null): string {
   if (!url) return "";
   const match = url.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/);
@@ -75,6 +85,18 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [requestedKey, setRequestedKey] = useState<string>("");
 
   const currentRouteTutorialKey = useMemo(() => resolveRouteTutorialKey(location.pathname), [location.pathname]);
+
+  const openYouTubeTutorial = useCallback(async (tutorialKey: string) => {
+    const topic = formatKeyToTitle(tutorialKey || "PG Ease");
+    const search = `https://www.youtube.com/results?search_query=${encodeURIComponent(`PG Ease ${topic} tutorial`)}`;
+    try {
+      const data = await getTutorialByKey(tutorialKey);
+      const watch = toWatchUrl(data?.videoUrl || data?.youtube_url || data?.youtubeUrl);
+      window.open(watch || search, "_blank", "noopener,noreferrer");
+    } catch {
+      window.open(search, "_blank", "noopener,noreferrer");
+    }
+  }, []);
 
   const openTutorial = useCallback(async (tutorialKey: string) => {
     if (!tutorialKey) return;
@@ -111,6 +133,7 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     <TutorialContext.Provider
       value={{
         openTutorial,
+        openYouTubeTutorial,
         currentRouteTutorialKey,
         isTutorialOpen: isOpen,
         activeTutorial,

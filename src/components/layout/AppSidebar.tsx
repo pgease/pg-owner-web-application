@@ -12,7 +12,6 @@ import {
   LogOut,
   X,
   Wrench,
-  LifeBuoy,
   Lock,
   UserCog,
 } from "lucide-react";
@@ -136,8 +135,6 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
 ];
-
-const HELP_ITEM: NavItem = { title: "Help & Support", url: "/support", icon: LifeBuoy };
 
 interface AppSidebarProps {
   collapsed: boolean;
@@ -415,7 +412,11 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
       <div className={cn("flex h-[56px] items-center border-b border-[#E2E6EA]", collapsed ? "justify-center px-2" : "justify-between px-4")}>
         <NavLink to="/dashboard" className="flex items-center gap-2.5" onClick={onMobileClose} aria-label="PG Ease dashboard">
           <img src={pgeaseLogo} alt="" className="h-7 w-7 rounded-[4px] object-cover" />
-          {!collapsed ? <span className="text-[16px] font-semibold tracking-tight text-[#18212B]">PG Ease</span> : null}
+          {!collapsed ? (
+            <span className="text-[16px] font-semibold tracking-tight text-[#008080] transition-colors hover:text-[#006B6B]">
+              PG Ease
+            </span>
+          ) : null}
         </NavLink>
         {mobileOpen ? (
           <button
@@ -438,9 +439,8 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
         </ul>
       </nav>
 
-      {/* Secondary: Help + Logout */}
-      <div className="space-y-1 border-t border-[#E2E6EA] px-2 py-2">
-        {renderTopLevel(HELP_ITEM)}
+      {/* Logout sits on the white sidebar, not a grey footer */}
+      <div className="space-y-1 border-t border-[#E2E6EA] bg-white px-2 py-2">
         {collapsed ? (
           <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>

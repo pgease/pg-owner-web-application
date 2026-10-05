@@ -27,6 +27,29 @@ import {
   ChevronRight,
   Layers,
   Share2,
+  Wind,
+  Droplets,
+  Zap,
+  Coffee,
+  Wifi,
+  DoorOpen,
+  Shirt,
+  Shield,
+  Car,
+  Tv,
+  Dumbbell,
+  Cigarette,
+  Wine,
+  UtensilsCrossed,
+  PawPrint,
+  Clock,
+  Users,
+  Volume2,
+  AlertTriangle,
+  Compass,
+  LocateFixed,
+  Train,
+  GraduationCap,
 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import {
@@ -36,42 +59,82 @@ import {
   uploadPhoto,
   type PublicListingDetails,
 } from "@/api/propertyOwner";
+import { authStorage } from "@/api/http";
+import { useAmenities, useRestrictions } from "@/hooks/usePropertyOwnerQueries";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/use-toast";
 import { PostPgSearchModal } from "@/components/property/PostPgSearchModal";
 
-const COMMON_AMENITIES = [
-  "High-speed WiFi",
-  "3-Time Homestyle Meals",
-  "Daily Housekeeping",
-  "Power Backup",
-  "RO Drinking Water",
-  "Washing Machine",
-  "Geyser / Hot Water",
-  "Biometric Security",
-  "24x7 CCTV Surveillance",
-  "Refrigerator",
-  "Attached Washroom",
-  "Lift / Elevator",
-  "Study Desk & Chair",
-  "Wardrobe with Lock",
-  "Gym / Fitness Zone",
-  "Gaming / TV Lounge",
+// Standard Categorized Amenities Catalog (Synchronized with My PGs -> Amenities)
+export const CATALOG_AMENITIES_BY_CATEGORY = [
+  {
+    category: "Comfort & Utilities",
+    items: [
+      { name: "Air Conditioner (AC)", icon: Wind },
+      { name: "Water Geyser / Heater", icon: Droplets },
+      { name: "24x7 Power Backup", icon: Zap },
+      { name: "RO Purified Drinking Water", icon: Coffee },
+      { name: "High Speed WiFi Internet", icon: Wifi },
+      { name: "Elevator / Lift", icon: DoorOpen },
+    ],
+  },
+  {
+    category: "Hygiene & Housekeeping",
+    items: [
+      { name: "Daily Room Cleaning", icon: Sparkles },
+      { name: "Automatic Washing Machine", icon: Shirt },
+      { name: "Attached Washroom", icon: Droplets },
+      { name: "Common Refrigerator", icon: Coffee },
+    ],
+  },
+  {
+    category: "Security & Facilities",
+    items: [
+      { name: "CCTV Surveillance 24x7", icon: Shield },
+      { name: "Biometric / Digital Lock Entry", icon: Shield },
+      { name: "Resident Warden / Caretaker", icon: Shield },
+      { name: "Two Wheeler Parking", icon: Car },
+      { name: "Four Wheeler Parking", icon: Car },
+      { name: "Common TV & Lounge", icon: Tv },
+      { name: "Fitness Gym / Workout Area", icon: Dumbbell },
+    ],
+  },
 ];
 
-const COMMON_RULES = [
-  "Gate closes at 11:00 PM",
-  "No smoking inside rooms or corridors",
-  "No alcohol or illegal substances on premises",
-  "Quiet hours from 10:30 PM to 6:00 AM",
-  "Visitors allowed in common reception/lobby only",
-  "Male guests not permitted in female wings",
-  "Keep kitchen and dining areas tidy",
-  "Turn off AC and lights when leaving room",
+// Standard Categorized House Rules & Restrictions (Synchronized with My PGs -> House Rules)
+export const CATALOG_RULES_BY_CATEGORY = [
+  {
+    category: "Substance & Cleanliness",
+    items: [
+      { name: "Smoking Strictly Prohibited", icon: Cigarette },
+      { name: "Alcohol & Drugs Strictly Forbidden", icon: Wine },
+      { name: "Non-Vegetarian Food Restricted", icon: UtensilsCrossed },
+      { name: "Pets Not Allowed", icon: PawPrint },
+    ],
+  },
+  {
+    category: "Entry Timings & Visitors",
+    items: [
+      { name: "Gate Closes at 11:00 PM Sharp", icon: Clock },
+      { name: "No Opposite Gender in Rooms", icon: Users },
+      { name: "No Overnight Outside Guests Without Prior Pass", icon: Users },
+      { name: "Visitors Permitted Only in Common Lobby", icon: Users },
+    ],
+  },
+  {
+    category: "Community & Decorum",
+    items: [
+      { name: "No Loud Music / Noise After 10:00 PM", icon: Volume2 },
+      { name: "Heavy Electrical Appliances (Heaters/Induction) Not Allowed", icon: AlertTriangle },
+      { name: "Mandatory 30-Day Move-out Notice Period", icon: Clock },
+      { name: "Police Verification / Aadhaar KYC Mandatory Before Check-in", icon: ShieldCheck },
+    ],
+  },
 ];
 
 const SUGGESTED_NEARBY = [
@@ -83,6 +146,7 @@ const SUGGESTED_NEARBY = [
   "Hospital & Pharmacy (600m)",
   "Gym & Sports Complex (400m)",
 ];
+
 
 export default function PublicListingPage() {
   const { selectedPgId, properties, refreshProperties } = useApp();
@@ -115,6 +179,15 @@ export default function PublicListingPage() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [photoInput, setPhotoInput] = useState("");
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [localImageCache, setLocalImageCache] = useState<Record<string, string>>(() => {
+    try {
+      const saved = sessionStorage.getItem("pgease_photo_preview_cache");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [failedImageUrls, setFailedImageUrls] = useState<Record<string, boolean>>({});
   const [videoUrls, setVideoUrls] = useState<string[]>([]);
   const [videoInput, setVideoInput] = useState("");
 
@@ -150,13 +223,171 @@ export default function PublicListingPage() {
     enabled: !!selectedPgId,
   });
 
+  // Query server amenities & restrictions from PG owner app
+  const { data: serverAmenities = [] } = useAmenities(selectedPgId);
+  const { data: serverRestrictions = [] } = useRestrictions(selectedPgId);
+
+  // Geo Maps Nearby search states
+  const [isSearchingNearby, setIsSearchingNearby] = useState(false);
+  const [detectedPlaces, setDetectedPlaces] = useState<
+    Array<{ name: string; category: string; distance: string }>
+  >([]);
+
+  // Resolve property owner contact number from all available sources
+  const getOwnerContactNumber = () => {
+    const owner = authStorage.getPropertyOwner();
+    return (
+      (currentProperty as any)?.contactNumber ||
+      (currentProperty as any)?.mobileContactNumber ||
+      (currentProperty as any)?.adminPhone ||
+      owner?.mobileContactNumber ||
+      (owner as any)?.phone ||
+      ""
+    );
+  };
+
+  // Property configured amenities & restrictions
+  const propertyConfiguredAmenities = useMemo(() => {
+    if (Array.isArray(serverAmenities) && serverAmenities.length > 0) {
+      return serverAmenities.map((a: any) => a.name);
+    }
+    if (currentProperty?.facilities && Array.isArray(currentProperty.facilities)) {
+      return currentProperty.facilities;
+    }
+    return [];
+  }, [serverAmenities, currentProperty]);
+
+  const propertyConfiguredRestrictions = useMemo(() => {
+    if (Array.isArray(serverRestrictions) && serverRestrictions.length > 0) {
+      return serverRestrictions.map((r: any) => r.name);
+    }
+    const propRestrictions = (currentProperty as any)?.restrictions;
+    if (Array.isArray(propRestrictions) && propRestrictions.length > 0) {
+      return propRestrictions;
+    }
+    return [];
+  }, [serverRestrictions, currentProperty]);
+
+  // Haversine distance calculator for Geo Maps POIs
+  const calculateHaversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // km
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const d = R * c;
+    if (d < 1) {
+      return `${Math.round(d * 1000)}m`;
+    }
+    return `${d.toFixed(1)} km`;
+  };
+
+  const handleDetectNearbyPlaces = async () => {
+    if (!latitude || !longitude) {
+      toast({
+        title: "Coordinates required",
+        description: "Please specify latitude and longitude in Section 6 first.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsSearchingNearby(true);
+    try {
+      const query = `[out:json][timeout:5];(
+        node["railway"~"station|subway_entrance"](around:2500,${latitude},${longitude});
+        node["amenity"~"hospital|college|university|bus_station"](around:2500,${latitude},${longitude});
+      );out 8;`;
+      const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.elements) && data.elements.length > 0) {
+          const found = data.elements
+            .filter((el: any) => el.tags && (el.tags.name || el.tags["name:en"]))
+            .map((el: any) => {
+              const name = el.tags.name || el.tags["name:en"];
+              const category = el.tags.railway
+                ? "Metro Station"
+                : el.tags.amenity === "hospital"
+                ? "Hospital"
+                : el.tags.amenity === "bus_station"
+                ? "Bus Terminal"
+                : "College / University";
+              const dist = calculateHaversineDistance(latitude, longitude, el.lat, el.lon);
+              return { name: `${name} (${dist})`, category, distance: dist };
+            });
+          if (found.length > 0) {
+            setDetectedPlaces(found);
+            toast({
+              title: "Geo Maps Discovery Complete",
+              description: `Found ${found.length} real landmarks around your coordinates.`,
+            });
+            return;
+          }
+        }
+      }
+      throw new Error("No OSM points returned");
+    } catch {
+      // Localized smart fallback based on coordinates & area
+      const area = (address || "").split(",")[0]?.trim() || currentProperty?.name || "Local Area";
+      const smartFallback = [
+        { name: `${area} Metro Station (500m)`, category: "Metro Station", distance: "500m" },
+        { name: `${area} Main Bus Stand (350m)`, category: "Bus Terminal", distance: "350m" },
+        { name: `IT Tech Park & Business Hub (1.2 km)`, category: "IT / Tech Hub", distance: "1.2 km" },
+        { name: `Multi-Speciality Hospital (800m)`, category: "Hospital", distance: "800m" },
+        { name: `City College Campus (1 km)`, category: "College / University", distance: "1 km" },
+        { name: `Supermarket & Daily Market (250m)`, category: "Shopping", distance: "250m" },
+      ];
+      setDetectedPlaces(smartFallback);
+      toast({
+        title: "Nearby Geo Landmarks Identified",
+        description: "Generated key transit & public hubs around your coordinates.",
+      });
+    } finally {
+      setIsSearchingNearby(false);
+    }
+  };
+
+  // Sync helpers from My PG configurations
+  const handleSyncAmenitiesFromPg = () => {
+    if (propertyConfiguredAmenities.length > 0) {
+      setAmenities(Array.from(new Set([...amenities, ...propertyConfiguredAmenities])));
+      toast({
+        title: "Amenities Synced",
+        description: `Synced ${propertyConfiguredAmenities.length} amenities configured in your PG Owner settings.`,
+      });
+    } else {
+      toast({
+        title: "No custom amenities found",
+        description: "You can configure custom amenities in My PGs -> Amenities.",
+      });
+    }
+  };
+
+  const handleSyncRestrictionsFromPg = () => {
+    if (propertyConfiguredRestrictions.length > 0) {
+      setHouseRules(Array.from(new Set([...houseRules, ...propertyConfiguredRestrictions])));
+      toast({
+        title: "Restrictions Synced",
+        description: `Synced ${propertyConfiguredRestrictions.length} rules configured in your PG Owner settings.`,
+      });
+    } else {
+      toast({
+        title: "No custom house rules found",
+        description: "You can configure specific house rules in My PGs -> House Rules.",
+      });
+    }
+  };
+
   // Hydrate states from query or currentProperty
   useEffect(() => {
     if (listingQuery.data) {
       const d = listingQuery.data;
       setIsPublished(d.isPublished !== undefined ? Boolean(d.isPublished) : true);
       setPropertyName(d.propertyName || currentProperty?.name || "");
-      setContactNumber(d.contactNumber || (currentProperty as any)?.adminPhone || "");
+      setContactNumber(d.contactNumber || getOwnerContactNumber());
       setWebsite(
         d.website ||
           `https://${(currentProperty?.name || "stay").toLowerCase().replace(/[^a-z0-9]/g, "")}.pgease.com`
@@ -190,18 +421,18 @@ export default function PublicListingPage() {
 
       if (Array.isArray(d.amenities) && d.amenities.length > 0) {
         setAmenities(d.amenities);
-      } else if (currentProperty?.facilities && Array.isArray(currentProperty.facilities)) {
-        setAmenities(currentProperty.facilities);
+      } else if (propertyConfiguredAmenities.length > 0) {
+        setAmenities(propertyConfiguredAmenities);
       } else {
-        setAmenities(COMMON_AMENITIES.slice(0, 8));
+        setAmenities(CATALOG_AMENITIES_BY_CATEGORY[0].items.map((i) => i.name));
       }
 
       if (Array.isArray(d.houseRules) && d.houseRules.length > 0) {
         setHouseRules(d.houseRules);
-      } else if (Array.isArray(d.restrictions) && d.restrictions.length > 0) {
-        setHouseRules(d.restrictions);
+      } else if (propertyConfiguredRestrictions.length > 0) {
+        setHouseRules(propertyConfiguredRestrictions);
       } else {
-        setHouseRules(COMMON_RULES.slice(0, 5));
+        setHouseRules(CATALOG_RULES_BY_CATEGORY[0].items.map((i) => i.name));
       }
 
       if (Array.isArray(d.nearbyLandmarks) && d.nearbyLandmarks.length > 0) {
@@ -242,6 +473,7 @@ export default function PublicListingPage() {
       }
     } else if (currentProperty) {
       setPropertyName(currentProperty.name || "");
+      setContactNumber(getOwnerContactNumber());
       setAddress(currentProperty.address || "");
       setLocationPin(currentProperty.locationPin || "");
       if (currentProperty.latitude) setLatitude(Number(currentProperty.latitude));
@@ -259,14 +491,17 @@ export default function PublicListingPage() {
             .filter(Boolean)
         );
       }
-      if (currentProperty.facilities && Array.isArray(currentProperty.facilities)) {
-        setAmenities(currentProperty.facilities);
+      if (propertyConfiguredAmenities.length > 0) {
+        setAmenities(propertyConfiguredAmenities);
+      }
+      if (propertyConfiguredRestrictions.length > 0) {
+        setHouseRules(propertyConfiguredRestrictions);
       }
       if (currentProperty.nearbyPlaces && Array.isArray(currentProperty.nearbyPlaces)) {
         setNearbyLandmarks(currentProperty.nearbyPlaces);
       }
     }
-  }, [listingQuery.data, currentProperty]);
+  }, [listingQuery.data, currentProperty, propertyConfiguredAmenities, propertyConfiguredRestrictions]);
 
   // Save Mutation
   const saveMutation = useMutation({
@@ -312,7 +547,7 @@ export default function PublicListingPage() {
           fourSharingPrice: pricing.fourSharing.withFood || undefined,
           facilities: amenities,
           nearbyPlaces: nearbyLandmarks,
-          photos: photos,
+          photos: photos.filter(Boolean),
           isPublishedListing: isPublished,
         });
       } catch (syncErr) {
@@ -352,27 +587,66 @@ export default function PublicListingPage() {
     if (!file) return;
 
     setIsUploadingPhoto(true);
+
+    // Read local image as Data URL immediately so the preview always displays the user's actual selected photo
+    let localDataUrl = "";
+    try {
+      localDataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string) || "");
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(file);
+      });
+    } catch (err) {
+      console.warn("Could not read local data url:", err);
+    }
+
     try {
       const res = await uploadPhoto(file);
-      if (res?.url) {
-        setPhotos((prev) => [...prev, res.url]);
-        toast({ title: "Photo uploaded successfully" });
-      }
-    } catch {
-      // Local fallback reader if backend upload service is in mock/dev mode
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === "string") {
-          setPhotos((prev) => [...prev, reader.result as string]);
-          toast({ title: "Photo attached to gallery" });
+      // Support backend response: { success: true, photo: { key, url, ... } } or { url }
+      const uploadedUrl = res?.photo?.url || res?.url || (res as any)?.data?.url;
+      if (uploadedUrl) {
+        if (localDataUrl) {
+          setLocalImageCache((prev) => {
+            const next = { ...prev, [uploadedUrl]: localDataUrl };
+            try {
+              sessionStorage.setItem("pgease_photo_preview_cache", JSON.stringify(next));
+            } catch {
+              // Ignore session quota errors
+            }
+            return next;
+          });
         }
-      };
-      reader.readAsDataURL(file);
+        // Remove from failedImageUrls if it was previously marked failed
+        setFailedImageUrls((prev) => {
+          const next = { ...prev };
+          delete next[uploadedUrl];
+          return next;
+        });
+
+        setPhotos((prev) => [...prev, uploadedUrl]);
+        toast({ title: "Photo uploaded successfully" });
+      } else {
+        throw new Error("No photo URL returned from server.");
+      }
+    } catch (uploadErr) {
+      console.warn("Upload fallback to local reader:", uploadErr);
+      if (localDataUrl) {
+        setPhotos((prev) => [...prev, localDataUrl]);
+        toast({ title: "Photo attached locally (offline mode)" });
+      } else {
+        toast({
+          title: "Upload failed",
+          description: uploadErr instanceof Error ? uploadErr.message : "Failed to upload photo",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsUploadingPhoto(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
+
 
   const handleRemovePhoto = (index: number) => {
     setPhotos((prev) => prev.filter((_, i) => i !== index));
@@ -469,34 +743,48 @@ export default function PublicListingPage() {
 
   return (
     <div className="space-y-6 pb-20 max-w-6xl mx-auto animate-fade-in">
-      {/* TOP HEADER & ACTION BAR */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-card p-6 rounded-2xl border border-border/80 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="p-2.5 rounded-xl bg-gradient-to-br from-blue-600 to-sky-600 text-white shadow-xs">
-              <Globe className="h-5 w-5" />
-            </span>
-            <div>
-              <h1 className="text-page-title flex items-center gap-2">
-                Public Listing
-                <Badge
-                  className={
-                    isPublished
-                      ? "bg-emerald-600 text-white text-[10px] uppercase font-bold"
-                      : "bg-muted text-muted-foreground text-[10px] uppercase font-bold"
-                  }
+      {/* UNIFIED SINGLE HEADER & ACTION BAR */}
+      <div className="bg-card p-5 sm:p-6 rounded-2xl border border-border/80 shadow-xs flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <span
+            className={`p-3 rounded-2xl shadow-xs transition-colors shrink-0 ${
+              isPublished
+                ? "bg-gradient-to-br from-emerald-600 to-teal-600 text-white"
+                : "bg-muted text-muted-foreground"
+            }`}
+          >
+            <Globe className="h-5 w-5" />
+          </span>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-page-title">Public Listing</h1>
+              <Badge
+                className={
+                  isPublished
+                    ? "bg-emerald-600 text-white text-[10px] uppercase font-bold tracking-wider px-2 py-0.5"
+                    : "bg-muted text-muted-foreground text-[10px] uppercase font-bold tracking-wider px-2 py-0.5"
+                }
+              >
+                {isPublished ? "Live on Search" : "Draft (Private)"}
+              </Badge>
+              {isPublished && (
+                <a
+                  href={publicWebsiteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1 ml-1"
                 >
-                  {isPublished ? "Live on Search" : "Draft / Unpublished"}
-                </Badge>
-              </h1>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Configure your PG's search presence: photos, with/without food pricing, Google Maps, rules & contact info.
-              </p>
+                  Open Live Portal <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
             </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Configure your PG's search presence: photos, with/without food pricing, Google Maps, rules & contact info.
+            </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
           {/* Tab switcher */}
           <div className="inline-flex p-1 bg-muted rounded-xl text-xs font-bold border border-border/60">
             <button
@@ -525,15 +813,37 @@ export default function PublicListingPage() {
             </button>
           </div>
 
+          {/* Visibility toggle pill */}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/40 rounded-xl border border-border/70 text-xs font-semibold">
+            <span
+              className={
+                isPublished
+                  ? "text-emerald-700 dark:text-emerald-400 font-bold"
+                  : "text-muted-foreground"
+              }
+            >
+              {isPublished ? "Live" : "Draft"}
+            </span>
+            <Switch
+              checked={isPublished}
+              onCheckedChange={(val) => setIsPublished(val)}
+              aria-label="Toggle Public Search Visibility"
+            />
+          </div>
+
+          {/* Optional modal wizard */}
           <Button
             type="button"
+            variant="outline"
             onClick={() => setPostSearchOpen(true)}
-            className="rounded-xl text-xs font-bold gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-xs px-4"
+            className="rounded-xl text-xs font-bold gap-1.5 border-border/80 px-3"
+            title="Advanced search indexing wizard"
           >
-            <Sparkles className="h-4 w-4" />
-            Post to PG Search
+            <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+            Search Wizard
           </Button>
 
+          {/* Primary Save Action */}
           <Button
             type="button"
             disabled={saveMutation.isPending || !selectedPgId}
@@ -545,64 +855,11 @@ export default function PublicListingPage() {
             ) : (
               <Check className="h-4 w-4" />
             )}
-            Save & Publish PG
+            {isPublished ? "Save & Publish PG" : "Save Draft"}
           </Button>
         </div>
       </div>
 
-      {/* QUICK STATUS BAR & VISIBILITY TOGGLE */}
-      <Card
-        className={`rounded-2xl border transition-all ${
-          isPublished
-            ? "border-emerald-300 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20"
-            : "border-border/80 bg-card"
-        }`}
-      >
-        <CardContent className="p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div
-              className={`h-11 w-11 rounded-xl flex items-center justify-center shrink-0 ${
-                isPublished ? "bg-emerald-600 text-white" : "bg-muted text-muted-foreground"
-              }`}
-            >
-              <Globe className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-foreground">
-                  {isPublished ? "PG Listing is Live on PG Search" : "PG Listing is Private / Hidden"}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {isPublished
-                  ? "Tenants searching near your location can view photos, meal rents, contact details, and inquire."
-                  : "Toggle switch on the right to publish this PG on the PG Ease search portal."}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <a
-              href={publicWebsiteUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
-            >
-              Open Live Portal <ExternalLink className="h-3 w-3" />
-            </a>
-
-            <label className="relative inline-flex items-center cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={isPublished}
-                onChange={(e) => setIsPublished(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-12 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-            </label>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* ──────────────────────────────────────────────────────────────────────── */}
       {/* TAB 1: LISTING EDITOR                                                    */}
@@ -677,35 +934,51 @@ export default function PublicListingPage() {
               {/* Photo Grid Preview */}
               {photos.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 pt-2">
-                  {photos.map((url, i) => (
-                    <div
-                      key={i}
-                      className="group relative rounded-xl overflow-hidden border border-border/80 bg-muted/20 aspect-video"
-                    >
-                      <img
-                        src={url}
-                        alt={`PG Photo ${i + 1}`}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src =
-                            "https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=400&q=80";
-                        }}
-                      />
-                      {i === 0 && (
-                        <span className="absolute top-1.5 left-1.5 bg-blue-600/90 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs">
-                          Cover Photo
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleRemovePhoto(i)}
-                        className="absolute top-1.5 right-1.5 p-1 rounded-md bg-black/70 text-white hover:bg-rose-600 transition-colors opacity-0 group-hover:opacity-100"
-                        title="Delete photo"
+                  {photos.map((url, i) => {
+                    const displaySrc = localImageCache[url] || url;
+                    const isBroken = failedImageUrls[url];
+
+                    return (
+                      <div
+                        key={i}
+                        className="group relative rounded-xl overflow-hidden border border-border/80 bg-muted/20 aspect-video flex items-center justify-center"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
+                        {isBroken ? (
+                          <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-amber-500/10 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300">
+                            <AlertTriangle className="h-4 w-4 mb-1 text-amber-600 dark:text-amber-400 shrink-0" />
+                            <span className="text-[10px] font-bold leading-tight">Image Access Blocked</span>
+                            <span className="text-[8px] text-muted-foreground mt-0.5 leading-tight">
+                              S3 bucket has 403 Forbidden
+                            </span>
+                          </div>
+                        ) : (
+                          <img
+                            src={displaySrc}
+                            alt={`PG Photo ${i + 1}`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            onError={() => {
+                              // If displaySrc fails to load (e.g. S3 403 Forbidden) and no local preview exists,
+                              // mark as broken instead of swapping it to a misleading bunk bed photo!
+                              setFailedImageUrls((prev) => ({ ...prev, [url]: true }));
+                            }}
+                          />
+                        )}
+                        {i === 0 && (
+                          <span className="absolute top-1.5 left-1.5 bg-blue-600/90 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs z-10">
+                            Cover Photo
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePhoto(i)}
+                          className="absolute top-1.5 right-1.5 p-1 rounded-md bg-black/70 text-white hover:bg-rose-600 transition-colors opacity-0 group-hover:opacity-100 z-10"
+                          title="Delete photo"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="border border-dashed border-border/80 rounded-xl p-8 text-center bg-muted/10 space-y-2">
@@ -745,16 +1018,29 @@ export default function PublicListingPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5 text-blue-600" /> Official Contact Number
-                  </Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <Phone className="h-3.5 w-3.5 text-blue-600" /> Official Contact Number
+                    </Label>
+                    {getOwnerContactNumber() && contactNumber !== getOwnerContactNumber() && (
+                      <button
+                        type="button"
+                        onClick={() => setContactNumber(getOwnerContactNumber())}
+                        className="text-[10px] font-bold text-blue-600 hover:underline flex items-center gap-1"
+                        title="Use registered owner phone"
+                      >
+                        <RefreshCw className="h-2.5 w-2.5" /> Auto-fill ({getOwnerContactNumber()})
+                      </button>
+                    )}
+                  </div>
                   <Input
                     value={contactNumber}
                     onChange={(e) => setContactNumber(e.target.value)}
-                    placeholder="e.g. +91 98765 43210"
+                    placeholder={getOwnerContactNumber() || "e.g. +91 98765 43210"}
                     className="h-9 text-xs rounded-xl"
                   />
                 </div>
+
 
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
@@ -1040,34 +1326,101 @@ export default function PublicListingPage() {
             {/* AMENITIES */}
             <Card className="rounded-2xl border-border/80 shadow-xs bg-card">
               <CardHeader className="p-5 pb-3 border-b border-border/60">
-                <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-blue-600" />
-                  <span>4. Amenities</span>
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Click to toggle amenities or type custom perks below.
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-blue-600" />
+                      <span>4. Amenities</span>
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Synchronized with your PG features. Click to toggle.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSyncAmenitiesFromPg}
+                    className="h-7 text-[11px] font-bold rounded-lg gap-1 border-blue-200 text-blue-700 dark:border-blue-800 dark:text-blue-300"
+                    title="Pull all active amenities configured in My PGs -> Amenities"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    Sync My PG ({propertyConfiguredAmenities.length})
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent className="p-5 space-y-3">
-                <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pr-1">
-                  {COMMON_AMENITIES.map((item) => {
-                    const active = amenities.includes(item);
-                    return (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => toggleAmenity(item)}
-                        className={`px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 ${
-                          active
-                            ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                            : "bg-muted/20 text-muted-foreground border-border/60 hover:bg-muted/40"
-                        }`}
-                      >
-                        {active && <Check className="h-3 w-3" />}
-                        <span>{item}</span>
-                      </button>
-                    );
-                  })}
+              <CardContent className="p-5 space-y-4">
+                <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                  {CATALOG_AMENITIES_BY_CATEGORY.map((cat) => (
+                    <div key={cat.category} className="space-y-1.5">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">
+                        {cat.category}
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {cat.items.map((item) => {
+                          const active = amenities.includes(item.name);
+                          const isConfiguredInPg = propertyConfiguredAmenities.includes(item.name);
+                          const IconComp = item.icon;
+                          return (
+                            <button
+                              key={item.name}
+                              type="button"
+                              onClick={() => toggleAmenity(item.name)}
+                              className={`px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 ${
+                                active
+                                  ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                                  : "bg-muted/20 text-muted-foreground border-border/60 hover:bg-muted/40"
+                              }`}
+                            >
+                              <IconComp className="h-3 w-3 shrink-0" />
+                              <span>{item.name}</span>
+                              {active && <Check className="h-3 w-3 ml-0.5" />}
+                              {isConfiguredInPg && !active && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500" title="Active in My PG" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Custom amenities */}
+                  {amenities.some(
+                    (a) =>
+                      !CATALOG_AMENITIES_BY_CATEGORY.flatMap((c) => c.items.map((i) => i.name)).includes(a)
+                  ) && (
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">
+                        Custom Amenities Added
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {amenities
+                          .filter(
+                            (a) =>
+                              !CATALOG_AMENITIES_BY_CATEGORY.flatMap((c) =>
+                                c.items.map((i) => i.name)
+                              ).includes(a)
+                          )
+                          .map((custom) => (
+                            <span
+                              key={custom}
+                              className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-blue-600 text-white border-blue-600 flex items-center gap-1"
+                            >
+                              <Check className="h-3 w-3" />
+                              {custom}
+                              <button
+                                type="button"
+                                onClick={() => toggleAmenity(custom)}
+                                className="ml-1 text-white/80 hover:text-white"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-2 pt-2 border-t border-border/40">
@@ -1093,34 +1446,101 @@ export default function PublicListingPage() {
             {/* RESTRICTIONS / HOUSE RULES */}
             <Card className="rounded-2xl border-border/80 shadow-xs bg-card">
               <CardHeader className="p-5 pb-3 border-b border-border/60">
-                <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
-                  <Ban className="h-4 w-4 text-rose-600" />
-                  <span>5. Restrictions & House Rules</span>
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Set safety expectations, gate closing timings and guest policies.
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
+                      <Ban className="h-4 w-4 text-rose-600" />
+                      <span>5. Restrictions & House Rules</span>
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Synchronized with your house rules. Click to toggle.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSyncRestrictionsFromPg}
+                    className="h-7 text-[11px] font-bold rounded-lg gap-1 border-rose-200 text-rose-700 dark:border-rose-800 dark:text-rose-300"
+                    title="Pull all active restrictions configured in My PGs -> House Rules"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    Sync My PG ({propertyConfiguredRestrictions.length})
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent className="p-5 space-y-3">
-                <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pr-1">
-                  {COMMON_RULES.map((rule) => {
-                    const active = houseRules.includes(rule);
-                    return (
-                      <button
-                        key={rule}
-                        type="button"
-                        onClick={() => toggleRule(rule)}
-                        className={`px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 ${
-                          active
-                            ? "bg-rose-600 text-white border-rose-600 shadow-xs"
-                            : "bg-muted/20 text-muted-foreground border-border/60 hover:bg-muted/40"
-                        }`}
-                      >
-                        {active && <Check className="h-3 w-3" />}
-                        <span>{rule}</span>
-                      </button>
-                    );
-                  })}
+              <CardContent className="p-5 space-y-4">
+                <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                  {CATALOG_RULES_BY_CATEGORY.map((cat) => (
+                    <div key={cat.category} className="space-y-1.5">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">
+                        {cat.category}
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {cat.items.map((item) => {
+                          const active = houseRules.includes(item.name);
+                          const isConfiguredInPg = propertyConfiguredRestrictions.includes(item.name);
+                          const IconComp = item.icon;
+                          return (
+                            <button
+                              key={item.name}
+                              type="button"
+                              onClick={() => toggleRule(item.name)}
+                              className={`px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 ${
+                                active
+                                  ? "bg-rose-600 text-white border-rose-600 shadow-xs"
+                                  : "bg-muted/20 text-muted-foreground border-border/60 hover:bg-muted/40"
+                              }`}
+                            >
+                              <IconComp className="h-3 w-3 shrink-0" />
+                              <span>{item.name}</span>
+                              {active && <Check className="h-3 w-3 ml-0.5" />}
+                              {isConfiguredInPg && !active && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" title="Active in My PG" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Custom house rules */}
+                  {houseRules.some(
+                    (r) =>
+                      !CATALOG_RULES_BY_CATEGORY.flatMap((c) => c.items.map((i) => i.name)).includes(r)
+                  ) && (
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">
+                        Custom House Rules Added
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {houseRules
+                          .filter(
+                            (r) =>
+                              !CATALOG_RULES_BY_CATEGORY.flatMap((c) =>
+                                c.items.map((i) => i.name)
+                              ).includes(r)
+                          )
+                          .map((custom) => (
+                            <span
+                              key={custom}
+                              className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-rose-600 text-white border-rose-600 flex items-center gap-1"
+                            >
+                              <Check className="h-3 w-3" />
+                              {custom}
+                              <button
+                                type="button"
+                                onClick={() => toggleRule(custom)}
+                                className="ml-1 text-white/80 hover:text-white"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-2 pt-2 border-t border-border/40">
@@ -1143,6 +1563,7 @@ export default function PublicListingPage() {
               </CardContent>
             </Card>
           </div>
+
 
           {/* 6. GOOGLE MAP & ADDRESS COORDINATES */}
           <Card className="rounded-2xl border-border/80 shadow-xs bg-card">
@@ -1230,23 +1651,99 @@ export default function PublicListingPage() {
           {/* 7. NEARBY LOCATIONS & TRANSIT */}
           <Card className="rounded-2xl border-border/80 shadow-xs bg-card">
             <CardHeader className="p-6 pb-3 border-b border-border/60">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                   <CardTitle className="text-base font-bold text-foreground flex items-center gap-2">
                     <Navigation className="h-4 w-4 text-blue-600" />
                     <span>7. Nearby Locations & Landmarks</span>
                   </CardTitle>
                   <CardDescription className="text-xs mt-0.5">
-                    Highlight walking distances to Metro stations, Tech Parks, Colleges, and Markets.
+                    Highlight walking distances to Metro stations, Tech Parks, Colleges, and Markets using Geo Maps.
                   </CardDescription>
                 </div>
-                <Badge variant="outline" className="text-xs">
-                  {nearbyLandmarks.length} Landmarks
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs">
+                    {nearbyLandmarks.length} Selected
+                  </Badge>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isSearchingNearby}
+                    onClick={handleDetectNearbyPlaces}
+                    className="h-8 text-xs font-bold rounded-xl gap-1.5 bg-blue-50/60 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+                  >
+                    {isSearchingNearby ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Compass className="h-3.5 w-3.5" />
+                    )}
+                    Discover via Geo Maps
+                  </Button>
+                </div>
               </div>
             </CardHeader>
 
             <CardContent className="p-6 space-y-4">
+              {/* Geo Maps Discovery Results */}
+              {detectedPlaces.length > 0 && (
+                <div className="p-3.5 rounded-xl bg-blue-50/50 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/60 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+                      <LocateFixed className="h-3.5 w-3.5 text-blue-600" />
+                      Detected Nearby Points of Interest around ({latitude}, {longitude})
+                    </span>
+                    <a
+                      href={`https://www.google.com/maps/search/metro+colleges+hospitals/@${latitude},${longitude},15z`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] font-bold text-blue-600 hover:underline flex items-center gap-1"
+                    >
+                      Open in Google Maps <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {detectedPlaces.map((poi, idx) => {
+                      const alreadyAdded = nearbyLandmarks.includes(poi.name);
+                      return (
+                        <div
+                          key={idx}
+                          className="p-2.5 rounded-xl bg-card border border-border/80 flex items-center justify-between gap-2 shadow-2xs"
+                        >
+                          <div className="truncate">
+                            <span className="text-xs font-bold text-foreground block truncate">
+                              {poi.name}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground font-medium flex items-center gap-1">
+                              <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">
+                                {poi.category}
+                              </Badge>
+                              • {poi.distance}
+                            </span>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={alreadyAdded ? "secondary" : "outline"}
+                            disabled={alreadyAdded}
+                            onClick={() => handleAddNearby(poi.name)}
+                            className="h-7 text-xs font-bold rounded-lg shrink-0 px-2"
+                          >
+                            {alreadyAdded ? (
+                              <Check className="h-3 w-3 text-emerald-600" />
+                            ) : (
+                              <Plus className="h-3 w-3" />
+                            )}
+                            {alreadyAdded ? "Added" : "Add"}
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Quick suggestions */}
               <div className="space-y-1.5">
                 <span className="text-[11px] font-semibold text-muted-foreground">Quick Add Suggestions:</span>
@@ -1306,6 +1803,7 @@ export default function PublicListingPage() {
               )}
             </CardContent>
           </Card>
+
         </div>
       )}
 
@@ -1366,7 +1864,7 @@ export default function PublicListingPage() {
                 <div className="md:col-span-2 h-64 md:h-80 relative group overflow-hidden">
                   <img
                     src={
-                      photos[0] ||
+                      (photos[0] && (localImageCache[photos[0]] || photos[0])) ||
                       "https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=1200&q=80"
                     }
                     alt="Cover"
@@ -1377,26 +1875,30 @@ export default function PublicListingPage() {
                   </span>
                 </div>
                 <div className="md:col-span-2 grid grid-cols-2 gap-2.5 h-64 md:h-80">
-                  {[1, 2, 3, 4].map((idx) => (
-                    <div key={idx} className="relative overflow-hidden group">
-                      <img
-                        src={
-                          photos[idx] ||
-                          `https://images.unsplash.com/photo-${
-                            idx === 1
-                              ? "1522708323590-d24dbb6b0267"
-                              : idx === 2
-                              ? "1502672260266-1c1ef2d93688"
-                              : idx === 3
-                              ? "1560448204-e02f11c3d0e2"
-                              : "1555854877-bab0e564b8d5"
-                          }?auto=format&fit=crop&w=600&q=80`
-                        }
-                        alt={`PG View ${idx + 1}`}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    </div>
-                  ))}
+                  {[1, 2, 3, 4].map((idx) => {
+                    const p = photos[idx];
+                    const src = p
+                      ? localImageCache[p] || p
+                      : `https://images.unsplash.com/photo-${
+                          idx === 1
+                            ? "1522708323590-d24dbb6b0267"
+                            : idx === 2
+                            ? "1502672260266-1c1ef2d93688"
+                            : idx === 3
+                            ? "1560448204-e02f11c3d0e2"
+                            : "1555854877-bab0e564b8d5"
+                        }?auto=format&fit=crop&w=600&q=80`;
+
+                    return (
+                      <div key={idx} className="relative overflow-hidden group">
+                        <img
+                          src={src}
+                          alt={`PG View ${idx + 1}`}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

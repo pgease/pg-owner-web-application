@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { useApp } from "@/context/AppContext";
 import { useSubscriptionAccess } from "@/hooks/useSubscriptionAccess";
+import { useEntitlements } from "@/hooks/useEntitlements";
 import { CelebrationDialog } from "@/components/CelebrationDialog";
 import { TrialExpiredGateModal } from "@/components/common/TrialExpiredGateModal";
 import { formatInr } from "@/lib/rentDashboard";
@@ -32,6 +33,7 @@ const Dashboard = () => {
   const list = Array.isArray(properties) ? properties : [];
   const selectedPg = list.find((p) => p.id === selectedPgId);
   const subAccess = useSubscriptionAccess();
+  const entitlements = useEntitlements();
 
   const [celebrationOpen, setCelebrationOpen] = useState(false);
   const [celebrationPgName, setCelebrationPgName] = useState("");
@@ -83,6 +85,12 @@ const Dashboard = () => {
   }
 
   const { beds, tenants, complaints, rent, loading, isError } = data;
+  const cheerful = !entitlements.isLoading && (entitlements.isTrial || entitlements.isPro) && !entitlements.isExpired;
+  const planLine = entitlements.isTrial
+    ? `Pro Trial · ${entitlements.daysRemaining} ${entitlements.daysRemaining === 1 ? "day" : "days"} left`
+    : entitlements.isPro
+      ? "Pro"
+      : "Lite";
   const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const currentMonthName = MONTHS[rent.month - 1];
   const shortMonthName = currentMonthName.slice(0, 3);
@@ -134,6 +142,33 @@ const Dashboard = () => {
             </>
           }
         />
+
+        <section
+          className={cn(
+            "rounded-md border px-4 py-4 sm:px-5",
+            cheerful
+              ? "border-[#B7DEDE] bg-gradient-to-r from-[#E8F4F4] via-white to-[#F4FBFB]"
+              : "border-[#E2E6EA] bg-white",
+          )}
+        >
+          <p className="text-[12px] font-semibold uppercase tracking-wide text-[#008080]">{planLine}</p>
+          <h2 className="mt-1 text-[18px] font-semibold leading-snug text-[#18212B]">
+            {cheerful ? `Welcome back to ${selectedPg?.name ?? "your PG"}` : selectedPg?.name ?? "Your PG"}
+          </h2>
+          <p className="mt-1 max-w-2xl text-[14px] leading-5 text-[#3D4A57]">
+            {cheerful
+              ? `${currentMonthName} is open. Collect what’s due, fill empty beds, and clear the list below.`
+              : `${currentMonthName}: occupancy, rent still due, and the items that need a decision.`}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" className="gap-1.5" onClick={() => navigate("/rent-payments")}>
+              <IndianRupee className="h-4 w-4" /> Record payment
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate("/tenants")}>
+              <Users className="h-4 w-4" /> View tenants
+            </Button>
+          </div>
+        </section>
 
         {isError ? (
           <div className="register-card p-6">

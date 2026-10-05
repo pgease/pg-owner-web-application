@@ -18,7 +18,6 @@ import {
   Loader2,
   Banknote,
   LayoutGrid,
-  User,
 } from "lucide-react";
 
 type Step = "phone" | "otp";
@@ -212,7 +211,6 @@ export default function Login() {
       return "";
     }
   });
-  const [pgOwnerName, setPgOwnerName] = useState("");
   const [otp, setOtp] = useState("");
   const [shaking, setShaking] = useState(false);
 
@@ -324,7 +322,7 @@ export default function Login() {
       if (otpValue.length !== 4) return;
       try {
         setIsVerifyingOtp(true);
-        const data = await verifyOtp(phone, otpValue, pgOwnerName.trim() || undefined);
+        const data = await verifyOtp(phone, otpValue);
 
         setShowSuccess(true);
         toast({
@@ -351,7 +349,7 @@ export default function Login() {
         setIsVerifyingOtp(false);
       }
     },
-    [phone, pgOwnerName, navigate, triggerShake]
+    [phone, navigate, triggerShake]
   );
 
   const handleOtpChange = useCallback(
@@ -569,32 +567,6 @@ export default function Login() {
                   </p>
                 </div>
 
-                {/* PG Owner Name (Optional) */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
-                      <User className="h-3.5 w-3.5 text-[#008080]" />
-                      <span>{T.nameLabel}</span>
-                    </label>
-                    <span className="text-[10px] text-gray-500 font-medium bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
-                      {T.nameOptional}
-                    </span>
-                  </div>
-                  <div className="flex rounded-lg border border-gray-300 bg-white overflow-hidden focus-within:border-[#008080] focus-within:ring-2 focus-within:ring-[#CCE6E6] h-11 sm:h-12 transition-all">
-                    <input
-                      value={pgOwnerName}
-                      onChange={(e) => setPgOwnerName(e.target.value)}
-                      onKeyDown={handlePhoneKeyDown}
-                      placeholder={T.namePlaceholder}
-                      autoComplete="name"
-                      className="flex-1 h-full px-3 text-sm font-semibold text-gray-900 placeholder:text-gray-400 outline-none"
-                    />
-                  </div>
-                  <p className="text-[10.5px] sm:text-[11px] text-gray-400">
-                    {T.nameHint}
-                  </p>
-                </div>
-
                 {/* Mobile Input Section */}
                 <div className="space-y-1">
                   <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider block">
@@ -749,14 +721,6 @@ export default function Login() {
                       <Pencil className="h-3 w-3" /> {T.editNumber}
                     </button>
                   </div>
-                  {pgOwnerName.trim() ? (
-                    <div className="pt-0.5">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#E6F8F0] border border-[#B4E5C5] text-[11px] font-medium text-[#0E7A4A]">
-                        <User className="h-3 w-3" />
-                        <span>{T.loggingInAs}: <strong>{pgOwnerName.trim()}</strong></span>
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
 
                 {/* 4-Slot OTP Inputs */}

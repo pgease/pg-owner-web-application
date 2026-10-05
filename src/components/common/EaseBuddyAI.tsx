@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
-  Bot,
   Sparkles,
   X,
   Send,
@@ -146,7 +145,7 @@ export const EaseBuddyAI: React.FC<{
     <>
       {/* Floating Action Button - Positioned at bottom: 24px, right: 24px */}
       {!isOpen && (
-        <div className="fixed bottom-6 right-6 z-40 hidden sm:block">
+        <div className="fixed bottom-24 right-5 z-30 hidden sm:block">
           <button
             type="button"
             onClick={() => setIsOpen(true)}
@@ -166,7 +165,7 @@ export const EaseBuddyAI: React.FC<{
 
       {/* Ease Buddy Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 w-[92vw] sm:w-[380px] h-[520px] max-h-[85vh] rounded-md border border-[var(--gray-200)] bg-white shadow-overlay flex flex-col overflow-hidden text-[var(--gray-900)]">
+        <div className="fixed bottom-24 right-5 z-50 w-[92vw] sm:w-[380px] h-[520px] max-h-[70vh] rounded-md border border-[var(--gray-200)] bg-white shadow-overlay flex flex-col overflow-hidden text-[var(--gray-900)]">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-[var(--gray-50)] border-b border-[var(--gray-200)] shrink-0">
             <div className="flex items-center gap-2.5">
@@ -235,30 +234,43 @@ export const EaseBuddyAI: React.FC<{
             {messages.map((m) => (
               <div
                 key={m.id}
-                className={`flex flex-col ${m.sender === "user" ? "items-end" : "items-start"}`}
+                className={`flex gap-2 ${m.sender === "user" ? "justify-end" : "justify-start"}`}
               >
-                <div
-                  className={`max-w-[85%] rounded-md px-3.5 py-2.5 text-xs leading-relaxed ${
-                    m.sender === "user"
-                      ? "bg-[var(--brand-600)] text-white"
-                      : "bg-[var(--gray-100)] text-[var(--gray-900)] border border-[var(--gray-200)]"
-                  }`}
-                >
-                  <p className="whitespace-pre-line">{m.text}</p>
-                </div>
-
-                {m.actionLink && (
-                  <button
-                    onClick={() => {
-                      handleClose();
-                      navigate(m.actionLink!.url);
-                    }}
-                    className="mt-1 flex items-center gap-1 text-xs font-medium text-[var(--brand-600)] hover:underline transition-colors"
-                  >
-                    <span>{m.actionLink.label}</span>
-                    <ChevronRight className="h-3 w-3" />
-                  </button>
+                {m.sender === "bot" && (
+                  <div className="h-6 w-6 rounded-full bg-[var(--brand-50)] border border-[var(--brand-100)] overflow-hidden shrink-0 mt-0.5 shadow-2xs">
+                    <img
+                      src={mascotRent}
+                      alt="Ease Buddy"
+                      className="h-full w-full object-cover object-top"
+                    />
+                  </div>
                 )}
+                <div
+                  className={`flex flex-col ${m.sender === "user" ? "items-end" : "items-start"}`}
+                >
+                  <div
+                    className={`max-w-[85%] rounded-md px-3.5 py-2.5 text-xs leading-relaxed ${
+                      m.sender === "user"
+                        ? "bg-[var(--brand-600)] text-white"
+                        : "bg-[var(--gray-100)] text-[var(--gray-900)] border border-[var(--gray-200)]"
+                    }`}
+                  >
+                    <p className="whitespace-pre-line">{m.text}</p>
+                  </div>
+
+                  {m.actionLink && (
+                    <button
+                      onClick={() => {
+                        handleClose();
+                        navigate(m.actionLink!.url);
+                      }}
+                      className="mt-1 flex items-center gap-1 text-xs font-medium text-[var(--brand-600)] hover:underline transition-colors"
+                    >
+                      <span>{m.actionLink.label}</span>
+                      <ChevronRight className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
             <div ref={messagesEndRef} />

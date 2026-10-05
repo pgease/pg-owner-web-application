@@ -160,11 +160,11 @@ const App = () => (
                         <Route path="/team/permissions-matrix" element={<RequireOwner><PermissionsMatrixPage /></RequireOwner>} />
                         <Route path="/settings/permissions" element={<RequireOwner><PermissionsMatrixPage /></RequireOwner>} />
                         <Route path="/food" element={<FoodDiningPage />} />
+                        <Route path="/food-menu" element={<Navigate to="/food" replace />} />
+                        <Route path="/dining" element={<Navigate to="/food" replace />} />
+                        <Route path="/billing" element={<RequireOwner><Plans /></RequireOwner>} />
+                        <Route path="/subscription" element={<RequireOwner><Plans /></RequireOwner>} />
                         <Route path="/nightout" element={<NightOutRequestsPage />} />
-                        <Route
-                          path="/attendance"
-                          element={<FeaturePlaceholder title="Attendance" permission="attend_view" />}
-                        />
                         <Route
                           path="/eviction"
                           element={<FeaturePlaceholder title="Eviction" permission="eviction_approve" />}
