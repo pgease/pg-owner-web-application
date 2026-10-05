@@ -18,6 +18,7 @@ import {
   Loader2,
   Banknote,
   LayoutGrid,
+  User,
 } from "lucide-react";
 
 type Step = "phone" | "otp";
@@ -238,6 +239,7 @@ export default function Login({ initialMode }: { initialMode?: AuthMode } = {}) 
       return "";
     }
   });
+  const [pgOwnerName, setPgOwnerName] = useState("");
   const [otp, setOtp] = useState("");
   const [shaking, setShaking] = useState(false);
 
@@ -349,7 +351,7 @@ export default function Login({ initialMode }: { initialMode?: AuthMode } = {}) 
       if (otpValue.length !== 4) return;
       try {
         setIsVerifyingOtp(true);
-        const data = await verifyOtp(phone, otpValue);
+        const data = await verifyOtp(phone, otpValue, pgOwnerName.trim() || undefined);
 
         setShowSuccess(true);
         toast({
@@ -376,7 +378,7 @@ export default function Login({ initialMode }: { initialMode?: AuthMode } = {}) 
         setIsVerifyingOtp(false);
       }
     },
-    [phone, navigate, triggerShake]
+    [phone, pgOwnerName, navigate, triggerShake]
   );
 
   const handleOtpChange = useCallback(

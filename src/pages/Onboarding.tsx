@@ -18,7 +18,6 @@ import {
   getPropertyTypesAndAmenities,
   type PropertyType,
   DEFAULT_PROPERTY_TYPE_ID,
-  updateMe,
 } from "@/api/propertyOwner";
 import { authStorage } from "@/api/http";
 import { useSubscriptionAccess } from "@/hooks/useSubscriptionAccess";
