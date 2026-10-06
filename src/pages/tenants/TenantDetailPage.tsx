@@ -834,7 +834,7 @@ export default function TenantDetailPage() {
         reference: paymentForm.reference.trim() || undefined,
         notes: paymentForm.notes.trim() || undefined,
         status: "paid",
-      } as any);
+      });
 
       toast({
         title: "Payment Recorded Successfully! 🎉",

@@ -12,22 +12,48 @@ import {
   Calendar,
   User,
   Users,
-  Building,
+  Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useApp } from "@/context/AppContext";
-import { getGuestRequests, updateGuestRequestStatus, createGuestRequest } from "@/api/propertyOwner";
+import {
+  getGuestRequests,
+  updateGuestRequestStatus,
+  createGuestRequest,
+  GuestDetailItem,
+} from "@/api/propertyOwner";
 import { usePropertyTenants } from "@/hooks/usePropertyOwnerQueries";
 import { CanAccessPage } from "@/components/PermissionGuard";
 import { toast } from "@/components/ui/use-toast";
+
+interface GuestFormItem {
+  name: string;
+  phone: string;
+  gender: "Male" | "Female" | "Other" | string;
+  relationship: string;
+}
+
+const defaultGuestItem: GuestFormItem = {
+  name: "",
+  phone: "",
+  gender: "Male",
+  relationship: "Friend",
+};
 
 export default function GuestRequestsPage() {
   const { selectedPgId, properties } = useApp();
@@ -43,15 +69,10 @@ export default function GuestRequestsPage() {
   // Add Guest Log modal on behalf of tenant
   const [addGuestModalOpen, setAddGuestModalOpen] = useState(false);
   const [selectedTenantId, setSelectedTenantId] = useState("");
-  const [guestName, setGuestName] = useState("");
-  const [guestPhone, setGuestPhone] = useState("");
-  const [guestGender, setGuestGender] = useState<string>("Male");
-  const [numberOfGuests, setNumberOfGuests] = useState<number>(1);
-  const [relationship, setRelationship] = useState("Friend");
+  const [guestList, setGuestList] = useState<GuestFormItem[]>([{ ...defaultGuestItem }]);
   const [arrivalDate, setArrivalDate] = useState("");
   const [departureDate, setDepartureDate] = useState("");
   const [purpose, setPurpose] = useState("");
-  const [additionalGuestNames, setAdditionalGuestNames] = useState("");
 
   const { data: tenantsData = [] } = usePropertyTenants(selectedPgId);
   const tenantsList = Array.isArray(tenantsData) ? tenantsData : (tenantsData as any)?.tenants || [];
@@ -62,17 +83,35 @@ export default function GuestRequestsPage() {
     enabled: Boolean(selectedPgId),
   });
 
+  const handleAddGuestItem = () => {
+    setGuestList((prev) => [
+      ...prev,
+      {
+        name: "",
+        phone: "",
+        gender: "Male",
+        relationship: prev[0]?.relationship || "Friend",
+      },
+    ]);
+  };
+
+  const handleRemoveGuestItem = (index: number) => {
+    if (guestList.length <= 1) return;
+    setGuestList((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleGuestItemChange = (index: number, field: keyof GuestFormItem, val: string) => {
+    setGuestList((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: val } : item))
+    );
+  };
+
   const resetAddGuestForm = () => {
     setSelectedTenantId("");
-    setGuestName("");
-    setGuestPhone("");
-    setGuestGender("Male");
-    setNumberOfGuests(1);
-    setRelationship("Friend");
+    setGuestList([{ ...defaultGuestItem }]);
     setArrivalDate("");
     setDepartureDate("");
     setPurpose("");
-    setAdditionalGuestNames("");
   };
 
   const updateStatusMutation = useMutation({
@@ -97,29 +136,38 @@ export default function GuestRequestsPage() {
 
   const createGuestMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedPgId || !guestName.trim()) return;
+      if (!selectedPgId) return;
+      const validGuests = guestList.filter((g) => g.name.trim().length > 0);
+      if (validGuests.length === 0) {
+        throw new Error("Please enter at least one guest name.");
+      }
 
-      const fullPurpose = [
-        purpose.trim(),
-        additionalGuestNames.trim() ? `Accompanying guests: ${additionalGuestNames.trim()}` : "",
-      ]
-        .filter(Boolean)
-        .join(" | ");
+      const primary = validGuests[0];
 
       return createGuestRequest(selectedPgId, {
         tenantId: selectedTenantId || undefined,
-        guestName: guestName.trim(),
-        guestPhone: guestPhone.trim() || undefined,
-        guestGender: guestGender || undefined,
-        numberOfGuests: Number(numberOfGuests) || 1,
-        relationship: relationship || undefined,
+        guestName: primary.name.trim(),
+        guestPhone: primary.phone.trim() || undefined,
+        guestGender: primary.gender || undefined,
+        relationship: primary.relationship || undefined,
+        numberOfGuests: validGuests.length,
+        guests: validGuests.map((g) => ({
+          name: g.name.trim(),
+          phone: g.phone.trim() || undefined,
+          gender: g.gender || undefined,
+          relationship: g.relationship.trim() || undefined,
+        })),
         expectedArrival: arrivalDate ? new Date(arrivalDate).toISOString() : new Date().toISOString(),
         expectedDeparture: departureDate ? new Date(departureDate).toISOString() : undefined,
-        purpose: fullPurpose || undefined,
+        purpose: purpose.trim() || undefined,
       });
     },
     onSuccess: () => {
-      toast({ title: "Guest Log Saved", description: `Guest arrival entry logged for ${guestName}.` });
+      const count = guestList.filter((g) => g.name.trim()).length;
+      toast({
+        title: "Guest Log Saved",
+        description: `Guest arrival entry logged for ${count} guest${count > 1 ? "s" : ""}.`,
+      });
       setAddGuestModalOpen(false);
       resetAddGuestForm();
       queryClient.invalidateQueries({ queryKey: ["guestRequests", selectedPgId] });
@@ -138,7 +186,10 @@ export default function GuestRequestsPage() {
     const total = requests.length;
     const pending = requests.filter((r) => (r.status || "").toLowerCase() === "pending").length;
     const approved = requests.filter((r) => (r.status || "").toLowerCase() === "approved").length;
-    const totalHeadcount = requests.reduce((sum, r) => sum + (Number(r.numberOfGuests) || 1), 0);
+    const totalHeadcount = requests.reduce((sum, r) => {
+      const count = Array.isArray(r.guests) && r.guests.length > 0 ? r.guests.length : Number(r.numberOfGuests) || 1;
+      return sum + count;
+    }, 0);
     return { total, pending, approved, totalHeadcount };
   }, [requests]);
 
@@ -153,13 +204,22 @@ export default function GuestRequestsPage() {
       const rNum = String(req.roomNumber || req.room?.roomNumber || "").toLowerCase();
       const gGender = (req.guestGender || "").toLowerCase();
       const rel = (req.relationship || "").toLowerCase();
+
+      const matchesGuestInList = Array.isArray(req.guests) && req.guests.some((g: any) =>
+        (g.name || "").toLowerCase().includes(q) ||
+        (g.phone || "").toLowerCase().includes(q) ||
+        (g.gender || "").toLowerCase().includes(q) ||
+        (g.relationship || "").toLowerCase().includes(q)
+      );
+
       return (
         gName.includes(q) ||
         gPhone.includes(q) ||
         tName.includes(q) ||
         rNum.includes(q) ||
         gGender.includes(q) ||
-        rel.includes(q)
+        rel.includes(q) ||
+        matchesGuestInList
       );
     });
   }, [requests, searchQuery]);
@@ -282,7 +342,7 @@ export default function GuestRequestsPage() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search guest, tenant, room..."
+              placeholder="Search guest name, phone, gender, room..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8 text-xs h-9"
@@ -295,7 +355,7 @@ export default function GuestRequestsPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">Visitor Log Table ({filteredRequests.length})</CardTitle>
             <CardDescription>
-              Grouped by month and arrival date with gender, headcount, and security status.
+              Grouped by month and arrival date with detailed guest roster, gender, and security status.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -324,7 +384,7 @@ export default function GuestRequestsPage() {
                       <TableHeader className="bg-slate-50">
                         <TableRow>
                           <TableHead className="font-bold">Stay Schedule</TableHead>
-                          <TableHead className="font-bold">Guest Details & Headcount</TableHead>
+                          <TableHead className="font-bold min-w-[280px]">Guest Roster & Details</TableHead>
                           <TableHead className="font-bold">Resident Tenant</TableHead>
                           <TableHead className="font-bold">Relation & Purpose</TableHead>
                           <TableHead className="font-bold">Status</TableHead>
@@ -338,12 +398,24 @@ export default function GuestRequestsPage() {
                           const arrDateStr = req.expectedArrival || req.arrivalDate || req.createdAt;
                           const depDateStr = req.expectedDeparture || req.departureDate;
 
+                          // All individual guests
+                          const roster: GuestDetailItem[] = Array.isArray(req.guests) && req.guests.length > 0
+                            ? req.guests
+                            : [
+                                {
+                                  name: req.guestName || req.name || "Guest Visitor",
+                                  phone: req.guestPhone || req.phone || "",
+                                  gender: req.guestGender || "",
+                                  relationship: req.relationship || "",
+                                },
+                              ];
+
                           return (
                             <TableRow key={req.id || idx} className="hover:bg-slate-50/60">
                               {/* STAY SCHEDULE */}
-                              <TableCell className="font-medium text-slate-900 text-xs">
+                              <TableCell className="font-medium text-slate-900 text-xs align-top pt-3">
                                 <div>
-                                  <span className="font-bold">Arr:</span>{" "}
+                                  <span className="font-bold text-slate-600">Arr:</span>{" "}
                                   {arrDateStr
                                     ? new Date(arrDateStr).toLocaleDateString("en-IN", {
                                         day: "2-digit",
@@ -353,8 +425,8 @@ export default function GuestRequestsPage() {
                                     : "N/A"}
                                 </div>
                                 {depDateStr && (
-                                  <div className="text-[11px] text-slate-500 mt-0.5">
-                                    <span className="font-semibold text-slate-700">Dep:</span>{" "}
+                                  <div className="text-[11px] text-slate-500 mt-1">
+                                    <span className="font-semibold text-slate-600">Dep:</span>{" "}
                                     {new Date(depDateStr).toLocaleDateString("en-IN", {
                                         day: "2-digit",
                                         month: "short",
@@ -364,41 +436,56 @@ export default function GuestRequestsPage() {
                                 )}
                               </TableCell>
 
-                              {/* GUEST DETAILS & HEADCOUNT */}
-                              <TableCell>
-                                <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5 flex-wrap">
-                                  <span>{req.guestName || req.name || "Guest Visitor"}</span>
-                                  {renderGuestsBadge(req.numberOfGuests)}
-                                  {renderGenderBadge(req.guestGender)}
-                                </div>
-                                <div className="text-[11px] text-slate-500 mt-0.5">
-                                  {req.guestPhone || req.phone || "No phone provided"}
+                              {/* GUEST ROSTER & DETAILS */}
+                              <TableCell className="align-top pt-3">
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center gap-1.5">
+                                    {renderGuestsBadge(roster.length)}
+                                  </div>
+
+                                  <div className="space-y-1">
+                                    {roster.map((g, gIdx) => (
+                                      <div
+                                        key={gIdx}
+                                        className="text-xs flex items-center gap-1.5 flex-wrap bg-white/70 py-0.5 px-1.5 rounded border border-slate-100"
+                                      >
+                                        <span className="font-bold text-slate-900">{g.name || "Guest"}</span>
+                                        {renderGenderBadge(g.gender)}
+                                        {g.phone && (
+                                          <span className="text-[11px] text-slate-500">📞 {g.phone}</span>
+                                        )}
+                                        {g.relationship && g.relationship !== req.relationship && (
+                                          <span className="text-[10px] text-slate-400 font-medium">({g.relationship})</span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
                               </TableCell>
 
                               {/* RESIDENT TENANT */}
-                              <TableCell>
+                              <TableCell className="align-top pt-3">
                                 <div className="font-semibold text-slate-900 text-xs">
                                   {req.tenantName || req.tenant?.name || "Resident"}
                                 </div>
-                                <div className="text-[11px] text-slate-500">
+                                <div className="text-[11px] text-slate-500 mt-0.5">
                                   Room {req.roomNumber || req.room?.roomNumber || "N/A"}
                                   {req.room?.floor ? ` • ${req.room.floor}` : ""}
                                 </div>
                               </TableCell>
 
                               {/* RELATION & PURPOSE */}
-                              <TableCell className="text-xs">
+                              <TableCell className="text-xs align-top pt-3">
                                 <span className="font-semibold text-slate-800">
                                   {req.relationship || req.relation || "Friend"}
                                 </span>
-                                <span className="block text-[11px] text-slate-500 truncate max-w-xs">
+                                <span className="block text-[11px] text-slate-500 truncate max-w-xs mt-0.5">
                                   {req.purpose || "Visiting"}
                                 </span>
                               </TableCell>
 
                               {/* STATUS */}
-                              <TableCell>
+                              <TableCell className="align-top pt-3">
                                 <Badge
                                   className={
                                     isPending
@@ -413,7 +500,7 @@ export default function GuestRequestsPage() {
                               </TableCell>
 
                               {/* ACTIONS */}
-                              <TableCell className="text-right">
+                              <TableCell className="text-right align-top pt-3">
                                 {isPending ? (
                                   <div className="flex items-center justify-end gap-1.5">
                                     <Button
@@ -462,17 +549,20 @@ export default function GuestRequestsPage() {
             if (!open) resetAddGuestForm();
           }}
         >
-          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-teal-700 font-bold">
                 <UserCheck className="h-5 w-5" /> Add Guest Log (On Behalf of Tenant)
               </DialogTitle>
+              <DialogDescription>
+                Log visitor arrival and provide individual details for each guest.
+              </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-3 py-2 text-sm">
+            <div className="space-y-4 py-2 text-sm">
               {/* RESIDENT TENANT SELECT */}
               <div className="space-y-1">
-                <Label>Select Resident Tenant *</Label>
+                <Label className="font-semibold text-slate-800">Select Resident Tenant *</Label>
                 <Select value={selectedTenantId} onValueChange={setSelectedTenantId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select Tenant" />
@@ -487,88 +577,105 @@ export default function GuestRequestsPage() {
                 </Select>
               </div>
 
-              {/* PRIMARY GUEST NAME */}
-              <div className="space-y-1">
-                <Label>Primary Guest Name *</Label>
-                <Input
-                  value={guestName}
-                  onChange={(e) => setGuestName(e.target.value)}
-                  placeholder="e.g. Rahul Sharma"
-                />
-              </div>
-
-              {/* GENDER & NUMBER OF GUESTS */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>Guest Gender *</Label>
-                  <Select value={guestGender} onValueChange={setGuestGender}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select Gender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Male">Male</SelectItem>
-                      <SelectItem value="Female">Female</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <Label>Total Guests (Count) *</Label>
-                  <div className="flex items-center gap-1.5">
-                    <Input
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={numberOfGuests}
-                      onChange={(e) => setNumberOfGuests(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* CONDITIONAL ACCOMPANYING GUESTS */}
-              {numberOfGuests > 1 && (
-                <div className="space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                  <Label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                    <Users className="h-3.5 w-3.5 text-teal-600" /> Additional Guest Names (Optional)
+              {/* INDIVIDUAL GUEST LIST */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                    <Users className="h-4 w-4 text-teal-600" /> Guest Details ({guestList.length} Guest{guestList.length > 1 ? "s" : ""})
                   </Label>
-                  <Input
-                    value={additionalGuestNames}
-                    onChange={(e) => setAdditionalGuestNames(e.target.value)}
-                    placeholder="e.g. Amit Kumar, Priya Sharma"
-                    className="text-xs bg-white"
-                  />
-                  <p className="text-[11px] text-muted-foreground">
-                    Names of the other {numberOfGuests - 1} accompanying guest(s) staying with this visitor.
-                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddGuestItem}
+                    className="text-xs h-8 border-teal-500 text-teal-700 hover:bg-teal-50 font-bold gap-1"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add Another Guest
+                  </Button>
                 </div>
-              )}
 
-              {/* GUEST CONTACT & RELATIONSHIP */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>Guest Mobile</Label>
-                  <Input
-                    value={guestPhone}
-                    onChange={(e) => setGuestPhone(e.target.value)}
-                    placeholder="10-digit number"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Relationship</Label>
-                  <Input
-                    value={relationship}
-                    onChange={(e) => setRelationship(e.target.value)}
-                    placeholder="e.g. Parent, Friend, Sibling"
-                  />
-                </div>
+                {guestList.map((g, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-3 relative"
+                  >
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <span className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
+                        <span className="h-5 w-5 rounded-full bg-teal-100 text-teal-800 text-[11px] font-black inline-flex items-center justify-center">
+                          {idx + 1}
+                        </span>
+                        {idx === 0 ? "Primary Guest" : `Guest #${idx + 1}`}
+                      </span>
+
+                      {idx > 0 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveGuestItem(idx)}
+                          className="h-6 px-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50 text-[11px] font-semibold gap-1"
+                        >
+                          <Trash2 className="h-3 w-3" /> Remove
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold text-slate-700">Full Name *</Label>
+                        <Input
+                          value={g.name}
+                          onChange={(e) => handleGuestItemChange(idx, "name", e.target.value)}
+                          placeholder="e.g. Rahul Sharma"
+                          className="bg-white text-xs"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold text-slate-700">Gender *</Label>
+                        <Select
+                          value={g.gender}
+                          onValueChange={(val) => handleGuestItemChange(idx, "gender", val)}
+                        >
+                          <SelectTrigger className="bg-white text-xs">
+                            <SelectValue placeholder="Select Gender" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Male">Male</SelectItem>
+                            <SelectItem value="Female">Female</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold text-slate-700">Mobile Number</Label>
+                        <Input
+                          value={g.phone}
+                          onChange={(e) => handleGuestItemChange(idx, "phone", e.target.value)}
+                          placeholder="10-digit number"
+                          className="bg-white text-xs"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold text-slate-700">Relationship to Tenant</Label>
+                        <Input
+                          value={g.relationship}
+                          onChange={(e) => handleGuestItemChange(idx, "relationship", e.target.value)}
+                          placeholder="e.g. Friend, Parent, Sibling"
+                          className="bg-white text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               {/* ARRIVAL & DEPARTURE DATES */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3 pt-1">
                 <div className="space-y-1">
-                  <Label>Expected Arrival *</Label>
+                  <Label className="font-semibold text-slate-800">Expected Arrival *</Label>
                   <Input
                     type="date"
                     value={arrivalDate}
@@ -576,7 +683,7 @@ export default function GuestRequestsPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Expected Departure</Label>
+                  <Label className="font-semibold text-slate-800">Expected Departure</Label>
                   <Input
                     type="date"
                     min={arrivalDate || undefined}
@@ -588,7 +695,7 @@ export default function GuestRequestsPage() {
 
               {/* PURPOSE */}
               <div className="space-y-1">
-                <Label>Purpose of Visit</Label>
+                <Label className="font-semibold text-slate-800">Purpose of Visit</Label>
                 <Textarea
                   value={purpose}
                   onChange={(e) => setPurpose(e.target.value)}
@@ -611,9 +718,11 @@ export default function GuestRequestsPage() {
               <Button
                 className="bg-teal-600 hover:bg-teal-700 text-white font-bold"
                 onClick={() => createGuestMutation.mutate()}
-                disabled={createGuestMutation.isPending || !guestName.trim()}
+                disabled={createGuestMutation.isPending || !guestList[0]?.name.trim()}
               >
-                {createGuestMutation.isPending ? "Saving Log..." : "Save Guest Log"}
+                {createGuestMutation.isPending
+                  ? "Saving Log..."
+                  : `Save Guest Log (${guestList.filter((g) => g.name.trim()).length || 1})`}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -638,9 +747,27 @@ export default function GuestRequestsPage() {
 
             <div className="space-y-3 py-2 text-sm">
               <p className="text-slate-700">
-                Are you sure you want to {actionType} guest arrival for{" "}
-                <strong className="font-bold text-slate-900">{selectedRequest?.guestName || "Guest"}</strong>?
+                Are you sure you want to {actionType} visitor arrival for:
               </p>
+
+              {Array.isArray(selectedRequest?.guests) && selectedRequest.guests.length > 0 ? (
+                <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
+                  <div className="font-bold text-xs text-slate-800 flex items-center gap-1">
+                    <Users className="h-3.5 w-3.5 text-teal-600" />
+                    {selectedRequest.guests.length} Guest{selectedRequest.guests.length > 1 ? "s" : ""}:
+                  </div>
+                  {selectedRequest.guests.map((g: any, i: number) => (
+                    <div key={i} className="text-xs text-slate-700 flex items-center gap-1.5 flex-wrap">
+                      <span className="font-semibold">• {g.name}</span>
+                      {renderGenderBadge(g.gender)}
+                      {g.phone && <span className="text-[11px] text-slate-500">({g.phone})</span>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="font-bold text-slate-900">{selectedRequest?.guestName || "Guest"}</div>
+              )}
+
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-700">Remarks / Instructions for Guard Desk</label>
                 <Textarea
@@ -674,4 +801,5 @@ export default function GuestRequestsPage() {
     </CanAccessPage>
   );
 }
+
 

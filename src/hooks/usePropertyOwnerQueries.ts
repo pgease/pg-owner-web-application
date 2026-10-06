@@ -46,6 +46,8 @@ import {
   updateProperty,
   updateStaffPermissions,
   uploadPhoto,
+  uploadOwnerProfilePhoto,
+  deleteOwnerProfilePhoto,
   updateMe,
   type UpdatePropertyOwnerPayload,
   createBlock,
@@ -850,8 +852,36 @@ export function useStaffPermissionsAssignMutation(propertyId?: string | null) {
 export function useUploadPhotoMutation() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (file: File) => uploadPhoto(file),
+    mutationFn: (file: File) => uploadOwnerProfilePhoto(file),
+    onSuccess: (res) => {
+      const current = authStorage.getPropertyOwner();
+      if (current && res?.profilePhotoUrl) {
+        authStorage.setPropertyOwner({
+          ...current,
+          profilePhotoUrl: res.profilePhotoUrl,
+          profilePhotoKey: res.profilePhotoKey || null,
+          photoUrl: res.profilePhotoUrl,
+        });
+      }
+      qc.invalidateQueries({ queryKey: ["property-owner", "me"] });
+    },
+  });
+}
+
+export function useDeleteProfilePhotoMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => deleteOwnerProfilePhoto(),
     onSuccess: () => {
+      const current = authStorage.getPropertyOwner();
+      if (current) {
+        authStorage.setPropertyOwner({
+          ...current,
+          profilePhotoUrl: null,
+          profilePhotoKey: null,
+          photoUrl: null,
+        });
+      }
       qc.invalidateQueries({ queryKey: ["property-owner", "me"] });
     },
   });

@@ -102,8 +102,16 @@ export function EditProfileModal({ open, onOpenChange, onSuccess }: EditProfileM
       <DialogContent className="sm:max-w-[460px] p-0 overflow-hidden bg-white border border-[var(--gray-200)] shadow-xl">
         <div className="bg-[var(--gray-50)] px-6 py-5 border-b border-[var(--gray-200)]">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-[var(--brand-50)] text-[var(--brand-700)] flex items-center justify-center font-bold text-sm border border-[var(--brand-200)]">
-              {(name || me?.name || "O").slice(0, 2).toUpperCase()}
+            <div className="h-10 w-10 rounded-full bg-[var(--brand-50)] text-[var(--brand-700)] flex items-center justify-center font-bold text-sm border border-[var(--brand-200)] overflow-hidden">
+              {me?.profilePhotoUrl || (me as any)?.photoUrl ? (
+                <img
+                  src={me?.profilePhotoUrl || (me as any)?.photoUrl}
+                  alt={name || me?.name || "Owner"}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                (name || me?.name || "O").slice(0, 2).toUpperCase()
+              )}
             </div>
             <div>
               <DialogTitle className="text-base font-bold text-[var(--gray-900)]">

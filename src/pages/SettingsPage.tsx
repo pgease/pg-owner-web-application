@@ -41,6 +41,7 @@ import { useApp } from "@/context/AppContext";
 import { PageHeader } from "@/components/common/PageHeader";
 import {
   useUploadPhotoMutation,
+  useDeleteProfilePhotoMutation,
   useUpdateMeMutation,
   useAccountDeleteRequest,
   useCreateAccountDeleteRequestMutation,
@@ -65,6 +66,7 @@ export default function SettingsPage() {
   const [managementDrawerOpen, setManagementDrawerOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const uploadMut = useUploadPhotoMutation();
+  const deletePhotoMut = useDeleteProfilePhotoMutation();
   const updateMeMut = useUpdateMeMutation();
   const meQuery = useQuery({
     queryKey: ["property-owner", "me"],
@@ -170,6 +172,20 @@ export default function SettingsPage() {
       });
     }
     e.target.value = "";
+  };
+
+  const handleRemovePhoto = async () => {
+    try {
+      await deletePhotoMut.mutateAsync();
+      toast({ title: "Profile photo removed successfully" });
+      void meQuery.refetch();
+    } catch (err: unknown) {
+      toast({
+        title: "Removal failed",
+        description: err instanceof Error ? err.message : undefined,
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -339,20 +355,70 @@ export default function SettingsPage() {
           </div>
         )}
 
-        <div className="pt-2 flex items-center gap-3 border-t border-[var(--gray-200)]">
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickPhoto} />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs border-[var(--gray-300)] gap-1.5"
-            disabled={uploadMut.isPending}
-            onClick={() => fileRef.current?.click()}
-          >
-            {uploadMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-            Upload profile photo
-          </Button>
-          <span className="text-xs text-[var(--gray-500)]">JPG or PNG up to 5MB</span>
+        <div className="pt-3 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--gray-200)]">
+          <div className="flex items-center gap-3">
+            <div className="relative h-12 w-12 rounded-full overflow-hidden bg-gradient-to-br from-[#008080] to-[#005e5e] text-white flex items-center justify-center font-bold text-sm shadow-inner ring-2 ring-slate-200 dark:ring-slate-700">
+              {me?.profilePhotoUrl || (me as any)?.photoUrl ? (
+                <img
+                  src={me?.profilePhotoUrl || (me as any)?.photoUrl}
+                  alt={me?.name || "Owner Profile"}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span>{(me?.name || "PO").slice(0, 2).toUpperCase()}</span>
+              )}
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-[var(--gray-900)]">Profile Picture</p>
+              <p className="text-[11px] text-[var(--gray-500)]">
+                {me?.profilePhotoUrl || (me as any)?.photoUrl
+                  ? "Personal photo visible on owner account"
+                  : "No photo uploaded yet (PNG, JPG, WebP up to 5MB)"}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/jpg"
+              className="hidden"
+              onChange={onPickPhoto}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs border-[var(--gray-300)] gap-1.5"
+              disabled={uploadMut.isPending || deletePhotoMut.isPending}
+              onClick={() => fileRef.current?.click()}
+            >
+              {uploadMut.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Upload className="h-3.5 w-3.5" />
+              )}
+              {me?.profilePhotoUrl || (me as any)?.photoUrl ? "Change photo" : "Upload photo"}
+            </Button>
+            {me?.profilePhotoUrl || (me as any)?.photoUrl ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 gap-1.5"
+                disabled={deletePhotoMut.isPending || uploadMut.isPending}
+                onClick={handleRemovePhoto}
+              >
+                {deletePhotoMut.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3.5 w-3.5" />
+                )}
+                Remove
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
 

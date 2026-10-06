@@ -143,7 +143,7 @@ export const RentPayments = () => {
   const [tenantId, setTenantId] = useState("");
   const [amountPaid, setAmountPaid] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
-  const [paymentMode, setPaymentMode] = useState("UPI");
+  const [paymentMode, setPaymentMode] = useState("cash");
 
   const handleOpenRecordPayment = (row?: RentDashboardTenantRow) => {
     if (entitlements.isExpired) {
@@ -524,21 +524,25 @@ export const RentPayments = () => {
     }
 
     try {
+      const normalizedMethod = (paymentMode || "cash").toLowerCase().replace(/\s+/g, "_");
       await manualMut.mutateAsync({
         roomTenantId: roomTenantId.trim(),
         tenantId: tenantId.trim(),
         periodMonth: month,
         periodYear: year,
         amountPaid: amt,
+        paymentMethod: normalizedMethod,
+        reference: paymentReference.trim() || undefined,
       });
 
       toast({
         title: "Payment recorded successfully",
-        description: `Credited ${formatINR(amt)} to tenant register.`,
+        description: `Credited ${formatINR(amt)} via ${normalizedMethod.toUpperCase()} to tenant register.`,
       });
       setManualPaymentOpen(false);
       setAmountPaid("");
       setPaymentReference("");
+      setPaymentMode("cash");
       void rentQuery.refetch();
     } catch (e: any) {
       toast({
@@ -558,6 +562,8 @@ export const RentPayments = () => {
         periodMonth: month,
         periodYear: year,
         amountPaid: item.amountClaimed,
+        paymentMethod: "upi",
+        reference: item.utrNumber || undefined,
       });
 
       setVerifications((prev) =>
@@ -1967,16 +1973,16 @@ export const RentPayments = () => {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Payment Mode</Label>
+                  <Label className="text-xs">Payment Method</Label>
                   <Select value={paymentMode} onValueChange={setPaymentMode}>
                     <SelectTrigger className="h-9 text-xs">
-                      <SelectValue />
+                      <SelectValue placeholder="Select Method" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="UPI">UPI / QR Code</SelectItem>
-                      <SelectItem value="Cash">Cash</SelectItem>
-                      <SelectItem value="Bank Transfer">Bank Transfer (NEFT/IMPS)</SelectItem>
-                      <SelectItem value="Cheque">Cheque</SelectItem>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="upi">UPI / QR Code (GPay, PhonePe, Paytm)</SelectItem>
+                      <SelectItem value="bank_transfer">Bank Transfer (NEFT/IMPS)</SelectItem>
+                      <SelectItem value="cheque">Cheque</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

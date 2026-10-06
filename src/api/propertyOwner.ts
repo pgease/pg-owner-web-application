@@ -36,6 +36,12 @@ export interface PropertyOwner {
   language: string;
   bankDetails: unknown | null;
   createdBy: string;
+  referralCode?: string;
+  referredByCode?: string | null;
+  profilePhotoUrl?: string | null;
+  profilePhotoKey?: string | null;
+  photoUrl?: string | null;
+  imageUrl?: string | null;
   createdAt: string;
 }
 
@@ -321,6 +327,9 @@ export interface UpdatePropertyOwnerPayload {
   phone?: string;
   countryCode?: string;
   language?: "en-US" | "hi-IN";
+  profilePhotoUrl?: string;
+  profilePhotoKey?: string;
+  photoUrl?: string;
   bankDetails?: Record<string, unknown>;
   kycInfo?: Record<string, unknown>;
 }
@@ -359,6 +368,32 @@ export async function uploadPhoto(file: File) {
     auth: true,
     body: formData,
   });
+}
+
+// Upload Owner Profile Photo
+export async function uploadOwnerProfilePhoto(file: File) {
+  const formData = new FormData();
+  formData.append("photo", file);
+
+  return httpRequest<UploadPhotoResponse & { profilePhotoUrl?: string; profilePhotoKey?: string; photoUrl?: string }>(
+    `${PROPERTY_OWNER_BASE}/me/profile-photo`,
+    {
+      method: "POST",
+      auth: true,
+      body: formData,
+    }
+  );
+}
+
+// Delete Owner Profile Photo
+export async function deleteOwnerProfilePhoto() {
+  return httpRequest<{ success: boolean; message: string }>(
+    `${PROPERTY_OWNER_BASE}/me/profile-photo`,
+    {
+      method: "DELETE",
+      auth: true,
+    }
+  );
 }
 
 // Property Types and Amenities
@@ -1680,10 +1715,16 @@ export async function rejectKycApplication(roomTenantId: string, reason: string)
 
 export interface ManualRentCollectionPayload {
   roomTenantId: string;
-  tenantId: string;
-  periodMonth: number;
-  periodYear: number;
+  tenantId?: string;
+  periodMonth?: number;
+  periodYear?: number;
   amountPaid: number;
+  paymentMethod?: "cash" | "upi" | "bank_transfer" | "cheque" | "card" | string;
+  reference?: string;
+  notes?: string;
+  status?: "paid" | "partial" | "pending";
+  paidAt?: string;
+  dueType?: string;
 }
 
 export async function postManualRentCollection(propertyId: string, payload: ManualRentCollectionPayload) {
@@ -2491,6 +2532,14 @@ export async function updatePropertyWifiHierarchy(
 // GUEST ARRIVAL REQUESTS
 // ==========================================================
 
+export interface GuestDetailItem {
+  name: string;
+  phone?: string;
+  gender?: "Male" | "Female" | "Other" | string;
+  relationship?: string;
+  idProofUrl?: string;
+}
+
 export interface CreateGuestRequestPayload {
   tenantId?: string;
   roomTenantId?: string;
@@ -2501,6 +2550,7 @@ export interface CreateGuestRequestPayload {
   expectedArrival: string;
   expectedDeparture?: string;
   numberOfGuests?: number;
+  guests?: GuestDetailItem[];
   purpose?: string;
   idProofUrl?: string;
 }
@@ -2517,8 +2567,10 @@ export interface GuestRequestItem {
   expectedArrival: string;
   expectedDeparture?: string;
   numberOfGuests?: number;
+  guests?: GuestDetailItem[];
   purpose?: string;
   idProofUrl?: string;
+
   status: "pending" | "approved" | "rejected" | string;
   ownerRemarks?: string;
   actionTakenAt?: string;

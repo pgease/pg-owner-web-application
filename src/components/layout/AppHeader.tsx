@@ -433,16 +433,24 @@ const AppHeader = ({ onMenuToggle, onSidebarToggle, isSidebarCollapsed }: AppHea
               </TooltipContent>
             </Tooltip>
 
-            {/* Rentok-style User Avatar Pill (Solid circular with initial) */}
+            {/* Rentok-style User Avatar Pill (Solid circular with initial or photo) */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="h-9 w-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-black text-sm flex items-center justify-center ring-2 ring-white/50 shadow-md hover:scale-105 transition-all select-none cursor-pointer"
+                  className="h-9 w-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-black text-sm flex items-center justify-center ring-2 ring-white/50 shadow-md hover:scale-105 transition-all select-none cursor-pointer overflow-hidden"
                   aria-label="Account menu"
                   title={ownerName}
                 >
-                  {initials}
+                  {owner?.profilePhotoUrl || (owner as any)?.photoUrl ? (
+                    <img
+                      src={owner?.profilePhotoUrl || (owner as any)?.photoUrl}
+                      alt={ownerName}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    initials
+                  )}
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent
@@ -451,8 +459,16 @@ const AppHeader = ({ onMenuToggle, onSidebarToggle, isSidebarCollapsed }: AppHea
               >
                 <DropdownMenuLabel className="font-normal p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl mb-1 border border-slate-100 dark:border-slate-700/60">
                   <div className="flex items-center gap-2.5">
-                    <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-[#008080] to-[#005e5e] text-white font-black text-xs flex items-center justify-center shadow-xs ring-2 ring-[#008080]/20">
-                      {initials}
+                    <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-[#008080] to-[#005e5e] text-white font-black text-xs flex items-center justify-center shadow-xs ring-2 ring-[#008080]/20 overflow-hidden">
+                      {owner?.profilePhotoUrl || (owner as any)?.photoUrl ? (
+                        <img
+                          src={owner?.profilePhotoUrl || (owner as any)?.photoUrl}
+                          alt={ownerName}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        initials
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-extrabold text-slate-900 dark:text-white leading-tight">
