@@ -3411,6 +3411,8 @@ const TUTORIAL_KEY_FALLBACK_MAP: Record<string, string> = {
   "tracking pg expenses, electricity & monthly profits": "expense_tracker",
   "tenant complaints & maintenance ticketing": "complaints_resolution",
   "publishing your pg online & capturing direct leads": "public_listing",
+  "how to post your pg in live": "post_your_pg_in_live",
+  "how to post your pg": "post_your_pg_in_live",
 };
 
 /**

@@ -69,6 +69,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/use-toast";
 import { PostPgSearchModal } from "@/components/property/PostPgSearchModal";
+import { HelpLink } from "@/components/common/HelpLink";
 
 // Standard Categorized Amenities Catalog (Synchronized with My PGs -> Amenities)
 export const CATALOG_AMENITIES_BY_CATEGORY = [
@@ -830,6 +831,13 @@ export default function PublicListingPage() {
               aria-label="Toggle Public Search Visibility"
             />
           </div>
+
+          {/* Watch Tutorial Button */}
+          <HelpLink
+            tutorialKey="post_your_pg_in_live"
+            label="Watch Tutorial"
+            className="rounded-xl text-xs font-bold gap-1.5 border-border/80 px-3"
+          />
 
           {/* Optional modal wizard */}
           <Button

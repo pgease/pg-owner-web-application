@@ -216,9 +216,9 @@ const AppHeader = ({ onMenuToggle, onSidebarToggle, isSidebarCollapsed }: AppHea
     <>
       {/* Header bar: fixed at the top of the app container, never scrolls */}
       <header className="h-[64px] shrink-0 bg-gradient-to-r from-[#005555] via-[#005050] to-[#004848] text-white select-none z-20">
-        <div className="flex h-full items-center justify-between gap-2.5 sm:gap-4 px-3 sm:px-6">
+        <div className="flex h-full items-center justify-between gap-1.5 sm:gap-4 px-2.5 sm:px-6">
           {/* Left section: Mobile menu + Mobile property switcher */}
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-3 min-w-0 shrink-0">
             {/* Mobile-only menu toggle */}
             <button
               type="button"
@@ -230,21 +230,23 @@ const AppHeader = ({ onMenuToggle, onSidebarToggle, isSidebarCollapsed }: AppHea
             </button>
 
             {/* Mobile-only brand & property switcher */}
-            <div className="flex items-center gap-2 md:hidden min-w-0">
+            <div className="flex items-center md:hidden min-w-0">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="flex items-center gap-1.5 px-2 py-1 rounded-xl bg-white/10 text-white text-xs font-bold truncate cursor-pointer"
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold truncate cursor-pointer transition-colors max-w-[140px] sm:max-w-[200px]"
                   >
                     <div className="h-6 w-6 rounded-full bg-white flex items-center justify-center p-0.5 shrink-0">
                       <img src={pgeaseIconColor} alt="PG Ease" className="h-full w-full object-contain" />
                     </div>
-                    <span className="truncate max-w-[120px]">{selectedPg ? selectedPg.name : "My PG"}</span>
+                    <span className="truncate max-w-[70px] xs:max-w-[95px] sm:max-w-[130px]">
+                      {selectedPg ? selectedPg.name : "My PG"}
+                    </span>
                     <ChevronDown className="h-3 w-3 text-teal-200 shrink-0" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-68 rounded-2xl p-2 shadow-2xl border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 z-50">
+                <DropdownMenuContent align="start" className="w-68 max-w-[calc(100vw-2rem)] rounded-2xl p-2 shadow-2xl border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 z-50">
                   <div className="px-2 py-1">
                     <p className="text-xs font-black uppercase tracking-wider text-slate-400">Switch Active PG</p>
                   </div>
@@ -278,26 +280,36 @@ const AppHeader = ({ onMenuToggle, onSidebarToggle, isSidebarCollapsed }: AppHea
             </div>
           </div>
 
-          {/* Center section: Search Bar -> Opens Quick Command Palette on Click */}
-          <div className="flex-1 max-w-md mx-2 sm:mx-6 flex justify-center">
+          {/* Center section: Search Bar -> Opens Quick Command Palette on Click (hidden on small mobile to avoid crushing the header) */}
+          <div className="hidden sm:flex flex-1 max-w-md mx-2 sm:mx-6 justify-center min-w-0">
             <button
               type="button"
               onClick={() => setSearchModalOpen(true)}
-              className="group flex items-center justify-between gap-2.5 bg-black/25 hover:bg-black/35 focus:bg-black/45 border border-white/20 hover:border-teal-300 rounded-full px-4 py-2 w-full text-xs text-white shadow-inner transition-all ring-1 ring-teal-400/25 hover:ring-teal-400/50 cursor-pointer text-left"
+              className="group flex items-center justify-between gap-2.5 bg-black/25 hover:bg-black/35 focus:bg-black/45 border border-white/20 hover:border-teal-300 rounded-full px-4 py-2 w-full text-xs text-white shadow-inner transition-all ring-1 ring-teal-400/25 hover:ring-teal-400/50 cursor-pointer text-left min-w-0"
               title="Click or press ⌘K to open command palette"
             >
-              <div className="flex items-center gap-2.5 text-teal-100/80 group-hover:text-white transition-colors truncate">
+              <div className="flex items-center gap-2.5 text-teal-100/80 group-hover:text-white transition-colors truncate min-w-0">
                 <Search className="h-3.5 w-3.5 text-teal-200 shrink-0" />
                 <span className="text-xs truncate">Search tenants, rooms, dues, quick actions...</span>
               </div>
-              <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-bold text-teal-200 border border-white/15 shrink-0 group-hover:bg-white/20 group-hover:text-white">
+              <kbd className="hidden md:inline-flex items-center gap-0.5 rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-bold text-teal-200 border border-white/15 shrink-0 group-hover:bg-white/20 group-hover:text-white">
                 <Command className="h-3 w-3" /> K
               </kbd>
             </button>
           </div>
 
-          {/* Right section: Action Buttons & User Menu (Matching Rentok) */}
-          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          {/* Right section: Action Buttons & User Menu */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+            {/* Mobile-only Quick Search Button */}
+            <button
+              type="button"
+              onClick={() => setSearchModalOpen(true)}
+              className="sm:hidden h-8 w-8 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white flex items-center justify-center transition-all shadow-xs cursor-pointer shrink-0"
+              aria-label="Open search"
+              title="Search"
+            >
+              <Search className="h-4 w-4 text-teal-200" />
+            </button>
             {/* Plan Badge Pill */}
             {planChip ? (
               <button
@@ -350,7 +362,7 @@ const AppHeader = ({ onMenuToggle, onSidebarToggle, isSidebarCollapsed }: AppHea
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
-                      className="relative h-9 w-9 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white flex items-center justify-center transition-all shadow-xs hover:scale-105 cursor-pointer"
+                      className="relative h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white flex items-center justify-center transition-all shadow-xs hover:scale-105 cursor-pointer shrink-0"
                       aria-label="View notifications"
                     >
                       <Bell className="h-4 w-4 text-teal-200 hover:text-white" />
@@ -363,7 +375,7 @@ const AppHeader = ({ onMenuToggle, onSidebarToggle, isSidebarCollapsed }: AppHea
               </Tooltip>
               <DropdownMenuContent
                 align="end"
-                className="w-80 rounded-2xl p-3 shadow-2xl border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 z-50"
+                className="w-72 sm:w-80 max-w-[calc(100vw-1.5rem)] rounded-2xl p-3 shadow-2xl border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 z-50"
               >
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
                   <span className="text-xs font-bold text-slate-900 dark:text-white">Notifications</span>
@@ -400,9 +412,9 @@ const AppHeader = ({ onMenuToggle, onSidebarToggle, isSidebarCollapsed }: AppHea
                   <img
                     src={mascotRent}
                     alt="Ease Buddy"
-                    className="h-8 w-8 rounded-full object-cover object-top ring-2 ring-emerald-400 group-hover:scale-105 transition-transform"
+                    className="h-7 w-7 sm:h-8 sm:w-8 rounded-full object-cover object-top ring-2 ring-emerald-400 group-hover:scale-105 transition-transform"
                   />
-                  <span className="absolute -bottom-1 -right-1 bg-emerald-500 text-[8px] font-black text-white px-1 rounded-full uppercase shadow-xs">
+                  <span className="absolute -bottom-1 -right-1 bg-emerald-500 text-[7.5px] font-black text-white px-1 rounded-full uppercase shadow-xs">
                     AI
                   </span>
                 </button>
@@ -412,13 +424,13 @@ const AppHeader = ({ onMenuToggle, onSidebarToggle, isSidebarCollapsed }: AppHea
               </TooltipContent>
             </Tooltip>
 
-            {/* Theme Toggle Button */}
+            {/* Theme Toggle Button (Tablet & Desktop) */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   type="button"
                   onClick={() => setIsDark((v) => !v)}
-                  className="h-9 w-9 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white flex items-center justify-center transition-all shadow-xs hover:scale-105 cursor-pointer"
+                  className="hidden sm:flex h-9 w-9 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white items-center justify-center transition-all shadow-xs hover:scale-105 cursor-pointer shrink-0"
                   aria-label="Toggle light or dark appearance"
                 >
                   {isDark ? (
@@ -438,7 +450,7 @@ const AppHeader = ({ onMenuToggle, onSidebarToggle, isSidebarCollapsed }: AppHea
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="h-9 w-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-black text-sm flex items-center justify-center ring-2 ring-white/50 shadow-md hover:scale-105 transition-all select-none cursor-pointer overflow-hidden"
+                  className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-black text-xs sm:text-sm flex items-center justify-center ring-2 ring-white/50 shadow-md hover:scale-105 transition-all select-none cursor-pointer shrink-0 overflow-hidden"
                   aria-label="Account menu"
                   title={ownerName}
                 >
@@ -455,7 +467,7 @@ const AppHeader = ({ onMenuToggle, onSidebarToggle, isSidebarCollapsed }: AppHea
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="w-68 rounded-2xl p-2 shadow-2xl border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900"
+                className="w-68 max-w-[calc(100vw-1.5rem)] rounded-2xl p-2 shadow-2xl border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900"
               >
                 <DropdownMenuLabel className="font-normal p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl mb-1 border border-slate-100 dark:border-slate-700/60">
                   <div className="flex items-center gap-2.5">
@@ -501,6 +513,20 @@ const AppHeader = ({ onMenuToggle, onSidebarToggle, isSidebarCollapsed }: AppHea
                   >
                     <ShieldCheck className="h-4 w-4 text-[#008080]" />
                     <span>Business Settings & Rules</span>
+                  </DropdownMenuItem>
+
+                  {/* Theme Switcher inside menu for mobile convenience */}
+                  <DropdownMenuItem
+                    onClick={() => setIsDark((v) => !v)}
+                    className="sm:hidden flex items-center justify-between rounded-xl px-2.5 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      {isDark ? <Sun className="h-4 w-4 text-amber-500" /> : <Moon className="h-4 w-4 text-teal-600" />}
+                      <span>Appearance</span>
+                    </div>
+                    <span className="text-[11px] font-semibold text-slate-400">
+                      {isDark ? "Dark Mode" : "Light Mode"}
+                    </span>
                   </DropdownMenuItem>
 
                   <DropdownMenuSeparator className="bg-slate-100 dark:bg-slate-800 my-1" />
@@ -550,11 +576,11 @@ const AppHeader = ({ onMenuToggle, onSidebarToggle, isSidebarCollapsed }: AppHea
       {/* Quick Command Palette Modal Dialog */}
       {searchModalOpen ? (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-4 bg-black/65 backdrop-blur-xs animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 flex items-start justify-center pt-10 sm:pt-24 px-3 sm:px-4 bg-black/65 backdrop-blur-xs animate-in fade-in duration-150"
           onClick={() => setSearchModalOpen(false)}
         >
           <div
-            className="w-full max-w-xl bg-slate-900 border border-slate-700/80 text-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[80vh]"
+            className="w-full max-w-xl bg-slate-900 border border-slate-700/80 text-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Search Input Bar */}

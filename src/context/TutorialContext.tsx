@@ -32,8 +32,8 @@ const ROUTE_TUTORIAL_MAP: Record<string, string> = {
   "/rent-payments": "rent_collection",
   "/my-pgs/structure": "room_management",
   "/my-pgs": "room_management",
-  "/post-pg": "public_listing",
-  "/public-listing": "public_listing",
+  "/post-pg": "post_your_pg_in_live",
+  "/public-listing": "post_your_pg_in_live",
   "/team": "staff_management",
   "/complaints": "complaints_resolution",
   "/expenses": "expense_tracker",
@@ -90,7 +90,12 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const topic = formatKeyToTitle(tutorialKey || "PG Ease");
     const search = `https://www.youtube.com/results?search_query=${encodeURIComponent(`PG Ease ${topic} tutorial`)}`;
     try {
-      const data = await getTutorialByKey(tutorialKey);
+      let data = await getTutorialByKey(tutorialKey);
+      if (!data && tutorialKey === "post_your_pg_in_live") {
+        data = await getTutorialByKey("public_listing");
+      } else if (!data && tutorialKey === "public_listing") {
+        data = await getTutorialByKey("post_your_pg_in_live");
+      }
       const watch = toWatchUrl(data?.videoUrl || data?.youtube_url || data?.youtubeUrl);
       window.open(watch || search, "_blank", "noopener,noreferrer");
     } catch {
@@ -106,7 +111,12 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setIsOpen(true);
 
     try {
-      const data = await getTutorialByKey(tutorialKey);
+      let data = await getTutorialByKey(tutorialKey);
+      if (!data && tutorialKey === "post_your_pg_in_live") {
+        data = await getTutorialByKey("public_listing");
+      } else if (!data && tutorialKey === "public_listing") {
+        data = await getTutorialByKey("post_your_pg_in_live");
+      }
       const video = data?.videoUrl || data?.youtube_url || data?.youtubeUrl;
       if (data && video) {
         setActiveTutorial(data);

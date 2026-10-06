@@ -714,7 +714,7 @@ const SidebarContent = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
       {/* Primary Navigation */}
       <nav
         aria-label="Main"
-        className="flex-1 overflow-y-auto px-2 py-2.5 space-y-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-teal-800/40 hover:[&::-webkit-scrollbar-thumb]:bg-teal-700/60 [&::-webkit-scrollbar-thumb]:rounded-full"
+        className="flex-1 overflow-y-auto overscroll-contain px-2 py-2.5 space-y-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-teal-800/40 hover:[&::-webkit-scrollbar-thumb]:bg-teal-700/60 [&::-webkit-scrollbar-thumb]:rounded-full"
       >
         {NAV_ITEMS.map((item, index) => {
           const showSection = !collapsed && item.section;
@@ -837,7 +837,7 @@ const AppSidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }: AppSideb
       {/* Mobile Drawer */}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-50 flex h-screen w-[280px] flex-col border-r border-white/10 bg-gradient-to-b from-[#005555] via-[#004b4b] to-[#003d3d] text-white transition-[transform,visibility] duration-200 md:hidden shadow-2xl select-none",
+          "fixed left-0 top-0 z-50 flex h-dvh max-h-screen w-[280px] max-w-[85vw] flex-col border-r border-white/10 bg-gradient-to-b from-[#005555] via-[#004b4b] to-[#003d3d] text-white transition-[transform,visibility] duration-200 md:hidden shadow-2xl select-none",
           mobileOpen ? "translate-x-0 visible" : "-translate-x-full invisible",
         )}
         aria-hidden={!mobileOpen}

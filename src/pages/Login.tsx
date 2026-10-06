@@ -1,10 +1,17 @@
 import { useEffect, useState, useCallback } from "react";
-import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { toast } from "@/components/ui/use-toast";
 
-import { requestOtp, verifyOtp, type OtpChannel } from "@/api/propertyOwner";
+import {
+  requestOtp,
+  verifyOtp,
+  updateMe,
+  type OtpChannel,
+  type VerifyOtpResponse,
+} from "@/api/propertyOwner";
+import { authStorage } from "@/api/http";
 import pgeaseLogo from "@/assets/pgease-logo.png";
 import {
   Lock,
@@ -19,11 +26,11 @@ import {
   Banknote,
   LayoutGrid,
   User,
+  Sparkles,
 } from "lucide-react";
 
-type Step = "phone" | "otp";
+type Step = "phone" | "otp" | "first_time_name";
 type Lang = "en" | "hi";
-type AuthMode = "signin" | "signup";
 
 const LAST_PHONE_KEY = "pgEase_lastPhone";
 const LANG_STORAGE_KEY = "pgEase_lang";
@@ -137,16 +144,10 @@ const TEXTS = {
     tabSignUp: "New Owner Sign Up",
     titleSignIn: "Sign in to PG Ease",
     subtitleSignIn: "Enter your registered mobile number. Zero password hassle.",
-    titleSignUp: "Create Owner Account",
-    subtitleSignUp: "Register your PG and start with 45-day free Pro access.",
-    promptToSignUp: "New to PG Ease?",
-    actionSignUp: "Sign Up for Free",
-    promptToSignIn: "Already have an account?",
-    actionSignIn: "Sign in here",
-    nameLabel: "PG Owner Name",
+    nameLabel: "Your Full Name",
     nameOptional: "Optional",
-    namePlaceholder: "e.g. Rahul Sharma (optional)",
-    nameHint: "Used on tenant rent receipts and your owner profile.",
+    namePlaceholder: "e.g. Rahul Sharma",
+    nameHint: "Used on tenant rent receipts, invoices, and your owner profile.",
     signingUpAs: "Registering as",
     phoneLabel: "MOBILE NUMBER",
     otpNote: "We will send a 6-digit one-time password (OTP)",
@@ -165,6 +166,10 @@ const TEXTS = {
     resendSms: "Resend via SMS",
     resendIn: "Resend code in",
     switchChannelPrompt: "Didn't receive the code?",
+    firstTimeTitle: "Welcome to PG Ease! 🎉",
+    firstTimeSubtitle: "Please enter your name to complete your owner account setup.",
+    firstTimeContinue: "Continue to Dashboard",
+    firstTimeSaving: "Setting up your account...",
   },
   hi: {
     trustedPill: "भारत भर में 2,500+ पीजी और हॉस्टल मालिकों का भरोसा",
@@ -177,15 +182,9 @@ const TEXTS = {
     tabSignUp: "नया खाता बनाएं",
     titleSignIn: "पीजी ईज़ में लॉगिन करें",
     subtitleSignIn: "अपना पंजीकृत मोबाइल नंबर दर्ज करें। पासवर्ड का कोई झंझट नहीं।",
-    titleSignUp: "नया ओनर खाता बनाएं",
-    subtitleSignUp: "अपना पीजी रजिस्टर करें और 45 दिनों का मुफ़्त Pro एक्सेस पाएं।",
-    promptToSignUp: "नया खाता बनाना चाहते हैं?",
-    actionSignUp: "मुफ़्त साइन अप करें",
-    promptToSignIn: "पहले से खाता है?",
-    actionSignIn: "यहाँ साइन इन करें",
-    nameLabel: "पीजी मालिक का नाम",
+    nameLabel: "आपका पूरा नाम",
     nameOptional: "वैकल्पिक",
-    namePlaceholder: "उदा. राहुल शर्मा (वैकल्पिक)",
+    namePlaceholder: "उदा. राहुल शर्मा",
     nameHint: "किरायेदार रसीदों और आपके ओनर प्रोफ़ाइल पर उपयोग किया जाता है।",
     signingUpAs: "रजिस्टर कर रहे हैं",
     phoneLabel: "मोबाइल नंबर",
@@ -194,7 +193,7 @@ const TEXTS = {
     sendOtpWhatsapp: "व्हाट्सएप पर ओटीपी पाएं",
     sendOtpSms: "एसएमएस द्वारा ओटीपी पाएं",
     sending: "भेज रहे हैं...",
-    trialPill: "नए पीजी मालिक? 30 दिनों का मुफ़्त Pro ट्रायल सक्रिय",
+    trialPill: "नए पीजी मालिक? 45 दिनों का मुफ़्त Pro ट्रायल सक्रिय",
     verifyTitle: "मोबाइल नंबर सत्यापित करें",
     verifySubWhatsapp: "व्हाट्सएप पर भेजा गया 4-अंकीय कोड दर्ज करें",
     verifySubSms: "एसएमएस द्वारा भेजा गया 4-अंकीय कोड दर्ज करें",
@@ -205,22 +204,16 @@ const TEXTS = {
     resendSms: "एसएमएस द्वारा पुनः भेजें",
     resendIn: "पुनः भेजें",
     switchChannelPrompt: "कोड प्राप्त नहीं हुआ?",
+    firstTimeTitle: "पीजी ईज़ में आपका स्वागत है! 🎉",
+    firstTimeSubtitle: "अपना ओनर खाता पूरा करने के लिए कृपया अपना नाम दर्ज करें।",
+    firstTimeContinue: "डैशबोर्ड खोलें",
+    firstTimeSaving: "खाता सेटअप हो रहा है...",
   },
 };
 
 /* ==================== Main Component ==================== */
-export default function Login({ initialMode }: { initialMode?: AuthMode } = {}) {
+export default function Login({ initialMode: _initialMode }: { initialMode?: string } = {}) {
   const navigate = useNavigate();
-  const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  const [mode, setMode] = useState<AuthMode>(() => {
-    if (initialMode) return initialMode;
-    if (location.pathname === "/signup") return "signup";
-    const q = searchParams.get("mode");
-    if (q === "signup") return "signup";
-    return "signin";
-  });
 
   const [lang, setLang] = useState<Lang>(() => {
     try {
@@ -239,13 +232,16 @@ export default function Login({ initialMode }: { initialMode?: AuthMode } = {}) 
       return "";
     }
   });
-  const [pgOwnerName, setPgOwnerName] = useState("");
   const [otp, setOtp] = useState("");
   const [shaking, setShaking] = useState(false);
 
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [isSavingName, setIsSavingName] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+
+  const [verifiedAuthData, setVerifiedAuthData] = useState<VerifyOtpResponse | null>(null);
+  const [firstTimeOwnerName, setFirstTimeOwnerName] = useState("");
 
   const { secondsLeft, start, reset, canResend } = useResendTimer(30);
   const phoneValid = phone.length === 10;
@@ -351,21 +347,39 @@ export default function Login({ initialMode }: { initialMode?: AuthMode } = {}) 
       if (otpValue.length !== 4) return;
       try {
         setIsVerifyingOtp(true);
-        const data = await verifyOtp(phone, otpValue, pgOwnerName.trim() || undefined);
+        const data = await verifyOtp(phone, otpValue);
 
-        setShowSuccess(true);
-        toast({
-          title: "Authenticated Successfully",
-          description: data.isNewUser ? "Welcome! Let's set up your property." : "Welcome back to PG Ease.",
-        });
+        const currentName = data.propertyOwner?.name?.trim();
+        const isPlaceholder =
+          !currentName ||
+          currentName.toLowerCase() === "owner" ||
+          currentName.toLowerCase().startsWith("user_");
+        const isFirstTime = Boolean(data.isNewUser || isPlaceholder);
 
-        setTimeout(() => {
-          if (data.isNewUser || !data.hasProperties) {
-            navigate("/onboarding", { replace: true });
-          } else {
-            navigate("/dashboard", { replace: true });
-          }
-        }, 800);
+        if (isFirstTime) {
+          // First-time owner signup: prompt for their name before entering dashboard
+          setVerifiedAuthData(data);
+          setStep("first_time_name");
+          toast({
+            title: "Mobile Verified!",
+            description: "Welcome to PG Ease! Please enter your name to complete your setup.",
+          });
+        } else {
+          // Normal returning login: never ask for name, direct access
+          setShowSuccess(true);
+          toast({
+            title: "Authenticated Successfully",
+            description: `Welcome back${currentName ? `, ${currentName}` : ""}!`,
+          });
+
+          setTimeout(() => {
+            if (!data.hasProperties) {
+              navigate("/onboarding", { replace: true });
+            } else {
+              navigate("/dashboard", { replace: true });
+            }
+          }, 700);
+        }
       } catch (error: any) {
         triggerShake();
         setOtp("");
@@ -378,8 +392,59 @@ export default function Login({ initialMode }: { initialMode?: AuthMode } = {}) 
         setIsVerifyingOtp(false);
       }
     },
-    [phone, pgOwnerName, navigate, triggerShake]
+    [phone, navigate, triggerShake]
   );
+
+  const handleSaveFirstTimeName = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = firstTimeOwnerName.trim();
+    if (!trimmed) {
+      toast({
+        title: "Name required",
+        description: "Please enter your full name to proceed.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSavingName(true);
+      const updated = await updateMe({ name: trimmed });
+      if (verifiedAuthData) {
+        authStorage.setPropertyOwner({
+          ...verifiedAuthData.propertyOwner,
+          name: updated?.name || trimmed,
+        });
+      }
+      setShowSuccess(true);
+      toast({
+        title: `Welcome, ${trimmed}!`,
+        description: "Your PG Ease account is ready.",
+      });
+
+      setTimeout(() => {
+        if (verifiedAuthData?.hasProperties) {
+          navigate("/dashboard", { replace: true });
+        } else {
+          navigate("/onboarding", { replace: true });
+        }
+      }, 700);
+    } catch {
+      // Graceful fallback: persist name in local storage session so user is not blocked
+      if (verifiedAuthData) {
+        authStorage.setPropertyOwner({
+          ...verifiedAuthData.propertyOwner,
+          name: trimmed,
+        });
+      }
+      setShowSuccess(true);
+      setTimeout(() => {
+        navigate(verifiedAuthData?.hasProperties ? "/dashboard" : "/onboarding", { replace: true });
+      }, 700);
+    } finally {
+      setIsSavingName(false);
+    }
+  };
 
   const handleOtpChange = useCallback(
     (value: string) => {
@@ -572,6 +637,63 @@ export default function Login({ initialMode }: { initialMode?: AuthMode } = {}) 
                   </p>
                 </div>
               </div>
+            ) : step === "first_time_name" ? (
+              /* First-Time Sign Up: Prompt for PG Owner Name */
+              <form
+                onSubmit={handleSaveFirstTimeName}
+                className="space-y-4 max-w-[390px] sm:max-w-[420px] mx-auto w-full animate-in fade-in duration-300"
+              >
+                <div className="space-y-1.5">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#E8F4F4] text-[#008080] text-xs font-bold">
+                    <Sparkles className="h-3.5 w-3.5 text-[#008080]" />
+                    <span>First-Time Setup</span>
+                  </div>
+                  <h2 className="text-2xl sm:text-[25px] font-extrabold text-[#18212B] tracking-tight">
+                    {T.firstTimeTitle}
+                  </h2>
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    {T.firstTimeSubtitle}
+                  </p>
+                </div>
+
+                <div className="space-y-1 pt-1">
+                  <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5 text-[#008080]" />
+                    <span>{T.nameLabel}</span>
+                  </label>
+                  <div className="flex rounded-lg border border-gray-300 bg-white overflow-hidden focus-within:border-[#008080] focus-within:ring-2 focus-within:ring-[#CCE6E6] h-11 sm:h-12 transition-all">
+                    <input
+                      autoFocus
+                      value={firstTimeOwnerName}
+                      onChange={(e) => setFirstTimeOwnerName(e.target.value)}
+                      placeholder={T.namePlaceholder}
+                      autoComplete="name"
+                      className="flex-1 h-full px-3 text-sm font-semibold text-gray-900 placeholder:text-gray-400 outline-none"
+                    />
+                  </div>
+                  <p className="text-[10.5px] sm:text-[11px] text-gray-400">
+                    {T.nameHint}
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={!firstTimeOwnerName.trim() || isSavingName}
+                  className="w-full h-11 sm:h-12 rounded-lg bg-[#007A78] hover:bg-[#006866] active:bg-[#005755] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+                >
+                  {isSavingName ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin text-white" />
+                      <span>{T.firstTimeSaving}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>{T.firstTimeContinue}</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              </form>
             ) : step === "phone" ? (
               <div className="space-y-3.5 sm:space-y-4 max-w-[390px] sm:max-w-[420px] mx-auto w-full">
                 {/* Mobile Social Proof Strip */}
@@ -587,74 +709,15 @@ export default function Login({ initialMode }: { initialMode?: AuthMode } = {}) 
                   </span>
                 </div>
 
-                {/* Sign In vs Sign Up Segmented Control */}
-                <div className="grid grid-cols-2 p-1 bg-gray-100 rounded-xl text-xs font-semibold select-none border border-gray-200/70">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMode("signin");
-                      setPgOwnerName("");
-                    }}
-                    className={`py-2 rounded-lg transition-all text-center ${
-                      mode === "signin"
-                        ? "bg-white text-gray-900 shadow-2xs font-bold"
-                        : "text-gray-500 hover:text-gray-900"
-                    }`}
-                  >
-                    {T.tabSignIn}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMode("signup")}
-                    className={`py-2 rounded-lg transition-all text-center flex items-center justify-center gap-1.5 ${
-                      mode === "signup"
-                        ? "bg-white text-[#008080] shadow-2xs font-bold"
-                        : "text-gray-500 hover:text-gray-900"
-                    }`}
-                  >
-                    <span>{T.tabSignUp}</span>
-                    <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold uppercase">
-                      Trial
-                    </span>
-                  </button>
-                </div>
-
                 <div className="space-y-1">
                   <h2 className="text-2xl sm:text-[25px] font-extrabold text-[#18212B] tracking-tight">
-                    {mode === "signup" ? T.titleSignUp : T.titleSignIn}
+                    {T.titleSignIn}
                   </h2>
                   <p className="text-xs text-gray-500">
-                    {mode === "signup" ? T.subtitleSignUp : T.subtitleSignIn}
+                    {T.subtitleSignIn}
                   </p>
                 </div>
 
-                {/* PG Owner Name (Optional) - SHOWN ONLY ON SIGNUP! */}
-                {mode === "signup" && (
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
-                        <User className="h-3.5 w-3.5 text-[#008080]" />
-                        <span>{T.nameLabel}</span>
-                      </label>
-                      <span className="text-[10px] text-gray-500 font-medium bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
-                        {T.nameOptional}
-                      </span>
-                    </div>
-                    <div className="flex rounded-lg border border-gray-300 bg-white overflow-hidden focus-within:border-[#008080] focus-within:ring-2 focus-within:ring-[#CCE6E6] h-11 sm:h-12 transition-all">
-                      <input
-                        value={pgOwnerName}
-                        onChange={(e) => setPgOwnerName(e.target.value)}
-                        onKeyDown={handlePhoneKeyDown}
-                        placeholder={T.namePlaceholder}
-                        autoComplete="name"
-                        className="flex-1 h-full px-3 text-sm font-semibold text-gray-900 placeholder:text-gray-400 outline-none"
-                      />
-                    </div>
-                    <p className="text-[10.5px] sm:text-[11px] text-gray-400">
-                      {T.nameHint}
-                    </p>
-                  </div>
-                )}
                 {/* Mobile Input Section */}
                 <div className="space-y-1">
                   <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider block">
@@ -778,36 +841,6 @@ export default function Login({ initialMode }: { initialMode?: AuthMode } = {}) 
                   </div>
                 </div>
 
-                {/* Switch Mode Prompt Link */}
-                <div className="text-center pt-0.5 text-xs text-gray-500">
-                  {mode === "signin" ? (
-                    <p>
-                      {T.promptToSignUp}{" "}
-                      <button
-                        type="button"
-                        onClick={() => setMode("signup")}
-                        className="font-bold text-[#008080] hover:underline cursor-pointer"
-                      >
-                        {T.actionSignUp}
-                      </button>
-                    </p>
-                  ) : (
-                    <p>
-                      {T.promptToSignIn}{" "}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMode("signin");
-                          setPgOwnerName("");
-                        }}
-                        className="font-bold text-[#008080] hover:underline cursor-pointer"
-                      >
-                        {T.actionSignIn}
-                      </button>
-                    </p>
-                  )}
-                </div>
-
                 {/* Security Note */}
                 <div className="flex items-center justify-center gap-1.5 text-[10.5px] sm:text-[11px] text-gray-400 pt-0.5">
                   <Lock className="h-3 w-3 text-gray-400 shrink-0" />
@@ -839,14 +872,6 @@ export default function Login({ initialMode }: { initialMode?: AuthMode } = {}) 
                       <Pencil className="h-3 w-3" /> {T.editNumber}
                     </button>
                   </div>
-                  {mode === "signup" && pgOwnerName.trim() ? (
-                    <div className="pt-0.5">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#E6F8F0] border border-[#B4E5C5] text-[11px] font-medium text-[#0E7A4A]">
-                        <User className="h-3 w-3" />
-                        <span>{T.signingUpAs}: <strong>{pgOwnerName.trim()}</strong></span>
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
 
                 {/* 4-Slot OTP Inputs */}
