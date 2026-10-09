@@ -1680,6 +1680,139 @@ export async function getDashboardKpis() {
   });
 }
 
+export interface MonthlyKpisResponse {
+  period: {
+    month: number;
+    year: number;
+    monthName: string;
+    daysInMonth: number;
+  };
+  propertyId: string | null;
+  propertyName: string;
+  headlineNumbers: {
+    collected: {
+      value: number;
+      formatted: string;
+      label: string;
+      formula: string;
+    };
+    pendingThisMonth: {
+      value: number;
+      formatted: string;
+      label: string;
+      formula: string;
+    };
+    collectionPercentage: {
+      value: number;
+      formatted: string;
+      label: string;
+      formula: string;
+    };
+    totalOutstanding: {
+      value: number;
+      formatted: string;
+      activeTenantsAmount: number;
+      exitedTenantsAmount: number;
+      label: string;
+      formula: string;
+    };
+    occupancy: {
+      totalBeds: number;
+      occupiedBeds: number;
+      vacantBeds: number;
+      occupancyPct: number;
+      formattedPct: string;
+      label: string;
+      formula: string;
+    };
+    underNotice: {
+      count: number;
+      label: string;
+      formula: string;
+    };
+    openComplaints: {
+      count: number;
+      open: number;
+      inProgress: number;
+      label: string;
+      formula: string;
+    };
+    depositsHeld: {
+      value: number;
+      formatted: string;
+      label: string;
+      formula: string;
+    };
+    moveIns: {
+      count: number;
+      label: string;
+      formula?: string;
+    };
+    moveOuts: {
+      count: number;
+      label: string;
+      formula?: string;
+    };
+  };
+  actionItems: Array<{
+    id: string;
+    title: string;
+    count: number;
+    tone: "danger" | "warning" | "info";
+    to: string;
+  }>;
+  proAnalytics: {
+    overdueAgeing: {
+      zeroTo15: { count: number; amount: number };
+      sixteenTo30: { count: number; amount: number };
+      thirtyOneTo60: { count: number; amount: number };
+      sixtyPlus: { count: number; amount: number };
+    };
+    defaultersCount: number;
+    revenueLostToVacancy: {
+      amount: number;
+      formatted: string;
+      vacantBeds: number;
+      formula: string;
+    };
+    paymentModeSplit: {
+      upi: number;
+      cash: number;
+      bankTransfer: number;
+      gateway: number;
+    };
+    collectionsByType: {
+      rent: number;
+      electricity: number;
+      deposit: number;
+      other: number;
+    };
+    trends: {
+      collectionTrend: Array<{ month: string; collected: number; paymentCount: number }>;
+      occupancyTrend: Array<{ month: string; occupancyPct: number; occupiedBeds: number; totalBeds: number }>;
+    };
+  };
+}
+
+export async function getMonthlyOwnerKpis(
+  propertyId?: string | null,
+  month?: number,
+  year?: number,
+) {
+  const query = new URLSearchParams();
+  if (propertyId) query.set("propertyId", propertyId);
+  if (month) query.set("month", String(month));
+  if (year) query.set("year", String(year));
+  const queryString = query.toString() ? `?${query.toString()}` : "";
+  return httpRequest<MonthlyKpisResponse>(
+    `${PROPERTY_OWNER_BASE}/kpis/monthly${queryString}`,
+    {
+      method: "GET",
+      auth: true,
+    },
+  );
+}
+
 // ─── KYC ───────────────────────────────────────────────────────────────────
 
 export async function getKycApplications() {

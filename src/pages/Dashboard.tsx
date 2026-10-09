@@ -24,6 +24,7 @@ import { AttentionList } from "@/components/dashboard/AttentionList";
 import { OccupancyCard } from "@/components/dashboard/OccupancyCard";
 import { PendingRentCard } from "@/components/dashboard/PendingRentCard";
 import { RoomGrid } from "@/components/dashboard/RoomGrid";
+import { MonthlyKpiDashboard } from "@/components/dashboard/MonthlyKpiDashboard";
 import { cn } from "@/lib/utils";
 
 const Dashboard = () => {
@@ -181,65 +182,11 @@ const Dashboard = () => {
           </div>
         ) : (
           <>
-            {/* Overview Operational Metrics */}
-            <section aria-label="Key operational metrics" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-              <MetricDisplay
-                label={`Collected (${shortMonthName})`}
-                value={rent.collectedThisMonth != null ? formatInr(rent.collectedThisMonth) : "—"}
-                subText={rent.paidCount != null ? `${rent.paidCount} tenant${rent.paidCount === 1 ? "" : "s"} paid` : "This month"}
-                tone="success"
-                loading={loading.rent}
-                to="/rent-payments"
-              />
-              <MetricDisplay
-                label={`Pending (${shortMonthName})`}
-                value={rent.pendingAmount != null ? formatInr(rent.pendingAmount) : rent.unpaidCount != null ? rent.unpaidCount : "—"}
-                subText={rent.unpaidCount != null ? `${rent.unpaidCount} tenant${rent.unpaidCount === 1 ? "" : "s"} pending` : "This month"}
-                tone={(rent.unpaidCount ?? 0) > 0 ? "warning" : "default"}
-                loading={loading.rent}
-                to="/rent-payments/dues"
-              />
-              <MetricDisplay
-                label="Overdue rent"
-                value={(rent.unpaidCount ?? 0) > 0 ? `${rent.unpaidCount}` : "0"}
-                subText={(rent.unpaidCount ?? 0) > 0 ? "Needs immediate reminder" : "None overdue"}
-                tone={(rent.unpaidCount ?? 0) > 0 ? "danger" : "default"}
-                loading={loading.rent}
-                to="/rent-payments/dues"
-              />
-              <MetricDisplay
-                label="Occupied beds"
-                value={loading.rooms ? "" : `${beds.occupiedBeds}/${beds.totalBeds}`}
-                subText={loading.rooms ? undefined : `${beds.occupancyPct}% occupancy`}
-                loading={loading.rooms}
-                to="/my-pgs/structure"
-              />
-              <MetricDisplay
-                label="Vacant beds"
-                value={beds.vacantBeds}
-                subText={beds.vacantBeds > 0 ? "Ready for check-in" : "Fully occupied"}
-                loading={loading.rooms}
-                to="/tenants/vacant-rooms"
-              />
-              <MetricDisplay
-                label="Open complaints"
-                value={complaints.open}
-                subText={complaints.inProgress > 0 ? `${complaints.inProgress} in progress` : `${complaints.total} total`}
-                tone={complaints.open > 0 ? "danger" : "default"}
-                loading={loading.complaints}
-                to="/complaints"
-              />
-            </section>
-
-            {/* Attention + occupancy */}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-              <div className="lg:col-span-7">
-                <AttentionList data={data} />
-              </div>
-              <div className="lg:col-span-5">
-                <OccupancyCard data={data} />
-              </div>
-            </div>
+            {/* Month-Wise Comprehensive Operational & Pro KPIs (PG-OWNER-KPIS.md) */}
+            <MonthlyKpiDashboard
+              propertyId={selectedPgId}
+              propertyName={selectedPg?.name}
+            />
 
             {/* Pending Rent Quick Collection */}
             <PendingRentCard data={data} />

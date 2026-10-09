@@ -14,6 +14,8 @@ import {
   getComplaintsByProperty,
   getDashboardDetails,
   getDashboardKpis,
+  getMonthlyOwnerKpis,
+  type MonthlyKpisResponse,
   getDesignations,
   getDiningSchedule,
   getFloors,
@@ -661,6 +663,18 @@ export function useDashboardKpis() {
   return useQuery({
     queryKey: ["dashboard-kpis"],
     queryFn: getDashboardKpis,
+  });
+}
+
+export function useMonthlyOwnerKpis(
+  propertyId?: string | null,
+  month?: number,
+  year?: number,
+) {
+  return useQuery({
+    queryKey: ["monthly-owner-kpis", propertyId ?? "all", month, year],
+    queryFn: () => getMonthlyOwnerKpis(propertyId, month, year),
+    staleTime: 60 * 1000,
   });
 }
 

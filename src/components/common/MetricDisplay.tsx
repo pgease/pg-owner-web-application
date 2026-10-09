@@ -1,5 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export interface MetricDisplayProps {
@@ -7,6 +9,8 @@ export interface MetricDisplayProps {
   value: React.ReactNode;
   subText?: React.ReactNode;
   hint?: React.ReactNode;
+  formula?: string;
+  badge?: React.ReactNode;
   to?: string;
   tone?: "default" | "success" | "warning" | "danger" | "neutral" | "error" | "info";
   loading?: boolean;
@@ -28,6 +32,8 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
   value,
   subText,
   hint,
+  formula,
+  badge,
   to,
   tone = "default",
   loading = false,
@@ -37,14 +43,38 @@ export const MetricDisplay: React.FC<MetricDisplayProps> = ({
   const content = (
     <div
       className={cn(
-        "register-card flex flex-col justify-between p-4 transition-colors",
+        "register-card flex flex-col justify-between p-4 transition-colors relative group",
         to && "hover:border-[#008080] hover:bg-[#F6F7F8] cursor-pointer",
         className,
       )}
     >
-      <span className="whitespace-normal text-[12px] leading-[16px] font-medium text-[#6B7785]">
-        {label}
-      </span>
+      <div className="flex items-center justify-between gap-1">
+        <span className="whitespace-normal text-[12px] leading-[16px] font-medium text-[#6B7785]">
+          {label}
+        </span>
+        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+          {badge}
+          {formula ? (
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="text-[#9AA4B2] hover:text-[#008080] transition-colors p-0.5 rounded focus:outline-none"
+                    aria-label={`Formula for ${label}`}
+                  >
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs text-xs font-normal">
+                  <p className="font-semibold text-slate-800 dark:text-slate-100 mb-0.5">Calculation Formula</p>
+                  <p className="text-slate-600 dark:text-slate-300">{formula}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : null}
+        </div>
+      </div>
 
       <div className="mt-2 flex items-baseline gap-2">
         {loading ? (
