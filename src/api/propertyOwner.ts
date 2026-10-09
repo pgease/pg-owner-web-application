@@ -1868,6 +1868,8 @@ export async function postManualRentCollection(propertyId: string, payload: Manu
   });
 }
 
+export const recordManualRentCollection = postManualRentCollection;
+
 /** Row shape may include extra fields from the API; camelCase or snake_case accepted in helpers. */
 export interface RentDashboardTenantRow {
   roomTenantId?: string;
@@ -3144,13 +3146,22 @@ export async function getPublicListing(propertyId: string) {
   return res as PublicListingDetails;
 }
 
-export async function updatePublicListing(propertyId: string, payload: PublicListingDetails) {
+export async function updatePublicListing(propertyId: string, payload: any) {
+  const isPublished = payload.isPublishedListing ?? payload.isPublished ?? true;
+  const details = payload.publicListingDetails ? payload.publicListingDetails : payload;
+  const { propertyName, contactNumber, website, address, isPublishedListing, isPublished: _isPub, ...cleanDetails } = details;
+
+  const body = {
+    isPublishedListing: Boolean(isPublished),
+    publicListingDetails: cleanDetails,
+  };
+
   return httpRequest<{ success?: boolean; data?: unknown; message?: string }>(
     `${PROPERTY_OWNER_BASE}/properties/${propertyId}/public-listing`,
     {
       method: "PUT",
       auth: true,
-      body: payload,
+      body,
     }
   );
 }
@@ -3633,6 +3644,169 @@ export async function getAccountDeleteRequest(): Promise<AccountDeleteRequestRes
     method: "GET",
     auth: true,
   });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TENANT DUES MANAGEMENT APIS (Flat/Custom & Metered Electricity Dues)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type DueCategory =
+  | 'electricity'
+  | 'maintenance'
+  | 'fine'
+  | 'wifi'
+  | 'food'
+  | 'damage'
+  | 'other';
+
+export interface CreateFlatDuePayload {
+  category?: DueCategory;
+  dueType?: string;
+  title?: string;
+  amount: number;
+  description?: string;
+  dueDate?: string; // YYYY-MM-DD
+}
+
+export interface CreateMeteredElectricityDuePayload {
+  category: 'electricity';
+  dueType?: 'electricity';
+  title?: string;
+  initialReading: number;
+  finalReading: number;
+  ratePerUnit?: number;
+  initialReadingDate?: string;
+  finalReadingDate?: string;
+  description?: string;
+}
+
+export type CreateTenantDueDto =
+  | CreateFlatDuePayload
+  | CreateMeteredElectricityDuePayload;
+
+export interface ItemizedDue {
+  id: string;
+  type: 'rent' | 'electricity' | 'security_deposit' | 'joining_fee' | 'other';
+  title: string;
+  amount: number;
+  formattedAmount: string;
+  dueDate: string | null;
+  isOverdue: boolean;
+  daysOverdue: number;
+  status: 'paid' | 'unpaid' | 'waived';
+  canPayOnline: boolean;
+}
+
+export interface TenantDuesSummary {
+  monthlyRent: number;
+  currentMonthRentDue: number;
+  currentMonthRentPaid: number;
+  pastRentArrears: number;
+  totalRentDue: number;
+  securityDepositTotal: number;
+  isSecurityDepositPaid: boolean;
+  securityDepositDue: number;
+  totalElectricityDue: number;
+  miscellaneousDue: number;
+  totalOtherDues: number;
+  totalOpeningBalanceDue: number;
+  totalLateFee: number;
+  grandTotalOutstanding: number;
+  currency: string;
+  formattedGrandTotal: string;
+}
+
+export interface TenantAllDuesResponse {
+  success: boolean;
+  data: {
+    summary: TenantDuesSummary;
+    itemizedDues: ItemizedDue[];
+    paymentDetails?: {
+      upiId?: string;
+      upiQrString?: string;
+      paymentLink?: string;
+    };
+    whatsappReminder?: {
+      message: string;
+      whatsappUrl: string;
+    };
+  };
+}
+
+/**
+ * Fetch all dues & itemized breakdown for a tenant (or room-tenant stay).
+ * Accepts roomTenantId or tenantId as parameter.
+ */
+export async function getTenantAllDues(
+  tenantIdOrRoomTenantId: string,
+  propertyId?: string | null,
+  periodMonth?: number,
+  periodYear?: number
+): Promise<TenantAllDuesResponse> {
+  const query = new URLSearchParams();
+  if (periodMonth) query.append("periodMonth", String(periodMonth));
+  if (periodYear) query.append("periodYear", String(periodYear));
+  const qs = query.toString();
+
+  if (propertyId) {
+    try {
+      return await httpRequest<TenantAllDuesResponse>(
+        `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${tenantIdOrRoomTenantId}/dues${qs ? `?${qs}` : ""}`,
+        { method: "GET", auth: true }
+      );
+    } catch (_) {}
+  }
+
+  return httpRequest<TenantAllDuesResponse>(
+    `${PROPERTY_OWNER_BASE}/tenants/${tenantIdOrRoomTenantId}/dues${qs ? `?${qs}` : ""}`,
+    { method: "GET", auth: true }
+  );
+}
+
+/**
+ * Add a new custom/flat or metered electricity due for a tenant.
+ */
+export async function createTenantDue(
+  tenantIdOrRoomTenantId: string,
+  payload: CreateTenantDueDto,
+  propertyId?: string | null
+): Promise<any> {
+  if (propertyId) {
+    try {
+      return await httpRequest<any>(
+        `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${tenantIdOrRoomTenantId}/dues`,
+        { method: "POST", auth: true, body: payload }
+      );
+    } catch (_) {}
+  }
+
+  return httpRequest<any>(
+    `${PROPERTY_OWNER_BASE}/tenants/${tenantIdOrRoomTenantId}/dues`,
+    { method: "POST", auth: true, body: payload }
+  );
+}
+
+/**
+ * Delete a due by its dueId for a tenant.
+ */
+export async function deleteTenantDue(
+  tenantIdOrRoomTenantId: string,
+  dueId: string,
+  propertyId?: string | null
+): Promise<any> {
+  if (propertyId) {
+    try {
+      return await httpRequest<any>(
+        `${PROPERTY_OWNER_BASE}/properties/${propertyId}/room-tenants/${tenantIdOrRoomTenantId}/dues/${dueId}`,
+        { method: "DELETE", auth: true }
+      );
+    } catch (_) {}
+  }
+
+  return httpRequest<any>(
+    `${PROPERTY_OWNER_BASE}/tenants/${tenantIdOrRoomTenantId}/dues/${dueId}`,
+    { method: "DELETE", auth: true }
+  );
 }
 
 

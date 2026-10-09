@@ -53,13 +53,13 @@ export const MonthlyKpiDashboard: React.FC<MonthlyKpiDashboardProps> = ({
   const [hisaabModalOpen, setHisaabModalOpen] = useState(false);
 
   const now = new Date();
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
+  const [selectedMonth, setSelectedMonth] = useState<number>(now.getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState<number>(now.getFullYear());
 
   const { data: kpiData, isLoading, isError, refetch } = useMonthlyOwnerKpis(
     propertyId,
-    currentMonth,
-    currentYear,
+    selectedMonth,
+    selectedYear,
   );
 
   const headline = kpiData?.headlineNumbers;
@@ -67,20 +67,52 @@ export const MonthlyKpiDashboard: React.FC<MonthlyKpiDashboardProps> = ({
   const pro = kpiData?.proAnalytics;
   const period = kpiData?.period;
 
+  const MONTH_NAMES = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+  const YEARS = [2024, 2025, 2026, 2027];
+
   return (
     <div className="space-y-6">
       {/* ─── Top Bar: Month Context & PG ka Hisaab CTA ───────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-[#E2E6EA] dark:border-slate-800 rounded-lg p-3 sm:px-4 shadow-sm">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Calendar className="h-4 w-4 text-[#008080]" />
           <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-            {period ? `${period.monthName} ${period.year}` : "Current Month"} Snapshot
+            KPI Snapshot:
           </span>
-          <span className="text-xs text-slate-500">
+          
+          {/* Month & Year Selectors */}
+          <div className="flex items-center gap-1.5">
+            <select
+              aria-label="Select KPI Month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(Number(e.target.value))}
+              className="h-8 px-2 py-1 text-xs font-semibold rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#008080]"
+            >
+              {MONTH_NAMES.map((m, idx) => (
+                <option key={m} value={idx + 1}>{m}</option>
+              ))}
+            </select>
+
+            <select
+              aria-label="Select KPI Year"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="h-8 px-2 py-1 text-xs font-semibold rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#008080]"
+            >
+              {YEARS.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+
+          <span className="text-xs text-slate-500 hidden sm:inline">
             ({period?.daysInMonth ?? 31} days)
           </span>
           {headline && (headline.moveIns.count > 0 || headline.moveOuts.count > 0) && (
-            <Badge variant="outline" className="ml-2 text-[11px] font-normal border-slate-200">
+            <Badge variant="outline" className="text-[11px] font-normal border-slate-200">
               {headline.moveIns.count} Move-ins · {headline.moveOuts.count} Move-outs
             </Badge>
           )}

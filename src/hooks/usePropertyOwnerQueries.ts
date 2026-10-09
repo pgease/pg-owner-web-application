@@ -29,6 +29,10 @@ import {
   type RentCollectionHistoryParams,
   type RentCollectionHistoryResponse,
   type RentCollectionHistoryItem,
+  getTenantAllDues,
+  createTenantDue,
+  deleteTenantDue,
+  type CreateTenantDueDto,
   getPropertyTenantById,
   getPropertyTenants,
   getRooms,
@@ -1371,6 +1375,56 @@ export function useCreateAccountDeleteRequestMutation() {
     mutationFn: (reason?: string) => createAccountDeleteRequest(reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["accountDeleteRequest"] });
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TENANT DUES MANAGEMENT HOOKS
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function useTenantAllDuesQuery(
+  tenantIdOrRoomTenantId?: string | null,
+  propertyId?: string | null,
+  periodMonth?: number,
+  periodYear?: number
+) {
+  return useQuery({
+    queryKey: ["tenant-all-dues", tenantIdOrRoomTenantId, propertyId, periodMonth, periodYear],
+    queryFn: () => getTenantAllDues(tenantIdOrRoomTenantId!, propertyId, periodMonth, periodYear),
+    enabled: Boolean(tenantIdOrRoomTenantId),
+    staleTime: 15_000,
+  });
+}
+
+export function useCreateTenantDueMutation(
+  tenantIdOrRoomTenantId?: string | null,
+  propertyId?: string | null
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateTenantDueDto) =>
+      createTenantDue(tenantIdOrRoomTenantId!, payload, propertyId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tenant-all-dues"] });
+      queryClient.invalidateQueries({ queryKey: ["rent-collection-dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["propertyTenants"] });
+    },
+  });
+}
+
+export function useDeleteTenantDueMutation(
+  tenantIdOrRoomTenantId?: string | null,
+  propertyId?: string | null
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (dueId: string) =>
+      deleteTenantDue(tenantIdOrRoomTenantId!, dueId, propertyId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tenant-all-dues"] });
+      queryClient.invalidateQueries({ queryKey: ["rent-collection-dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["propertyTenants"] });
     },
   });
 }

@@ -13,7 +13,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export interface Column<T> {
-  key: string;
+  key?: string;
+  id?: string;
   header: React.ReactNode;
   align?: "left" | "right" | "center";
   width?: string;
@@ -40,6 +41,9 @@ export interface DataTableProps<T> {
   onSort?: (columnKey: string) => void;
   compact?: boolean;
   className?: string;
+  loading?: boolean;
+  density?: string;
+  emptyState?: React.ReactNode;
 }
 
 export function DataTable<T>({
@@ -61,7 +65,11 @@ export function DataTable<T>({
   onSort,
   compact = false,
   className,
+  loading,
+  density,
+  emptyState,
 }: DataTableProps<T>) {
+  const actualLoading = Boolean(loading || isLoading);
   const hasCheckbox = Boolean(onSelectRow);
   const allSelected =
     hasCheckbox && data.length > 0 && selectedIds && data.every((row, i) => selectedIds.has(keyExtractor(row, i)));
@@ -101,17 +109,18 @@ export function DataTable<T>({
                 />
               </TableHead>
             ) : null}
-            {columns.map((col) => {
-              const isSorted = sortColumn === col.key;
+            {columns.map((col, cIdx) => {
+              const colKey = col.key || col.id || `col-${cIdx}`;
+              const isSorted = sortColumn === colKey;
               return (
                 <TableHead
-                  key={col.key}
+                  key={colKey}
                   style={col.width ? { width: col.width } : undefined}
                   className={cn(
                     col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left",
                     col.sortable && "cursor-pointer hover:text-[#18212B]",
                   )}
-                  onClick={() => col.sortable && onSort?.(col.key)}
+                  onClick={() => col.sortable && onSort?.(colKey)}
                 >
                   <div
                     className={cn(
@@ -139,7 +148,7 @@ export function DataTable<T>({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading ? (
+          {actualLoading ? (
             Array.from({ length: 5 }).map((_, rIdx) => (
               <TableRow key={`skeleton-row-${rIdx}`} className="hover:bg-transparent">
                 {hasCheckbox ? (
@@ -147,8 +156,8 @@ export function DataTable<T>({
                     <div className="h-4 w-4 rounded-[3px] bg-[#EEF1F3] animate-pulse" />
                   </TableCell>
                 ) : null}
-                {columns.map((col) => (
-                  <TableCell key={`skeleton-cell-${col.key}`} compact={compact}>
+                {columns.map((col, cIdx) => (
+                  <TableCell key={`skeleton-cell-${col.key || col.id || cIdx}`} compact={compact}>
                     <div className="h-4 w-3/4 rounded-[4px] bg-[#EEF1F3] animate-pulse" />
                   </TableCell>
                 ))}
@@ -160,16 +169,18 @@ export function DataTable<T>({
                 colSpan={columns.length + (hasCheckbox ? 1 : 0)}
                 className="py-12 text-center"
               >
-                <div className="flex flex-col items-center justify-center">
-                  <p className="text-sm font-medium text-[#18212B]">{emptyTitle}</p>
-                  <p className="mt-1 text-xs text-[#6B7785]">{emptyDescription}</p>
-                  {emptyAction ? <div className="mt-3">{emptyAction}</div> : null}
-                </div>
+                {emptyState || (
+                  <div className="flex flex-col items-center justify-center">
+                    <p className="text-sm font-medium text-[#18212B]">{emptyTitle}</p>
+                    <p className="mt-1 text-xs text-[#6B7785]">{emptyDescription}</p>
+                    {emptyAction ? <div className="mt-3">{emptyAction}</div> : null}
+                  </div>
+                )}
               </TableCell>
             </TableRow>
           ) : (
             data.map((row, index) => {
-              const id = keyExtractor(row, index);
+              const id = keyExtractor(row, index) || `row-${index}`;
               const isSelected = selectedIds?.has(id);
               return (
                 <TableRow
@@ -196,11 +207,12 @@ export function DataTable<T>({
                       />
                     </TableCell>
                   ) : null}
-                  {columns.map((col) => {
-                    const content = col.render ? col.render(row, index) : (row as any)[col.key];
+                  {columns.map((col, cIdx) => {
+                    const colKey = col.key || col.id || `cell-${cIdx}`;
+                    const content = col.render ? col.render(row, index) : (row as any)[colKey];
                     return (
                       <TableCell
-                        key={col.key}
+                        key={colKey}
                         compact={compact}
                         className={cn(
                           col.align === "right" && "text-right tabular-nums",

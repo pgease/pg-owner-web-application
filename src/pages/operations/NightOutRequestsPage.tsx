@@ -107,6 +107,8 @@ export default function NightOutRequestsPage() {
   const [returnTime, setReturnTime] = useState("");
   const [reason, setReason] = useState("");
   const [destinationAddress, setDestinationAddress] = useState("");
+  const [contactDuringStay, setContactDuringStay] = useState("");
+  const [parentConsentConfirmed, setParentConsentConfirmed] = useState(false);
 
   const { data: tenantsData = [] } = usePropertyTenants(selectedPgId);
   const tenantsList = asList(tenantsData);
@@ -147,6 +149,8 @@ export default function NightOutRequestsPage() {
         returnDate: returnAt.toISOString(),
         reason: reason.trim() || undefined,
         destinationAddress: destinationAddress.trim() || undefined,
+        contactDuringStay: contactDuringStay.trim() || undefined,
+        parentConsentConfirmed: parentConsentConfirmed,
       });
     },
     onSuccess: () => {
@@ -159,6 +163,8 @@ export default function NightOutRequestsPage() {
       setReturnTime("");
       setReason("");
       setDestinationAddress("");
+      setContactDuringStay("");
+      setParentConsentConfirmed(false);
       queryClient.invalidateQueries({ queryKey: ["nightOutRequests", selectedPgId] });
     },
     onError: () => {
@@ -272,39 +278,105 @@ export default function NightOutRequestsPage() {
                   }
                 />
               ) : (
-                <ul className="divide-y divide-[var(--gray-200)]">
+                <ul className="divide-y divide-border">
                   {visible.map((req: any, idx: number) => {
                     const status = requestStatus(req);
                     const leave = req.leaveDate || req.fromDate;
                     const leaveDate = leave ? new Date(leave) : null;
                     const dayNum = leaveDate && !Number.isNaN(leaveDate.getTime()) ? leaveDate.getDate() : "—";
                     const month = leaveDate && !Number.isNaN(leaveDate.getTime()) ? leaveDate.toLocaleDateString("en-IN", { month: "short" }) : "";
+                    const tenantPhone = req.tenant?.phone || req.phone;
+
                     return (
-                      <li key={req.id || req._id || idx} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center">
-                        <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-md bg-[var(--gray-50)] text-[var(--gray-900)]">
-                          <span className="text-lg font-semibold leading-none tabular-nums">{dayNum}</span>
-                          <span className="mt-0.5 text-[10px] uppercase tracking-wide text-[var(--gray-500)]">{month}</span>
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-semibold text-[var(--gray-900)]">{tenantName(req)}</p>
-                            <span className="text-xs text-[var(--gray-500)]">{roomLabel(req)}</span>
-                            <StatusBadge status={status} tone={status === "pending" ? "warning" : undefined} size="sm" />
+                      <li key={req.id || req._id || idx} className="p-4 sm:p-5 hover:bg-slate-50/60 dark:hover:bg-slate-900/40 transition-colors">
+                        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                          {/* Left section with Date avatar & main info */}
+                          <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                            {/* Date badge */}
+                            <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 shadow-2xs">
+                              <span className="text-xl font-bold leading-none tabular-nums">{dayNum}</span>
+                              <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{month}</span>
+                            </div>
+
+                            {/* Main Details */}
+                            <div className="min-w-0 flex-1 space-y-2">
+                              {/* Header: Name, Phone, Room */}
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-base font-bold text-slate-900 dark:text-slate-100">{tenantName(req)}</p>
+                                {tenantPhone && (
+                                  <span className="text-xs text-slate-500 font-mono">({tenantPhone})</span>
+                                )}
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-xs font-medium text-slate-600 dark:text-slate-300">
+                                  {roomLabel(req)}
+                                </span>
+                                <div className="md:hidden">
+                                  <StatusBadge status={status} tone={status === "pending" ? "warning" : undefined} size="sm" />
+                                </div>
+                              </div>
+
+                              {/* Timings & Destination */}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600 dark:text-slate-300">
+                                <div className="flex items-center gap-1.5 font-medium bg-slate-50 dark:bg-slate-900/80 px-2.5 py-1.5 rounded-md border border-slate-200/60 dark:border-slate-800">
+                                  <Clock className="h-3.5 w-3.5 text-brand-600 shrink-0" />
+                                  <span>{formatWhen(leave)} → {formatWhen(req.returnDate || req.toDate)}</span>
+                                </div>
+                                {(req.destinationAddress || req.destination) && (
+                                  <div className="flex items-center gap-1.5 bg-amber-50/60 dark:bg-amber-950/30 px-2.5 py-1.5 rounded-md border border-amber-200/60 dark:border-amber-900/40 text-amber-900 dark:text-amber-200">
+                                    <MapPin className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                                    <span className="truncate">Destination: <strong>{req.destinationAddress || req.destination}</strong></span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Reason Box */}
+                              <div className="rounded-md bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-2.5 text-xs text-slate-800 dark:text-slate-200">
+                                <span className="font-semibold text-slate-900 dark:text-slate-100">Reason: </span>
+                                {req.reason || req.purpose || "No reason specified"}
+                              </div>
+
+                              {/* Contact & Parent Consent row */}
+                              <div className="flex flex-wrap items-center gap-2 pt-0.5 text-xs">
+                                {req.contactDuringStay && (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-blue-50 text-blue-800 dark:bg-blue-950/40 dark:text-blue-200 border border-blue-200 dark:border-blue-900/60 font-medium">
+                                    <span>📞 Stay Contact:</span> <strong>{req.contactDuringStay}</strong>
+                                  </span>
+                                )}
+                                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold ${
+                                  req.parentConsentConfirmed 
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900" 
+                                    : "bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
+                                }`}>
+                                  {req.parentConsentConfirmed ? "✓ Parent Consent Confirmed" : "Parent Consent Pending"}
+                                </span>
+                              </div>
+
+                              {/* Owner Remarks if present */}
+                              {req.ownerRemarks && (
+                                <div className="rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 p-2.5 text-xs text-amber-900 dark:text-amber-200">
+                                  <span className="font-bold">Owner Remarks: </span>
+                                  {req.ownerRemarks}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <p className="mt-1 text-sm text-[var(--gray-700)]">{req.reason || req.purpose || "No reason given"}</p>
-                          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--gray-500)]">
-                            <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" aria-hidden /> {formatWhen(leave)} → {formatWhen(req.returnDate || req.toDate)}</span>
-                            {req.destinationAddress || req.destination ? (
-                              <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" aria-hidden /> {req.destinationAddress || req.destination}</span>
+
+                          {/* Right side: Status Badge + Actions column */}
+                          <div className="flex flex-row md:flex-col items-end justify-between md:justify-start gap-3 shrink-0">
+                            <div className="hidden md:block">
+                              <StatusBadge status={status} tone={status === "pending" ? "warning" : undefined} size="sm" />
+                            </div>
+                            {status === "pending" ? (
+                              <div className="flex items-center gap-2 w-full sm:w-auto">
+                                <Button size="sm" className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium" onClick={() => { setSelectedRequest(req); setActionType("approved"); setRemarks(""); }}>
+                                  Approve
+                                </Button>
+                                <Button size="sm" variant="outline" className="h-8 px-3 text-xs border-rose-300 text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 font-medium" onClick={() => { setSelectedRequest(req); setActionType("rejected"); setRemarks(""); }}>
+                                  Reject
+                                </Button>
+                              </div>
                             ) : null}
-                          </p>
-                        </div>
-                        {status === "pending" ? (
-                          <div className="flex shrink-0 gap-2 sm:flex-col">
-                            <Button size="sm" onClick={() => { setSelectedRequest(req); setActionType("approved"); setRemarks(""); }}>Approve</Button>
-                            <Button size="sm" variant="outline" onClick={() => { setSelectedRequest(req); setActionType("rejected"); setRemarks(""); }}>Reject</Button>
                           </div>
-                        ) : null}
+                        </div>
                       </li>
                     );
                   })}
@@ -395,8 +467,24 @@ export default function NightOutRequestsPage() {
                 <Input id="nightout-destination" value={destinationAddress} onChange={(e) => setDestinationAddress(e.target.value)} placeholder="Address or area" />
               </div>
               <div className="space-y-1.5">
+                <Label htmlFor="nightout-contact">Contact number during stay</Label>
+                <Input id="nightout-contact" value={contactDuringStay} onChange={(e) => setContactDuringStay(e.target.value)} placeholder="e.g. 9876543210" />
+              </div>
+              <div className="space-y-1.5">
                 <Label htmlFor="nightout-reason">Reason</Label>
                 <Textarea id="nightout-reason" value={reason} onChange={(e) => setReason(e.target.value)} rows={2} placeholder="Why they need to stay out" />
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="nightout-parent-consent"
+                  checked={parentConsentConfirmed}
+                  onChange={(e) => setParentConsentConfirmed(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500 cursor-pointer"
+                />
+                <Label htmlFor="nightout-parent-consent" className="cursor-pointer text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Parent / Guardian Consent Confirmed
+                </Label>
               </div>
             </div>
             <DialogFooter>

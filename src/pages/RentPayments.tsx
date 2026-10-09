@@ -350,10 +350,8 @@ export const RentPayments = () => {
 
   // Unified Register Rows
   const registerRows = useMemo(() => {
-    if (!dashboard) return [];
-
-    const paidList = dashboard.paidTenants || [];
-    const unpaidList = dashboard.unpaidTenants || [];
+    const paidList = dashboard?.paidTenants || (dashboard as any)?.data?.paidTenants || [];
+    const unpaidList = dashboard?.unpaidTenants || (dashboard as any)?.data?.unpaidTenants || [];
 
     const combined: Array<{
       id: string;
@@ -372,14 +370,14 @@ export const RentPayments = () => {
     }> = [];
 
     // Paid tenants
-    paidList.forEach((item, idx) => {
+    paidList.forEach((item: any, idx: number) => {
       const parsed = parseRentTenantRow(item);
       const row = item as any;
       const amtPaid = Number(row.amountPaid) || Number(row.rentAmount) || amountFromRow(item) || 0;
       const rent = Number(row.monthlyRent) || amtPaid;
       const room = String(item.roomNumber ?? item.room_number ?? "—");
-      const name = parsed?.label || item.tenantName || item.name || `Tenant #${idx + 1}`;
-      const phone = String(item.phone || item.mobile || "");
+      const name = item.tenantName || item.name || item.tenant_name || (parsed?.label ? parsed.label.split(" · ")[0] : `Tenant #${idx + 1}`);
+      const phone = String(item.phone || item.mobile || item.tenantPhone || item.tenant_phone || "");
 
       combined.push({
         id: `paid-${item.id || idx}`,
@@ -399,23 +397,24 @@ export const RentPayments = () => {
     });
 
     // Unpaid tenants
-    unpaidList.forEach((item, idx) => {
+    unpaidList.forEach((item: any, idx: number) => {
       const parsed = parseRentTenantRow(item);
       const row = item as any;
-      const dueAmt = Number(row.amountOutstanding) || Number(row.amountDue) || Number(row.rentAmount) || amountFromRow(item) || 0;
-
-      // P0 Bug 6: Exclude ₹0 tenants from Pending
-      if (dueAmt <= 0) return;
-
+      const rawRent = Number(row.monthlyRent) || Number(row.rentAmount) || Number(row.rent) || 0;
       const amtPaid = Number(row.amountPaid) || 0;
-      const rent = dueAmt + amtPaid;
+      const dueAmt = Number(row.amountOutstanding) ?? Number(row.amountDue) ?? (rawRent > amtPaid ? rawRent - amtPaid : amountFromRow(item) ?? 0);
+      const effectiveDue = dueAmt > 0 ? dueAmt : Math.max(0, rawRent - amtPaid);
+
+      const rent = rawRent > 0 ? rawRent : (effectiveDue + amtPaid);
       const room = String(item.roomNumber ?? item.room_number ?? "—");
-      const name = parsed?.label || item.tenantName || item.name || `Tenant #${idx + 1}`;
-      const phone = String(item.phone || item.mobile || "");
+      const name = item.tenantName || item.name || item.tenant_name || (parsed?.label ? parsed.label.split(" · ")[0] : `Tenant #${idx + 1}`);
+      const phone = String(item.phone || item.mobile || item.tenantPhone || item.tenant_phone || "");
+
+      const tId = parsed?.tenantId || item.tenantId || String(item.id || idx);
 
       // Check if UTR verification is pending for this tenant
       const hasPendingVerification = verifications.some(
-        (v) => (v.tenantId === parsed?.tenantId || v.tenantName.toLowerCase() === name.toLowerCase()) && v.status === "pending"
+        (v) => (v.tenantId === tId || v.tenantName.toLowerCase() === name.toLowerCase()) && v.status === "pending"
       );
 
       const dueDayRaw = row.rentDueDate ?? row.dueDay ?? row.rent_due_date ?? 5;
@@ -426,7 +425,7 @@ export const RentPayments = () => {
       let st: "paid" | "partial" | "pending" | "overdue" | "verification_pending" = "pending";
       if (hasPendingVerification) {
         st = "verification_pending";
-      } else if (amtPaid > 0 && dueAmt > 0) {
+      } else if (amtPaid > 0 && effectiveDue > 0) {
         st = "partial";
       } else if (overdueDays > 0) {
         st = "overdue";
@@ -434,14 +433,14 @@ export const RentPayments = () => {
 
       combined.push({
         id: `unpaid-${item.id || idx}`,
-        tenantId: parsed?.tenantId || item.tenantId || String(item.id || idx),
+        tenantId: tId,
         roomTenantId: parsed?.roomTenantId || item.roomTenantId || String(item.id || idx),
         tenantName: name,
         phone,
         roomNumber: room,
         monthlyRent: rent,
         amountPaid: amtPaid,
-        amountDue: dueAmt,
+        amountDue: effectiveDue,
         status: st,
         dueDate: `${String(dueDay).padStart(2, "0")} ${MONTH_NAMES[month - 1].slice(0, 3)} ${year}`,
         overdueDays,
@@ -449,8 +448,49 @@ export const RentPayments = () => {
       });
     });
 
+    // Fallback: Merge active property tenants if missing from dashboard
+    if (tenantsQuery.data && Array.isArray(tenantsQuery.data)) {
+      const existingTenantIds = new Set(combined.map((c) => c.tenantId));
+      tenantsQuery.data.forEach((t: any, idx: number) => {
+        const tId = t.id || t.tenantId;
+        if (!tId || existingTenantIds.has(tId)) return;
+
+        const rent = Number(t.monthlyRent || t.roomTenant?.monthlyRent || t.rent || 0);
+        const name = t.name || t.tenantName || `Tenant #${idx + 1}`;
+        const phone = String(t.phone || t.mobile || t.tenantPhone || "");
+        const room = String(t.roomNumber || t.room_number || t.room?.roomNumber || "—");
+        const roomTenantId = t.roomTenant?.id || t.roomTenantId || tId;
+
+        const dueDayRaw = t.rentDueDate ?? t.dueDay ?? 5;
+        const dueDay = Number(dueDayRaw) || 5;
+        const dueDateObj = new Date(year, month - 1, dueDay);
+        const overdueDays = Math.max(0, Math.floor((Date.now() - dueDateObj.getTime()) / 86400000));
+
+        let st: "paid" | "partial" | "pending" | "overdue" | "verification_pending" = "pending";
+        if (overdueDays > 0) {
+          st = "overdue";
+        }
+
+        combined.push({
+          id: `property-tenant-${tId}`,
+          tenantId: tId,
+          roomTenantId,
+          tenantName: name,
+          phone,
+          roomNumber: room,
+          monthlyRent: rent,
+          amountPaid: 0,
+          amountDue: rent,
+          status: st,
+          dueDate: `${String(dueDay).padStart(2, "0")} ${MONTH_NAMES[month - 1].slice(0, 3)} ${year}`,
+          overdueDays,
+          raw: t,
+        });
+      });
+    }
+
     return combined;
-  }, [dashboard, month, year, verifications]);
+  }, [dashboard, tenantsQuery.data, month, year, verifications]);
 
   // Counts by status
   const counts = useMemo(() => {
@@ -461,11 +501,20 @@ export const RentPayments = () => {
     let verification = 0;
 
     for (const r of registerRows) {
-      if (r.status === "paid") paid++;
-      else if (r.status === "partial") partial++;
-      else if (r.status === "verification_pending") verification++;
-      else if (r.status === "overdue") overdue++;
-      else pending++;
+      if (r.status === "paid") {
+        paid++;
+      } else if (r.status === "partial") {
+        partial++;
+        pending++;
+      } else if (r.status === "verification_pending") {
+        verification++;
+        pending++;
+      } else if (r.status === "overdue") {
+        overdue++;
+        pending++;
+      } else {
+        pending++;
+      }
     }
 
     return {
@@ -484,7 +533,7 @@ export const RentPayments = () => {
       // Status filter
       if (statusFilter === "paid" && r.status !== "paid") return false;
       if (statusFilter === "partial" && r.status !== "partial") return false;
-      if (statusFilter === "pending" && r.status !== "pending") return false;
+      if (statusFilter === "pending" && r.status !== "pending" && r.status !== "overdue" && r.status !== "partial" && r.status !== "verification_pending") return false;
       if (statusFilter === "overdue" && r.status !== "overdue") return false;
       if (statusFilter === "verification_pending" && r.status !== "verification_pending") return false;
 
@@ -504,7 +553,7 @@ export const RentPayments = () => {
   }, [registerRows]);
 
   const totalPending = useMemo(() => {
-    return registerRows.filter((r) => r.status === "pending" || r.status === "partial").reduce((sum, r) => sum + r.amountDue, 0);
+    return registerRows.filter((r) => r.amountDue > 0 || r.status === "pending" || r.status === "overdue" || r.status === "partial").reduce((sum, r) => sum + r.amountDue, 0);
   }, [registerRows]);
 
   const totalOverdue = useMemo(() => {

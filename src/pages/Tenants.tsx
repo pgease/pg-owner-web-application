@@ -817,7 +817,7 @@ const Tenants = () => {
             },
           ]}
           data={filteredTenants}
-          keyExtractor={(t) => t.id}
+          keyExtractor={(t, idx) => t.id || (t as any)?.roomTenantId || (t as any)?._id || `tenant-${idx}`}
           loading={tenantsQuery.isLoading}
           density={density}
           onRowClick={handleRowClick}

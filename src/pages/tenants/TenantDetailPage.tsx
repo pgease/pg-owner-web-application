@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -29,9 +29,11 @@ import {
   MessageSquare,
   UserMinus,
   Link2,
+  Share2,
 } from "lucide-react";
 import { TenantActivityLogsDrawer } from "@/components/tenants/TenantActivityLogsDrawer";
 import { SharePaymentLinkDialog } from "@/components/tenants/SharePaymentLinkDialog";
+import { AddDuesDrawer } from "@/components/tenants/AddDuesDrawer";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -43,7 +45,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatOrdinalDay, formatHumanEnum } from "@/lib/formatters";
+import { formatOrdinalDay, formatHumanEnum, formatINR } from "@/lib/formatters";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -103,6 +105,8 @@ import {
   useMoveOutTenantMutation,
   useMoveTenantMutation,
   useRoomsList,
+  useTenantAllDuesQuery,
+  useDeleteTenantDueMutation,
 } from "@/hooks/usePropertyOwnerQueries";
 import { useSubscriptionAccess } from "@/hooks/useSubscriptionAccess";
 import { TrialExpiredGateModal } from "@/components/common/TrialExpiredGateModal";
@@ -319,6 +323,15 @@ export default function TenantDetailPage() {
   const addElectricityMut = useAddElectricityDuesMutation(currentPropertyId, roomTenantId);
   const deleteElectricityMut = useDeleteElectricityDuesMutation(currentPropertyId, roomTenantId);
 
+  const tenantDuesQuery = useTenantAllDuesQuery(
+    roomTenantId || tenantId,
+    currentPropertyId
+  );
+  const deleteTenantDueMut = useDeleteTenantDueMutation(
+    roomTenantId || tenantId,
+    currentPropertyId
+  );
+
   const setNoticeMut = useSetTenantNoticeMutation(currentPropertyId);
   const clearNoticeMut = useClearTenantNoticeMutation(currentPropertyId);
   const cancelNoticeMut = useCancelTenantNoticeMutation(currentPropertyId);
@@ -470,6 +483,7 @@ export default function TenantDetailPage() {
   });
 
   const [paymentLinkOpen, setPaymentLinkOpen] = useState(false);
+  const [addDuesDrawerOpen, setAddDuesDrawerOpen] = useState(false);
 
   // Linked settlement accounts for bank assignment
   const [ownerBankAccounts, setOwnerBankAccounts] = useState<SettlementBankAccountItem[]>([]);
@@ -733,6 +747,8 @@ export default function TenantDetailPage() {
   const name = tenantDisplayName(tenant);
   const initials = tenantInitials(tenant);
   const stayStatus = tenantStayStatus(tenant);
+  const stayDuration = getStayDurationText(tenant.joiningDate, tenant.moveOutDate || (tenant as any).moveOutDate, Boolean((tenant as any).isOnNotice), tenant.expectedMoveOutDate);
+  const currentPropertyName = (tenant as any)?.propertyName || (tenant as any)?.currentStay?.propertyName || "PG Ease Property";
   const photo = (tenant as any)?.photoUrl || (tenant as any)?.imageUrl || (tenant as any)?.profilePhotoUrl;
   const statusInfo = tenantStatusDisplay(tenant);
   const rawRoomNo = tenantRoomNo(tenant);
@@ -872,16 +888,139 @@ export default function TenantDetailPage() {
   const noticeStartDate = tenant.noticeGivenAt || (tenant as any).notice?.noticeStartedAt || (tenant as any).currentStay?.notice?.noticeStartedAt || "Recently";
   const noticeVacateDate = tenant.expectedMoveOutDate || (tenant as any).notice?.vacateOn || (tenant as any).currentStay?.notice?.vacateOn || (tenant as any).currentStay?.vacateOn;
 
-  const blockName = (tenant as any)?.block?.name || (tenant as any)?.room?.block || (tenant as any)?.roomTenant?.block || "Block A";
-  const currentProperty = (propertyList || []).find((p: any) => p.id === currentPropertyId);
-  const currentPropertyName = currentProperty?.name || (tenant as any)?.property?.name || "PG Ease";
+  const duesSummary = tenantDuesQuery.data?.data?.summary;
+  const itemizedDues = tenantDuesQuery.data?.data?.itemizedDues || [];
 
-  const stayDuration = getStayDurationText(
-    form.joiningDate || tenant?.joiningDate || tenant?.moveInDate,
-    form.expectedMoveOutDate || tenant?.expectedMoveOutDate,
-    hasActiveNotice,
-    noticeVacateDate
-  );
+  const passbookRows = (() => {
+    if (itemizedDues && itemizedDues.length > 0) {
+      return itemizedDues.map((d) => ({
+        id: d.id,
+        amount: d.amount,
+        formattedAmount: d.formattedAmount || formatINR(d.amount),
+        category: d.title || d.type,
+        subtitle: d.isOverdue ? `Late by ${d.daysOverdue} days` : "On schedule",
+        dueDate: d.dueDate ? formatDateText(d.dueDate) : "—",
+        daysOverdue: d.daysOverdue,
+        isOverdue: d.isOverdue,
+        addedBy: d.type === "rent" ? "Rent Manager" : "Owner",
+        status: d.status,
+        canDelete: d.type !== "rent",
+      }));
+    }
+
+    const rows: Array<{
+      id: string;
+      amount: number;
+      formattedAmount: string;
+      category: string;
+      subtitle: string;
+      dueDate: string;
+      daysOverdue: number;
+      isOverdue: boolean;
+      addedBy: string;
+      status: string;
+      canDelete: boolean;
+    }> = [];
+
+    const rentAmt = Number(tenant?.monthlyRent || (tenant as any)?.roomTenant?.rentAmount || (tenant as any)?.rentAmount || 0);
+    const secAmt = Number(tenant?.securityDeposit || (tenant as any)?.roomTenant?.securityDeposit || 0);
+
+    const now = new Date();
+    const MONTH_NAMES_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const currMonth = MONTH_NAMES_SHORT[now.getMonth()];
+    const currYear = now.getFullYear();
+
+    if (rentAmt > 0) {
+      rows.push({
+        id: "due-rent-current",
+        amount: rentAmt,
+        formattedAmount: formatINR(rentAmt),
+        category: `${currMonth} Rent`,
+        subtitle: `Billing period: 01 ${currMonth} - ${new Date(currYear, now.getMonth() + 1, 0).getDate()} ${currMonth}`,
+        dueDate: `05 ${currMonth} ${currYear}`,
+        daysOverdue: Math.max(0, now.getDate() - 5),
+        isOverdue: now.getDate() > 5,
+        addedBy: "Rent Manager",
+        status: "unpaid",
+        canDelete: false,
+      });
+    }
+
+    if (secAmt > 0) {
+      rows.push({
+        id: "due-security-deposit",
+        amount: secAmt,
+        formattedAmount: formatINR(secAmt),
+        category: "Security Deposit",
+        subtitle: "One-time refundable security deposit",
+        dueDate: formatDateText(tenant?.joiningDate || now),
+        daysOverdue: 0,
+        isOverdue: false,
+        addedBy: "Owner",
+        status: (tenant as any)?.isSecurityDepositPaid ? "paid" : "unpaid",
+        canDelete: false,
+      });
+    }
+
+    (electricityDuesList || []).forEach((e: any, idx: number) => {
+      const amt = Number(e.totalAmount || e.amount || 0);
+      rows.push({
+        id: e.id || `elec-${idx}`,
+        amount: amt,
+        formattedAmount: formatINR(amt),
+        category: "Electricity Bill",
+        subtitle: `${e.unitsConsumed || 0} units (${e.previousReading || 0} → ${e.currentReading || 0})`,
+        dueDate: formatDateText(e.createdAt || now),
+        daysOverdue: 0,
+        isOverdue: false,
+        addedBy: "Owner",
+        status: e.status || "unpaid",
+        canDelete: true,
+      });
+    });
+
+    return rows;
+  })();
+
+  const handleDeleteDue = async (dueId: string, dueTitle: string) => {
+    if (!confirm(`Are you sure you want to delete "${dueTitle}"?`)) return;
+    try {
+      await deleteTenantDueMut.mutateAsync(dueId);
+      toast({
+        title: "Due Deleted",
+        description: `Removed "${dueTitle}" from tenant passbook.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Could not delete due",
+        description: err?.message || "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExportLedgerPDF = () => {
+    const headers = ["Amount", "Category", "Due Date", "Status", "Added By"];
+    const csvRows = [
+      headers.join(","),
+      ...passbookRows.map((r) =>
+        [
+          `"${r.amount}"`,
+          `"${r.category}"`,
+          `"${r.dueDate}"`,
+          `"${r.status}"`,
+          `"${r.addedBy}"`,
+        ].join(",")
+      ),
+    ].join("\n");
+
+    const link = document.createElement("a");
+    link.href = encodeURI("data:text/csv;charset=utf-8," + csvRows);
+    link.download = `Tenant_Passbook_${form.name || tenant?.name || "Tenant"}_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const handleCancelEditing = () => {
     if (tenant) {
@@ -1331,6 +1470,15 @@ export default function TenantDetailPage() {
                 </Button>
 
                 <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 font-semibold border-teal-600 text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-950/30"
+                  onClick={() => setAddDuesDrawerOpen(true)}
+                >
+                  <Plus className="h-4 w-4 text-teal-600" /> Add Dues
+                </Button>
+
+                <Button
                   variant="secondary"
                   size="sm"
                   className="gap-1.5"
@@ -1346,6 +1494,12 @@ export default function TenantDetailPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuItem
+                      onClick={() => setAddDuesDrawerOpen(true)}
+                      className="cursor-pointer gap-2 font-medium text-teal-700 dark:text-teal-400"
+                    >
+                      <Plus className="h-4 w-4 text-teal-600" /> Add Dues (Manual Fee)
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setPaymentLinkOpen(true)}
                       className="cursor-pointer gap-2"
@@ -1500,11 +1654,12 @@ export default function TenantDetailPage() {
 
         {/* Tabbed Sections */}
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="flex h-auto w-full justify-start gap-1 rounded-md border border-[var(--gray-200)] bg-[var(--gray-50)] p-1">
-            <TabsTrigger value="overview" className="data-[state=active]:bg-white data-[state=active]:text-[var(--brand-700)]">Overview</TabsTrigger>
-            <TabsTrigger value="electricity" className="data-[state=active]:bg-white data-[state=active]:text-[var(--brand-700)]">Electricity</TabsTrigger>
-            <TabsTrigger value="notice" className="data-[state=active]:bg-white data-[state=active]:text-[var(--brand-700)]">Notice</TabsTrigger>
-            <TabsTrigger value="agreement" className="data-[state=active]:bg-white data-[state=active]:text-[var(--brand-700)]">Agreement</TabsTrigger>
+          <TabsList className="flex h-auto w-full justify-start gap-1 rounded-md border border-[var(--gray-200)] bg-[var(--gray-50)] p-1 overflow-x-auto">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-white data-[state=active]:text-[var(--brand-700)] font-medium">Joining Form</TabsTrigger>
+            <TabsTrigger value="passbook" className="data-[state=active]:bg-white data-[state=active]:text-[var(--brand-700)] font-medium">Passbook</TabsTrigger>
+            <TabsTrigger value="electricity" className="data-[state=active]:bg-white data-[state=active]:text-[var(--brand-700)] font-medium">Electricity</TabsTrigger>
+            <TabsTrigger value="notice" className="data-[state=active]:bg-white data-[state=active]:text-[var(--brand-700)] font-medium">Notice</TabsTrigger>
+            <TabsTrigger value="agreement" className="data-[state=active]:bg-white data-[state=active]:text-[var(--brand-700)] font-medium">Agreement</TabsTrigger>
           </TabsList>
 
           {/* TAB 1: OVERVIEW */}
@@ -2919,6 +3074,13 @@ export default function TenantDetailPage() {
                 </a>
               </Button>
               <Button
+                variant="outline"
+                className="border-teal-600 text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-950/30 h-11 font-semibold gap-1.5"
+                onClick={() => setAddDuesDrawerOpen(true)}
+              >
+                <Plus className="h-4 w-4" /> Add Dues
+              </Button>
+              <Button
                 className="flex-1 bg-teal-600 hover:bg-teal-700 text-white h-11"
                 onClick={() => {
                   setPaymentForm((p) => ({
@@ -2931,6 +3093,192 @@ export default function TenantDetailPage() {
                 <IndianRupee className="h-4 w-4 mr-2" /> Collect rent
               </Button>
             </div>
+          </TabsContent>
+
+          {/* TAB 2: PASSBOOK (FINANCIAL LEDGER) */}
+          <TabsContent value="passbook" className="mt-6 space-y-6">
+            {/* Top Metric Cards Row matching RentOK Passbook layout */}
+            <div className="flex items-center gap-3 overflow-x-auto pb-2">
+              {/* PDF Ledger Export Button */}
+              <button
+                type="button"
+                onClick={handleExportLedgerPDF}
+                className="flex flex-col items-center justify-center p-3 rounded-xl border border-red-200 bg-white shadow-sm hover:bg-red-50/50 transition min-w-[110px] text-center cursor-pointer group"
+              >
+                <span className="text-xs font-black text-red-600 uppercase tracking-wider group-hover:scale-105 transition-transform">PDF</span>
+                <span className="text-[11px] font-semibold text-slate-700 mt-1">Tenant Ledger</span>
+              </button>
+
+              {/* Total Dues Card (Red Highlight) */}
+              <div className="flex flex-col p-3 rounded-xl border border-red-300 bg-red-50/60 shadow-sm min-w-[130px] text-center">
+                <span className="text-[14px] font-black text-red-600">
+                  {duesSummary?.formattedGrandTotal || formatINR(duesSummary?.grandTotalOutstanding ?? passbookRows.reduce((acc, r) => acc + r.amount, 0))}
+                </span>
+                <span className="text-[11px] font-semibold text-slate-600 mt-0.5">Total Dues</span>
+              </div>
+
+              {/* Total Collection */}
+              <div className="flex flex-col p-3 rounded-xl border border-slate-200 bg-white shadow-sm min-w-[120px] text-center">
+                <span className="text-[14px] font-black text-emerald-600">
+                  {(duesSummary as any)?.totalCollectedFormatted || formatINR((duesSummary as any)?.totalCollected || 0)}
+                </span>
+                <span className="text-[11px] font-semibold text-slate-600 mt-0.5">Total Collection</span>
+              </div>
+
+              {/* Security Deposit */}
+              <div className="flex flex-col p-3 rounded-xl border border-slate-200 bg-white shadow-sm min-w-[130px] text-center">
+                <span className="text-[14px] font-black text-blue-600">
+                  {formatINR(Number(tenant?.securityDeposit || (tenant as any)?.roomTenant?.securityDeposit || 0))}
+                </span>
+                <span className="text-[11px] font-semibold text-slate-600 mt-0.5">Security Deposit</span>
+              </div>
+
+              {/* Advance */}
+              <div className="flex flex-col p-3 rounded-xl border border-slate-200 bg-white shadow-sm min-w-[110px] text-center">
+                <span className="text-[14px] font-black text-sky-600">
+                  {formatINR(0)}
+                </span>
+                <span className="text-[11px] font-semibold text-slate-600 mt-0.5">Advance</span>
+              </div>
+
+              {/* Total Discount */}
+              <div className="flex flex-col p-3 rounded-xl border border-slate-200 bg-white shadow-sm min-w-[120px] text-center">
+                <span className="text-[14px] font-black text-amber-600">
+                  {formatINR(0)}
+                </span>
+                <span className="text-[11px] font-semibold text-slate-600 mt-0.5">Total Discount</span>
+              </div>
+
+              {/* + Add Dues Card Button */}
+              <button
+                type="button"
+                onClick={() => setAddDuesDrawerOpen(true)}
+                className="flex flex-col items-center justify-center p-3 rounded-xl border border-dashed border-teal-500 bg-teal-50/50 text-teal-700 hover:bg-teal-100/60 transition min-w-[110px] text-center cursor-pointer group"
+              >
+                <Plus className="h-4 w-4 mb-0.5 group-hover:scale-110 transition-transform" />
+                <span className="text-xs font-bold">Add Dues</span>
+              </button>
+            </div>
+
+            {/* Itemized Passbook Ledger Table */}
+            <Card className="overflow-hidden border border-slate-200 shadow-sm rounded-xl">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-slate-50/90 border-b">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="text-xs font-bold text-slate-600 uppercase py-3">Amount ↑↓</TableHead>
+                      <TableHead className="text-xs font-bold text-slate-600 uppercase py-3">Category ↑↓</TableHead>
+                      <TableHead className="text-xs font-bold text-slate-600 uppercase py-3">Due Date ↑↓</TableHead>
+                      <TableHead className="text-xs font-bold text-slate-600 uppercase py-3">Added By ↑↓</TableHead>
+                      <TableHead className="text-xs font-bold text-slate-600 uppercase text-right py-3">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {passbookRows.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-10 text-slate-500 text-sm">
+                          No active dues recorded for this tenant.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      passbookRows.map((row) => (
+                        <TableRow key={row.id} className="hover:bg-slate-50/80 transition-colors">
+                          {/* Amount in Red font */}
+                          <TableCell className="font-extrabold text-red-600 text-sm py-3.5">
+                            {row.formattedAmount}
+                          </TableCell>
+
+                          {/* Category & Details */}
+                          <TableCell className="py-3.5">
+                            <div className="font-bold text-slate-900 text-sm">{row.category}</div>
+                            {row.subtitle && (
+                              <div className="text-xs text-slate-500 mt-0.5 font-medium">{row.subtitle}</div>
+                            )}
+                          </TableCell>
+
+                          {/* Due Date & Overdue Badge */}
+                          <TableCell className="py-3.5">
+                            <div className="font-semibold text-slate-800 text-xs">{row.dueDate}</div>
+                            {row.isOverdue ? (
+                              <div className="text-[11px] font-semibold text-red-500 mt-0.5">
+                                Late by {row.daysOverdue} days
+                              </div>
+                            ) : (
+                              <div className="text-[11px] font-medium text-emerald-600 mt-0.5">On schedule</div>
+                            )}
+                          </TableCell>
+
+                          {/* Added By */}
+                          <TableCell className="text-xs text-slate-700 font-semibold py-3.5">
+                            {row.addedBy}
+                          </TableCell>
+
+                          {/* Actions */}
+                          <TableCell className="text-right py-3.5">
+                            <div className="flex items-center justify-end gap-1">
+                              {/* Payment Link / Copy */}
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded-lg"
+                                title="Share Payment Link"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(window.location.href);
+                                  toast({ title: "Link Copied", description: "Payment link copied to clipboard." });
+                                }}
+                              >
+                                <Share2 className="h-4 w-4" />
+                              </Button>
+
+                              {/* WhatsApp Reminder */}
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg"
+                                title="Send WhatsApp Reminder"
+                                onClick={() => {
+                                  const text = encodeURIComponent(`Hi ${tenant?.name || "Tenant"}, your due for ${row.category} of ${row.formattedAmount} is pending.`);
+                                  window.open(`https://wa.me/${(tenant as any)?.phone || ''}?text=${text}`, '_blank');
+                                }}
+                              >
+                                <Send className="h-4 w-4" />
+                              </Button>
+
+                              {/* Record Payment */}
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
+                                title="Record Payment"
+                                onClick={() => {
+                                  setPaymentForm((p) => ({ ...p, amountPaid: row.amount }));
+                                  setRecordPaymentOpen(true);
+                                }}
+                              >
+                                <IndianRupee className="h-4 w-4" />
+                              </Button>
+
+                              {/* Delete Due */}
+                              {row.canDelete && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
+                                  title="Delete Due"
+                                  onClick={() => handleDeleteDue(row.id, row.category)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </Card>
           </TabsContent>
 
           {/* TAB 2: ELECTRICITY DUES */}
@@ -3807,6 +4155,17 @@ export default function TenantDetailPage() {
             tenantName={tenant?.name}
             roomNumber={tenant?.roomNumber || (tenant as any)?.room_number}
             phone={tenant?.mobileNumber || tenant?.phone}
+          />
+        )}
+
+        {currentPropertyId && roomTenantId && (
+          <AddDuesDrawer
+            open={addDuesDrawerOpen}
+            onOpenChange={setAddDuesDrawerOpen}
+            propertyId={currentPropertyId}
+            roomTenantId={roomTenantId}
+            tenantName={tenant?.name}
+            monthlyRent={Number(tenant?.monthlyRent || 0)}
           />
         )}
       </div>

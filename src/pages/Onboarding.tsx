@@ -138,18 +138,55 @@ function refinePostcode(address: string, detectedPostcode: string | null): strin
 
 const NOMINATIM_UA = "PGEase-OwnerWeb/1.0 (support@pgease.in)";
 
-async function reverseGeocode(lat: number, lon: number): Promise<{ displayName: string; postcode: string | null } | null> {
+function parseAddressComponents(displayName: string, rawAddress?: Record<string, string>) {
+  const houseNo = rawAddress?.house_number || rawAddress?.building || "";
+  const road = rawAddress?.road || rawAddress?.pedestrian || "";
+  const suburb = rawAddress?.suburb || rawAddress?.neighbourhood || rawAddress?.residential || "";
+
+  let line1 = [houseNo, road].filter(Boolean).join(" ");
+  let line2 = suburb;
+
+  const cityPart = rawAddress?.city || rawAddress?.town || rawAddress?.village || rawAddress?.city_district || rawAddress?.county || "";
+  const statePart = rawAddress?.state || rawAddress?.state_district || "";
+  let postcode = rawAddress?.postcode?.match(/\d{6}/)?.[0] || extractIndianPincode(displayName) || "";
+  postcode = refinePostcode(displayName, postcode) || postcode;
+
+  if (!line1 && !line2) {
+    const parts = displayName.split(",").map((p) => p.trim()).filter(Boolean);
+    const cleaned = parts.filter((p) => !/^\d{6}$/.test(p) && p.toLowerCase() !== "india");
+    if (cleaned.length >= 3) {
+      line1 = cleaned[0] || "";
+      line2 = cleaned.slice(1, Math.max(2, cleaned.length - 2)).join(", ");
+    } else {
+      line1 = displayName;
+    }
+  }
+
+  return { addressLine1: line1, addressLine2: line2, city: cityPart, state: statePart, postcode };
+}
+
+async function reverseGeocode(lat: number, lon: number): Promise<{ displayName: string; postcode: string | null; addressLine1: string; addressLine2: string; city: string; state: string } | null> {
   const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`;
   const res = await fetch(url, { headers: { "User-Agent": NOMINATIM_UA, Accept: "application/json" } });
   if (!res.ok) return null;
   const data = (await res.json()) as {
     display_name?: string;
-    address?: { postcode?: string };
+    address?: Record<string, string>;
   };
   const displayName = data.display_name ?? "";
-  let postcode = data.address?.postcode?.match(/\d{6}/)?.[0] ?? null;
+  const rawAddr = data.address || {};
+  let postcode = rawAddr.postcode?.match(/\d{6}/)?.[0] ?? null;
   postcode = refinePostcode(displayName, postcode);
-  return { displayName, postcode };
+
+  const parsed = parseAddressComponents(displayName, rawAddr);
+  return {
+    displayName,
+    postcode: postcode || parsed.postcode,
+    addressLine1: parsed.addressLine1,
+    addressLine2: parsed.addressLine2,
+    city: parsed.city,
+    state: parsed.state,
+  };
 }
 
 async function forwardGeocodeIndia(query: string): Promise<{ lat: number; lon: number; postcode: string | null } | null> {
@@ -226,6 +263,11 @@ const Onboarding = () => {
   const [ownerName, setOwnerName] = useState(initialOwnerName);
   const [pgName, setPgName] = useState("");
   const [address, setAddress] = useState("");
+  const [addressLine1, setAddressLine1] = useState("");
+  const [addressLine2, setAddressLine2] = useState("");
+  const [city, setCity] = useState("");
+  const [stateName, setStateName] = useState("");
+  const [pincode, setPincode] = useState("");
   const [propertyTypeId, setPropertyTypeId] = useState(DEFAULT_PROPERTY_TYPE_ID);
   const [bedRange, setBedRange] = useState("");
   const [latitude, setLatitude] = useState<number | null>(null);
@@ -274,11 +316,17 @@ const Onboarding = () => {
       setLatitude(lat);
       setLongitude(lon);
       const rev = await reverseGeocode(lat, lon);
-      if (rev?.displayName) setAddress(rev.displayName);
-      if (rev?.postcode) setLocationPin(rev.postcode);
-      else {
-        const fromAddr = extractIndianPincode(address);
-        if (fromAddr) setLocationPin(fromAddr);
+      if (rev) {
+        if (rev.displayName) setAddress(rev.displayName);
+        if (rev.addressLine1) setAddressLine1(rev.addressLine1);
+        if (rev.addressLine2) setAddressLine2(rev.addressLine2);
+        if (rev.city) setCity(rev.city);
+        if (rev.state) setStateName(rev.state);
+        const pin = rev.postcode || extractIndianPincode(rev.displayName) || "";
+        if (pin) {
+          setPincode(pin);
+          setLocationPin(pin);
+        }
       }
       toast({ title: lang === "en" ? "Location applied" : "लोकेशन सेट हो गई" });
     } catch {
@@ -289,10 +337,9 @@ const Onboarding = () => {
   }, [T.locationDenied, T.locationFailed, address, lang]);
 
   const canSubmitStep2 = useMemo(() => {
-    return Boolean(ownerName.trim() && pgName.trim() && address.trim() && propertyTypeId && bedRange);
-  }, [ownerName, pgName, address, propertyTypeId, bedRange]);
-
-
+    const hasAddress = Boolean(address.trim() || (addressLine1.trim() && city.trim() && pincode.trim()));
+    return Boolean(ownerName.trim() && pgName.trim() && hasAddress && propertyTypeId && bedRange);
+  }, [ownerName, pgName, address, addressLine1, city, pincode, propertyTypeId, bedRange]);
 
   const handlePropertyContinue = async () => {
     if (!canSubmitStep2) return;
@@ -302,15 +349,16 @@ const Onboarding = () => {
       return;
     }
 
+    const fullAddress = address.trim() || [addressLine1.trim(), addressLine2.trim(), city.trim(), stateName.trim(), pincode.trim()].filter(Boolean).join(", ");
     let lat = latitude;
     let lng = longitude;
-    let pin = locationPin.trim() || extractIndianPincode(address) || "";
+    let pin = pincode.trim() || locationPin.trim() || extractIndianPincode(fullAddress) || "";
 
     try {
       setIsSubmitting(true);
 
       if (lat == null || lng == null) {
-        const geo = await forwardGeocodeIndia(address.trim());
+        const geo = await forwardGeocodeIndia(fullAddress);
         if (!geo) {
           toast({ title: T.geocodeFailed, variant: "destructive" });
           return;
@@ -330,7 +378,7 @@ const Onboarding = () => {
 
       const newPg = await createProperty({
         name: pgName.trim(),
-        address: address.trim(),
+        address: fullAddress,
         latitude: lat,
         longitude: lng,
         locationPin: pin,
@@ -511,7 +559,8 @@ const Onboarding = () => {
                     />
                   </div>
 
-                  <div className="space-y-1.5">
+                  {/* Split PG Address Inputs */}
+                  <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <Label className="text-xs text-white/60">{T.pgAddress}</Label>
                       <button
@@ -524,12 +573,45 @@ const Onboarding = () => {
                         <span>{locating ? T.locating : T.useLocation}</span>
                       </button>
                     </div>
-                    <Textarea
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      placeholder={lang === "en" ? "Door no, street, area, city, state, pincode" : "पूरा पता, पिनकोड सहित"}
-                      rows={3}
-                      className="rounded-2xl border-white/[0.08] bg-white/[0.04] text-white placeholder:text-white/25 focus-visible:ring-1 focus-visible:ring-primary/50 resize-none"
+
+                    <Input
+                      value={addressLine1}
+                      onChange={(e) => setAddressLine1(e.target.value)}
+                      placeholder={lang === "en" ? "Address Line 1 (Flat/House No, Building, Street)" : "पता पंक्ति 1 (मकान सं., बिल्डिंग, गली)"}
+                      className="h-10 text-xs rounded-xl border-white/[0.08] bg-white/[0.04] text-white placeholder:text-white/25 focus-visible:ring-1 focus-visible:ring-primary/50"
+                    />
+
+                    <Input
+                      value={addressLine2}
+                      onChange={(e) => setAddressLine2(e.target.value)}
+                      placeholder={lang === "en" ? "Address Line 2 (Area, Locality, Landmark)" : "पता पंक्ति 2 (इलाका, लैंडमार्क)"}
+                      className="h-10 text-xs rounded-xl border-white/[0.08] bg-white/[0.04] text-white placeholder:text-white/25 focus-visible:ring-1 focus-visible:ring-primary/50"
+                    />
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        placeholder={lang === "en" ? "City (e.g. Noida)" : "शहर"}
+                        className="h-10 text-xs rounded-xl border-white/[0.08] bg-white/[0.04] text-white placeholder:text-white/25 focus-visible:ring-1 focus-visible:ring-primary/50"
+                      />
+                      <Input
+                        value={stateName}
+                        onChange={(e) => setStateName(e.target.value)}
+                        placeholder={lang === "en" ? "State (e.g. UP)" : "राज्य"}
+                        className="h-10 text-xs rounded-xl border-white/[0.08] bg-white/[0.04] text-white placeholder:text-white/25 focus-visible:ring-1 focus-visible:ring-primary/50"
+                      />
+                    </div>
+
+                    <Input
+                      value={pincode}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, "").slice(0, 6);
+                        setPincode(val);
+                        setLocationPin(val);
+                      }}
+                      placeholder={lang === "en" ? "6-Digit Pincode (e.g. 201301)" : "6-अंकों का पिनकोड"}
+                      className="h-10 text-xs rounded-xl border-white/[0.08] bg-white/[0.04] text-white placeholder:text-white/25 focus-visible:ring-1 focus-visible:ring-primary/50 font-mono"
                     />
                   </div>
 
