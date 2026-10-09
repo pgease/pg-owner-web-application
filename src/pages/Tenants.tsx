@@ -259,6 +259,7 @@ const Tenants = () => {
       await setNoticeMutation.mutateAsync({
         roomTenantId,
         body: {
+          noticeGivenAt: new Date().toISOString(),
           expectedMoveOutDate: noticeMoveOutDate,
           reason: noticeReason.trim() || "Tenant served move-out notice",
         },
@@ -497,7 +498,7 @@ const Tenants = () => {
           <div className="flex flex-wrap items-center gap-2 flex-1">
             <SearchInput
               value={searchQuery}
-              onChange={setSearchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search name, phone, room…"
               className="w-full sm:w-64"
             />

@@ -2772,6 +2772,8 @@ export async function createNightOutRequest(propertyId: string, payload: {
   returnDate: string;
   reason?: string;
   destinationAddress?: string;
+  contactDuringStay?: string;
+  parentConsentConfirmed?: boolean;
 }) {
   return httpRequest<unknown>(`${PROPERTY_OWNER_BASE}/properties/${propertyId}/night-out-requests`, {
     method: "POST",

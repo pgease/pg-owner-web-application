@@ -188,7 +188,8 @@ export const RentPayments = () => {
     const text = encodeURIComponent(
       `Hi ${row.tenantName}, gentle reminder that your PG rent of ${formatINR(row.amountDue)} is pending for ${MONTH_NAMES[month - 1]} ${year}. Please pay via UPI.`
     );
-    window.open(`https://wa.me/91${row.phone.replace(/\D/g, "")}?text=${text}`, "_blank");
+    const cleanPhone = String(row.phone || "").replace(/\D/g, "");
+    window.open(`https://wa.me/91${cleanPhone}?text=${text}`, "_blank");
   };
 
   const handleSharePaymentLink = (row: RentDashboardTenantRow) => {
@@ -211,10 +212,8 @@ export const RentPayments = () => {
         propertyId: selectedPgId,
         roomTenantId: row.roomTenantId,
         tenantName: row.tenantName,
-        roomNumber: row.roomNumber,
-        phone: row.phone,
-        amount: row.amountDue,
-        monthYear: `${MONTH_NAMES[month - 1]} ${year}`,
+        roomNumber: String(row.roomNumber ?? ""),
+        phone: String(row.phone ?? ""),
       });
     }
   };
@@ -254,7 +253,7 @@ export const RentPayments = () => {
       const tenantRow = tenantsQuery.data?.find((t) => t.id === s.recordForTenantId);
       if (tenantRow) {
         setRoomTenantId(tenantRow.roomTenant?.id || tenantRow.id);
-        const rentAmt = tenantRow.monthlyRent || tenantRow.roomTenant?.monthlyRent;
+        const rentAmt = (tenantRow as any).monthlyRent || (tenantRow.roomTenant as any)?.monthlyRent || (tenantRow as any).rentAmount;
         if (rentAmt) setAmountPaid(String(rentAmt));
       }
       setManualPaymentOpen(true);
@@ -939,7 +938,7 @@ export const RentPayments = () => {
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               <SearchInput
                 value={searchQuery}
-                onChange={setSearchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search tenant, room or phone…"
                 className="w-full sm:w-72"
               />
@@ -1247,8 +1246,8 @@ export const RentPayments = () => {
                 <div className="flex-1 min-w-[240px]">
                   <SearchInput
                     value={historySearch}
-                    onChange={(val) => {
-                      setHistorySearch(val);
+                    onChange={(e) => {
+                      setHistorySearch(e.target.value);
                       setHistoryPage(1);
                     }}
                     placeholder="Search tenant name, phone, room or UTR/reference…"
